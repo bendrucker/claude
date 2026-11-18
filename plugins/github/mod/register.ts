@@ -1,5 +1,14 @@
 import type { EngineInterface, On, PluginOptions, Timer } from "claude-code";
-import { drawPane, MUTED, PANE, REFRESH } from "./pane.tsx";
+import {
+  type Origin,
+  type PrRef,
+  bashOf,
+  parsePrCommand,
+  parsePrUrl,
+  prUrlsOf,
+} from "./discover.ts";
+import { type Chip, drawFooter } from "./footer.tsx";
+import { drawPane, MUTED, PANE, REFRESH, type Seen } from "./pane.tsx";
 import {
   type Noise,
   type Promoted,
@@ -7,17 +16,20 @@ import {
   type Span,
   EXTRAS_QUERY,
   type Extras,
+  type PrView,
   VIEW_FIELDS,
   baselineOf,
   combine,
   decide,
   messageOf,
+  nameOf,
   parseExtras,
   noiseOf,
   ownedOf,
   parseView,
   snapshotOf,
   statusOf,
+  statusPartsOf,
   turnOf,
 } from "./pr.ts";
 
@@ -45,6 +57,8 @@ const LATE_MS = 3 * TICK_MS;
 const STUCK_MS = 5 * 60_000;
 // Probes miss a resolved thread and a merge queue's progress, so a full read runs this often.
 const FULL_EVERY_MS = 30 * 60_000;
+// Each tick polls at most this many PRs at once, so a long list spreads its gh calls.
+export const PARALLEL = 2;
 
 // A dropped injection is retried on later polls, up to this many attempts.
 export const MAX_ATTEMPTS = 3;
@@ -61,7 +75,15 @@ interface Undelivered {
   attempts: number;
 }
 
-interface Watch {
+/** One pull request the session watches, with its own caches, backoff and delivery. */
+interface Tracked {
+  /** `host/owner/repo#n`, which a branch slot lacks until it finds a PR. */
+  key: string | undefined;
+  /** Where a PR away from the branch is read, before its first snapshot. */
+  url: string | undefined;
+  origin: Origin;
+  /** Read through the session's checkout rather than by URL. */
+  isBranch: boolean;
   snapshot: Snapshot | undefined;
   /** The last full read, before any carry-forward, which an unchanged probe repeats. */
   last: { cwd: string; branch: string; snapshot: Snapshot } | undefined;
@@ -72,16 +94,14 @@ interface Watch {
   /** A refresh or a turn wants the next poll to skip every cache. */
   isFullDue: boolean;
   extras: { url: string; extras: Extras } | undefined;
-  me: string | undefined;
-  noise: Noise;
   undelivered: Undelivered | undefined;
   /** What was muted since the last send, which the next send logs beside it. */
   held: string[];
+  /** Sends still waiting on the engine, which hold an ended PR in place. */
+  sending: number;
   error: string | undefined;
   /** Failed polls in a row, which stretch the wait so a rate limit can reset. */
   errors: number;
-  ticker: Timer | undefined;
-  tickedAt: number | undefined;
   polledAt: number;
   due: number;
   pollingSince: number | undefined;
@@ -91,10 +111,31 @@ interface Watch {
   streak: number;
   /** Why the last poll found no PR, and on which branch. */
   none: string | undefined;
+  /** Polls that found the PR ended with nothing left to send. */
+  endedPolls: number;
+}
+
+interface Ended {
+  key: string;
+  url: string;
+  pr: number;
+  state: string;
+}
+
+interface Watch {
+  branch: Tracked;
+  others: Map<string, Tracked>;
+  /** PRs retired after they ended, which the pane lists until session end. */
+  ended: Ended[];
+  /** The login per host, to tell the viewer's own feedback apart. */
+  me: Map<string, string>;
+  noise: Noise;
+  ticker: Timer | undefined;
+  tickedAt: number | undefined;
   /** This session's turns by id, any agent's, to tell its posts from the person's. */
   turns: Map<string, Span>;
-  line: string | undefined;
-  /** How the last successful poll read the PR. */
+  /** What the footer draws, and the plain text a surface without a viewport gets. */
+  footer: { chips: Chip[]; tail: string } | undefined;
   isMutedOpen: boolean;
   generation: number;
   isStopped: boolean;
@@ -111,29 +152,132 @@ type Read =
       read: Via;
       changed: string[] | undefined;
       /** What the read caches, kept only if no newer poll overtook it. */
-      cache: Pick<Watch, "last" | "etags">;
+      cache: Pick<Tracked, "last" | "etags">;
     };
 
-function show($: EngineInterface, watch: Watch, text: string | undefined) {
-  const line = text === "" ? undefined : text;
-  if (line === watch.line) return;
-  watch.line = line;
-  $.ui.invalidate("ui.render");
+function trackedOf(origin: Origin, isBranch: boolean, ref?: PrRef): Tracked {
+  return {
+    key: ref?.key,
+    url: ref?.url,
+    origin,
+    isBranch,
+    snapshot: undefined,
+    last: undefined,
+    etags: new Map(),
+    fullAt: 0,
+    isFullDue: false,
+    extras: undefined,
+    undelivered: undefined,
+    held: [],
+    sending: 0,
+    error: undefined,
+    errors: 0,
+    polledAt: 0,
+    due: 0,
+    pollingSince: undefined,
+    polls: 0,
+    streak: 0,
+    none: undefined,
+    endedPolls: 0,
+  };
 }
+
+const entriesOf = (watch: Watch): Tracked[] => [watch.branch, ...watch.others.values()];
+
+const isLive = (watch: Watch, t: Tracked) =>
+  t === watch.branch || (t.key !== undefined && watch.others.get(t.key) === t);
+
+const keyOf = (url: string) => parsePrUrl(url)?.key ?? url;
+
+// Several PRs, or one away from the branch, need their repository named.
+const isNamedOf = (watch: Watch, t: Tracked) => !t.isBranch || watch.others.size > 0;
 
 // Any running turn, the main agent's or a subagent's, is the agent at work.
 const isBusy = (watch: Watch) => [...watch.turns.values()].some(([, end]) => end === undefined);
 
+const needsAuthorOf = (t: Tracked, lead: { text: string } | undefined) =>
+  t.snapshot?.state === "OPEN" && (lead?.text === "author" || lead?.text === "agent");
+
+// The branch PR leads, then the rest by number.
+function shownOf(watch: Watch): Tracked[] {
+  const others = [...watch.others.values()]
+    .filter((t) => t.snapshot !== undefined)
+    .toSorted((a, b) => (a.snapshot?.pr ?? 0) - (b.snapshot?.pr ?? 0));
+  return watch.branch.snapshot === undefined ? others : [watch.branch, ...others];
+}
+
+// The PR that most needs the author gets the pane's full detail.
+function seenOf(watch: Watch): Seen {
+  const busy = isBusy(watch);
+  const rank = (t: Tracked) => {
+    const lead = t.snapshot && statusPartsOf(t.snapshot, busy).lead;
+    if (needsAuthorOf(t, lead)) return 0;
+    return t.isBranch ? 1 : 2;
+  };
+  const shown = shownOf(watch).toSorted((a, b) => rank(a) - rank(b));
+  const all = entriesOf(watch);
+  return {
+    prs: shown.flatMap((t) =>
+      t.snapshot === undefined
+        ? []
+        : [{ snapshot: t.snapshot, error: t.error, isBranch: t.isBranch }],
+    ),
+    none: watch.branch.none,
+    ended: watch.ended.map((pr) => ({ url: pr.url, name: nameOf(pr.url), state: pr.state })),
+    polledAt: Math.max(...all.map((t) => t.polledAt)),
+    due: Math.min(...all.map((t) => t.due)),
+    isMutedOpen: watch.isMutedOpen,
+    isBusy: busy,
+    isPolling: all.some((t) => t.pollingSince !== undefined),
+  };
+}
+
 function render($: EngineInterface, watch: Watch) {
-  if (watch.snapshot === undefined) {
-    show($, watch, undefined);
-    return;
-  }
-  show($, watch, statusOf(watch.snapshot, isBusy(watch), watch.error !== undefined));
+  const busy = isBusy(watch);
+  const shown = shownOf(watch);
+  const chips = shown.flatMap((t): Chip[] => {
+    const s = t.snapshot;
+    if (s === undefined || t.key === undefined) return [];
+    const { lead, parts } = statusPartsOf(s, busy, t.error !== undefined);
+    const needsAuthor = needsAuthorOf(t, lead);
+    return [
+      {
+        key: t.key,
+        pr: s.pr,
+        url: s.url,
+        lead,
+        parts,
+        needsAuthor,
+        isBranch: t.isBranch,
+        isLabelled: true,
+      },
+    ];
+  });
+  const lone = shown.length === 1 && shown[0]?.isBranch === true;
+  const tail = shown
+    .map((t) => {
+      if (t.snapshot === undefined) return "";
+      const status = statusOf(t.snapshot, busy, t.error !== undefined);
+      return lone ? status : `#${t.snapshot.pr} ${status}`;
+    })
+    .join(" · ");
+  const footer = chips.length === 0 ? undefined : { chips, tail };
+  if (JSON.stringify(footer) === JSON.stringify(watch.footer)) return;
+  watch.footer = footer;
+  $.ui.invalidate("ui.render");
 }
 
 function emit($: EngineInterface, event: string, detail: Record<string, unknown>, ok = true) {
   void $.modEvents.emit({ mod: MOD, event, ok, detail });
+}
+
+function persist($: EngineInterface, watch: Watch): void {
+  const kept = entriesOf(watch).flatMap((t) =>
+    t.origin === "branch" || t.snapshot === undefined
+      ? []
+      : [{ url: t.snapshot.url, origin: t.origin }],
+  );
+  void $.state.set({ plugin: "github", key: "tracked" }, kept);
 }
 
 async function isDefaultBranch($: EngineInterface, cwd: string, branch: string): Promise<boolean> {
@@ -153,12 +297,14 @@ async function meOf(
   cwd: string,
   url: string,
 ): Promise<string | undefined> {
-  if (watch.me !== undefined) return watch.me;
-  const argv = ["gh", "api", "user", "--hostname", new URL(url).hostname, "--jq", ".login"];
+  const host = new URL(url).hostname;
+  const known = watch.me.get(host);
+  if (known !== undefined) return known;
+  const argv = ["gh", "api", "user", "--hostname", host, "--jq", ".login"];
   const user = await $.process.run(argv, { cwd, timeoutMs: 20_000 });
   const login = user.stdout.trim();
   if (user.exitCode !== 0 || login === "") return undefined;
-  watch.me = login;
+  watch.me.set(host, login);
   return login;
 }
 
@@ -166,13 +312,13 @@ async function meOf(
 // keeps the last answer for the same PR rather than failing the poll.
 async function extrasOf(
   $: EngineInterface,
-  watch: Watch,
+  t: Tracked,
   cwd: string,
   url: string,
 ): Promise<Extras | undefined> {
   try {
     const extras = await readExtras($, cwd, url);
-    watch.extras = { url, extras };
+    t.extras = { url, extras };
     return extras;
   } catch (error) {
     emit(
@@ -181,7 +327,7 @@ async function extrasOf(
       { error: error instanceof Error ? error.message : String(error) },
       false,
     );
-    return watch.extras?.url === url ? watch.extras.extras : undefined;
+    return t.extras?.url === url ? t.extras.extras : undefined;
   }
 }
 
@@ -209,16 +355,29 @@ async function isKnown($: EngineInterface, cwd: string, sha: string): Promise<bo
   return result.exitCode !== 1;
 }
 
+// Whether the checkout's origin is the PR's repository, the only one whose commits it holds.
+async function isLocalRepo($: EngineInterface, cwd: string, url: string): Promise<boolean> {
+  const remote = await $.process.run(["git", "remote", "get-url", "origin"], { cwd });
+  if (remote.exitCode !== 0) return false;
+  const repo = nameOf(url).split("#")[0]?.toLowerCase() ?? "";
+  const path = remote.stdout
+    .trim()
+    .replace(/\.git$/, "")
+    .toLowerCase();
+  return path.endsWith(`/${repo}`) || path.endsWith(`:${repo}`);
+}
+
 // A commit once present stays present, so only a new or missing head is checked again.
 async function isHeadKnownOf(
   $: EngineInterface,
-  watch: Watch,
+  t: Tracked,
   cwd: string,
-  sha: string,
+  view: PrView,
 ): Promise<boolean> {
-  const prev = watch.snapshot;
-  if (prev?.head === sha && prev.isHeadKnown) return true;
-  return isKnown($, cwd, sha);
+  const prev = t.snapshot;
+  if (prev?.head === view.headRefOid && prev.isHeadKnown) return true;
+  if (!t.isBranch && !(await isLocalRepo($, cwd, view.url))) return true;
+  return isKnown($, cwd, view.headRefOid);
 }
 
 interface Probe {
@@ -253,7 +412,7 @@ async function probe(
  */
 async function changedOf(
   $: EngineInterface,
-  watch: Watch,
+  t: Tracked,
   cwd: string,
   prev: Snapshot,
 ): Promise<{ changed: string[]; etags: Map<string, string> }> {
@@ -266,47 +425,65 @@ async function changedOf(
     ["statuses", `${repo}/commits/${prev.head}/status?per_page=100`],
   ];
   const probes = await Promise.all(
-    paths.map((entry) => probe($, cwd, hostname, entry, watch.etags.get(entry[1]))),
+    paths.map((entry) => probe($, cwd, hostname, entry, t.etags.get(entry[1]))),
   );
   const etags = new Map(probes.flatMap((p) => (p.etag === undefined ? [] : [[p.path, p.etag]])));
   return { changed: probes.filter((p) => !p.isSame).map((p) => p.name), etags };
 }
 
-async function readPr($: EngineInterface, watch: Watch, now: number): Promise<Read> {
+// A merged or closed PR keeps answering 304, so a new PR on its branch needs the
+// full read, as does a mergeability GitHub has yet to decide.
+function isProbedOf(t: Tracked, now: number, matches: (last: Snapshot) => boolean): boolean {
+  const last = t.last?.snapshot;
+  return (
+    t.snapshot !== undefined &&
+    !t.isFullDue &&
+    now - t.fullAt < FULL_EVERY_MS &&
+    last !== undefined &&
+    matches(last) &&
+    last.state === "OPEN" &&
+    last.block !== undefined
+  );
+}
+
+async function readPr($: EngineInterface, watch: Watch, t: Tracked, now: number): Promise<Read> {
   const cwd = await $.session.cwd();
-  const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
-  const branch = head.stdout.trim();
-  if (head.exitCode !== 0) return { kind: "none", reason: "no git", branch };
-  if (branch === "HEAD") return { kind: "none", reason: "detached", branch };
-  if (await isDefaultBranch($, cwd, branch)) {
-    return { kind: "none", reason: "default branch", branch };
+  let branch = "";
+  let argv: string[];
+  if (t.isBranch) {
+    const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
+    branch = head.stdout.trim();
+    if (head.exitCode !== 0) return { kind: "none", reason: "no git", branch };
+    if (branch === "HEAD") return { kind: "none", reason: "detached", branch };
+    if (await isDefaultBranch($, cwd, branch)) {
+      return { kind: "none", reason: "default branch", branch };
+    }
+    argv = ["gh", "pr", "view", "--json", VIEW_FIELDS];
+  } else {
+    const ref = parsePrUrl(t.snapshot?.url ?? t.url ?? "");
+    if (ref === undefined) throw new Error(`not a pull request: ${t.key}`);
+    argv = ["gh", "pr", "view", String(ref.pr), "-R", `${ref.host}/${ref.owner}/${ref.repo}`];
+    argv.push("--json", VIEW_FIELDS);
   }
-  // A merged or closed PR keeps answering 304, so a new PR on its branch needs the
-  // full read, as does a mergeability GitHub has yet to decide.
-  const last = watch.last;
-  const isProbed =
-    watch.snapshot !== undefined &&
-    !watch.isFullDue &&
-    now - watch.fullAt < FULL_EVERY_MS &&
-    last?.cwd === cwd &&
-    last.branch === branch &&
-    last.snapshot.state === "OPEN" &&
-    last.snapshot.block !== undefined;
-  const probed = isProbed ? await changedOf($, watch, cwd, last.snapshot) : undefined;
+  const last = t.last;
+  const isProbed = isProbedOf(t, now, (snapshot) =>
+    t.isBranch ? last?.cwd === cwd && last.branch === branch : keyOf(snapshot.url) === t.key,
+  );
+  const probed =
+    isProbed && last !== undefined ? await changedOf($, t, cwd, last.snapshot) : undefined;
   const changed = probed?.changed;
   if (probed?.changed.length === 0 && last !== undefined) {
     const cache = { last, etags: probed.etags };
     return { kind: "pr", snapshot: last.snapshot, read: "hit", changed, cache };
   }
-  const view = await $.process.run(["gh", "pr", "view", "--json", VIEW_FIELDS], {
-    cwd,
-    timeoutMs: 20_000,
-  });
+  const view = await $.process.run(argv, { cwd, timeoutMs: 20_000 });
   if (view.exitCode !== 0) {
-    if (/no pull requests found/i.test(view.stderr)) {
+    if (t.isBranch && /no pull requests found/i.test(view.stderr)) {
       return { kind: "none", reason: "no pr", branch };
     }
-    if (FOREIGN.test(view.stderr)) return { kind: "none", reason: "not github", branch };
+    if (t.isBranch && FOREIGN.test(view.stderr)) {
+      return { kind: "none", reason: "not github", branch };
+    }
     const line = view.stderr.trim().split("\n")[0] ?? "";
     throw new Error(line === "" ? `gh exited ${view.exitCode}` : line);
   }
@@ -314,12 +491,12 @@ async function readPr($: EngineInterface, watch: Watch, now: number): Promise<Re
   if (parsed === undefined) throw new Error("gh pr view returned an unexpected shape");
   const [me, isHeadKnown, extras] = await Promise.all([
     meOf($, watch, cwd, parsed.url),
-    isHeadKnownOf($, watch, cwd, parsed.headRefOid),
-    extrasOf($, watch, cwd, parsed.url),
+    isHeadKnownOf($, t, cwd, parsed),
+    extrasOf($, t, cwd, parsed.url),
   ]);
   const turns = [...watch.turns.values()];
   const snapshot = snapshotOf(parsed, { me, isHeadKnown, noise: watch.noise, turns, extras });
-  const cache = { last: { cwd, branch, snapshot }, etags: probed?.etags ?? watch.etags };
+  const cache = { last: { cwd, branch, snapshot }, etags: probed?.etags ?? t.etags };
   return { kind: "pr", snapshot, read: changed === undefined ? "full" : "miss", changed, cache };
 }
 
@@ -329,8 +506,9 @@ async function inject(
   promoted: Promoted[],
   muted: string[],
   attempt: number,
+  isNamed: boolean,
 ): Promise<boolean> {
-  const text = messageOf(snapshot, promoted);
+  const text = messageOf(snapshot, promoted, isNamed);
   const kinds = promoted.map((d) => d.kind);
   const detail = {
     pr: snapshot.pr,
@@ -389,16 +567,19 @@ function stillDue(
 async function send(
   $: EngineInterface,
   watch: Watch,
+  t: Tracked,
   next: Snapshot,
   due: Promoted[],
   muted: string[],
   attempt: number,
   isCurrent: () => boolean,
 ): Promise<void> {
-  const isSent = await inject($, next, due, muted, attempt);
+  t.sending += 1;
+  const isSent = await inject($, next, due, muted, attempt, isNamedOf(watch, t));
+  t.sending -= 1;
   if (!isCurrent() || isSent || attempt >= MAX_ATTEMPTS) return;
-  const pending = watch.undelivered;
-  watch.undelivered = {
+  const pending = t.undelivered;
+  t.undelivered = {
     head: pending?.head ?? next.head,
     decisions: pending === undefined ? due : combine(due, pending.decisions),
     attempts: Math.max(attempt, pending?.attempts ?? 0),
@@ -421,29 +602,29 @@ async function streakOf($: EngineInterface, snapshot: Snapshot): Promise<number>
   return value ?? 0;
 }
 
-function schedule($: EngineInterface, watch: Watch, streak: number, cause: string): void {
-  const was = delayOf(watch.snapshot, watch.streak);
-  const delay = delayOf(watch.snapshot, streak);
+function schedule($: EngineInterface, t: Tracked, streak: number, cause: string): void {
+  const was = delayOf(t.snapshot, t.streak);
+  const delay = delayOf(t.snapshot, streak);
   if (delay !== was) {
-    const detail = { pr: watch.snapshot?.pr, streak, delayMs: delay };
+    const detail = { pr: t.snapshot?.pr, streak, delayMs: delay };
     if (streak > 0) emit($, "poll.backoff", detail);
     else emit($, "poll.reset", { ...detail, cause, fromMs: was });
   }
-  const url = watch.snapshot?.url;
-  if (url !== undefined && streak !== watch.streak) {
+  const url = t.snapshot?.url;
+  if (url !== undefined && streak !== t.streak) {
     void $.state.set({ plugin: "github", key: "quiet", id: url }, streak);
   }
-  watch.streak = streak;
-  watch.due = watch.polledAt + delay;
+  t.streak = streak;
+  t.due = t.polledAt + delay;
 }
 
 // Logs each newly muted item, marking those already there when the PR is first seen.
-function mute($: EngineInterface, watch: Watch, prev: Snapshot | undefined, next: Snapshot) {
+function mute($: EngineInterface, t: Tracked, prev: Snapshot | undefined, next: Snapshot) {
   const seen = new Set(prev?.muted.map((m) => m.id));
   const fresh = next.muted.filter((m) => !seen.has(m.id));
   const baseline = prev === undefined ? { baseline: true } : {};
   for (const m of fresh) emit($, "muted", { pr: next.pr, head: next.head, ...baseline, ...m });
-  if (prev !== undefined) watch.held.push(...fresh.map((m) => m.id));
+  if (prev !== undefined) t.held.push(...fresh.map((m) => m.id));
 }
 
 interface Applied {
@@ -451,21 +632,28 @@ interface Applied {
   isChanged: boolean;
 }
 
-function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => boolean): Applied {
+function apply(
+  $: EngineInterface,
+  watch: Watch,
+  t: Tracked,
+  read: Read,
+  isCurrent: () => boolean,
+): Applied {
   if (read.kind === "none") {
-    const prev = watch.snapshot;
+    const prev = t.snapshot;
     const none = `${read.reason} ${read.branch}`;
-    const isChanged = prev !== undefined || none !== watch.none;
+    const isChanged = prev !== undefined || none !== t.none;
     if (isChanged) emit($, "pr.none", { reason: read.reason, branch: read.branch, from: prev?.pr });
-    show($, watch, undefined);
-    watch.none = none;
-    watch.snapshot = undefined;
-    watch.held = [];
-    watch.undelivered = undefined;
+    t.none = none;
+    t.key = undefined;
+    t.snapshot = undefined;
+    t.held = [];
+    t.undelivered = undefined;
+    render($, watch);
     return { isTracked: false, isChanged };
   }
-  watch.none = undefined;
-  const prev = watch.snapshot;
+  t.none = undefined;
+  const prev = t.snapshot;
   const isSamePr = prev !== undefined && prev.url === read.snapshot.url;
   // An undecided poll keeps the last answer, so a recompute does not re-announce a block.
   const decided = read.snapshot.block;
@@ -475,25 +663,33 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   let attempt = 1;
   let isChanged = true;
   if (!isSamePr) {
-    emit($, "pr.tracked", { pr: next.pr, head: next.head, phase: next.phase, state: next.state });
-    watch.undelivered = undefined;
-    watch.held = [];
-    mute($, watch, undefined, next);
+    t.key = keyOf(next.url);
+    emit($, "pr.tracked", {
+      pr: next.pr,
+      head: next.head,
+      phase: next.phase,
+      state: next.state,
+      origin: t.origin,
+    });
+    t.undelivered = undefined;
+    t.held = [];
+    t.endedPolls = 0;
+    mute($, t, undefined, next);
     due = baselineOf(next);
     for (const { action, ...detail } of due) {
       emit($, action, { pr: next.pr, head: next.head, baseline: true, ...detail });
     }
   } else {
-    mute($, watch, prev, next);
+    mute($, t, prev, next);
     const decisions = decide(prev, next);
     for (const { action, ...detail } of decisions) {
       emit($, action, { pr: next.pr, head: next.head, ...detail });
     }
     isChanged = decisions.length > 0 || statusOf(next) !== statusOf(prev);
     const fresh = decisions.filter((d): d is Promoted => d.action === "promote");
-    const still = stillDue(watch.undelivered, next, decided);
-    attempt = fresh.length > 0 ? 1 : (watch.undelivered?.attempts ?? 0) + 1;
-    watch.undelivered =
+    const still = stillDue(t.undelivered, next, decided);
+    attempt = fresh.length > 0 ? 1 : (t.undelivered?.attempts ?? 0) + 1;
+    t.undelivered =
       still.held.length > 0
         ? { head: next.head, decisions: still.held, attempts: attempt - 1 }
         : undefined;
@@ -503,7 +699,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   if (!isSamePr || JSON.stringify(turn) !== JSON.stringify(turnOf(prev))) {
     emit($, "review.turn", { pr: next.pr, head: next.head, ...turn });
   }
-  watch.snapshot = next;
+  t.snapshot = next;
   render($, watch);
   const { sent, withheld } = ownedOf(next, due);
   for (const { action, ...detail } of withheld) {
@@ -511,58 +707,115 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   }
   // The send waits for an idle session, so the next poll is not held on it.
   if (sent.length > 0) {
-    void send($, watch, next, sent, watch.held, attempt, isCurrent);
-    watch.held = [];
+    void send($, watch, t, next, sent, t.held, attempt, isCurrent);
+    t.held = [];
   }
   return { isTracked: !isSamePr, isChanged };
 }
 
-async function poll($: EngineInterface, watch: Watch, generation: number, now: number) {
-  const isCurrent = () => !watch.isStopped && watch.generation === generation;
-  const seq = ++watch.polls;
+// A branch slot holding a PR tracked for another reason hands it back to the
+// tracked list, and starts over empty.
+function detach(watch: Watch): Tracked {
+  const t = watch.branch;
+  if (t.key !== undefined) watch.others.set(t.key, t);
+  t.isBranch = false;
+  t.last = undefined;
+  watch.branch = trackedOf("branch", true);
+  return watch.branch;
+}
+
+/** The entry a branch read lands on, so one PR never holds two caches. */
+function homeOf($: EngineInterface, watch: Watch, read: Read): Tracked {
+  const t = watch.branch;
+  const isKept = t.snapshot !== undefined && t.origin !== "branch";
+  if (read.kind === "none") return isKept ? detach(watch) : t;
+  const key = keyOf(read.snapshot.url);
+  if (key === t.key) return t;
+  const adopted = watch.others.get(key);
+  if (isKept) detach(watch);
+  if (adopted === undefined) return watch.branch;
+  if (!isKept && t.snapshot !== undefined) {
+    emit($, "pr.untracked", { pr: t.snapshot.pr, reason: "branch" });
+  }
+  watch.others.delete(key);
+  adopted.isBranch = true;
+  // Its own poll in flight read by URL, which this read supersedes.
+  adopted.polls += 1;
+  watch.branch = adopted;
+  return adopted;
+}
+
+// An ended PR away from the branch leaves the footer a poll after its last send.
+function retire($: EngineInterface, watch: Watch, t: Tracked): void {
+  const s = t.snapshot;
+  if (t.isBranch || s === undefined || t.key === undefined || s.state === "OPEN") return;
+  t.endedPolls += 1;
+  if (t.endedPolls < 2 || t.undelivered !== undefined || t.sending > 0) return;
+  watch.others.delete(t.key);
+  watch.ended.push({ key: t.key, url: s.url, pr: s.pr, state: s.state });
+  emit($, "pr.untracked", { pr: s.pr, key: t.key, reason: "ended" });
+  persist($, watch);
+  render($, watch);
+}
+
+async function poll($: EngineInterface, watch: Watch, t: Tracked, generation: number, now: number) {
+  const seq = ++t.polls;
+  const isFresh = () =>
+    !watch.isStopped && watch.generation === generation && seq === t.polls && isLive(watch, t);
   try {
-    const read = await readPr($, watch, now);
+    const read = await readPr($, watch, t, now);
     if (read.kind === "pr") {
       const ms = (await $.clock.now()) - now;
       const detail = { pr: read.snapshot.pr, read: read.read, changed: read.changed };
       void $.modEvents.emit({ mod: MOD, event: "poll", ms, detail });
     }
     // A session.end that landed while gh ran has already cleared the status.
-    if (!isCurrent() || seq !== watch.polls) return;
-    watch.error = undefined;
-    watch.errors = 0;
+    if (!isFresh()) return;
+    const home = t.isBranch ? homeOf($, watch, read) : t;
+    const isCurrent = () =>
+      !watch.isStopped && watch.generation === generation && isLive(watch, home);
+    home.error = undefined;
+    home.errors = 0;
     if (read.kind === "pr") {
-      Object.assign(watch, read.cache);
-      if (read.read !== "hit") Object.assign(watch, { fullAt: now, isFullDue: false });
+      Object.assign(home, read.cache);
+      if (read.read !== "hit") Object.assign(home, { fullAt: now, isFullDue: false });
     }
-    const { isTracked, isChanged } = apply($, watch, read, isCurrent);
-    let streak = isChanged ? 0 : watch.streak + 1;
-    if (isTracked && watch.snapshot !== undefined) {
-      streak = await streakOf($, watch.snapshot);
-      watch.streak = streak;
+    const { isTracked, isChanged } = apply($, watch, home, read, isCurrent);
+    let streak = isChanged ? 0 : home.streak + 1;
+    if (isTracked && home.snapshot !== undefined) {
+      streak = await streakOf($, home.snapshot);
+      home.streak = streak;
     }
-    watch.polledAt = now;
-    schedule($, watch, streak, "change");
+    home.polledAt = now;
+    schedule($, home, streak, "change");
+    if (home !== t && !isLive(watch, t)) persist($, watch);
+    retire($, watch, home);
     // The pane shows the poll times, which move on every poll.
     $.ui.invalidate("ui.render");
   } catch (error) {
-    if (!isCurrent() || seq !== watch.polls) return;
+    if (!isFresh()) return;
     const message = error instanceof Error ? error.message : String(error);
-    if (message !== watch.error) emit($, "poll.error", { error: message }, false);
-    watch.error = message;
-    watch.errors += 1;
-    watch.polledAt = now;
-    watch.due = now + Math.min(POLL_MS.error * 2 ** (watch.errors - 1), BACKOFF_CAP_MS);
+    if (message !== t.error) emit($, "poll.error", { pr: t.snapshot?.pr, error: message }, false);
+    t.error = message;
+    t.errors += 1;
+    t.polledAt = now;
+    t.due = now + Math.min(POLL_MS.error * 2 ** (t.errors - 1), BACKOFF_CAP_MS);
     render($, watch);
   }
 }
 
 // pollingSince marks the poll in flight, for the stuck check and the pane.
-async function pollNow($: EngineInterface, watch: Watch, generation: number, now: number) {
-  watch.pollingSince = now;
+async function pollNow(
+  $: EngineInterface,
+  watch: Watch,
+  t: Tracked,
+  generation: number,
+  now: number,
+) {
+  t.pollingSince = now;
   $.ui.invalidate("ui.render");
-  await poll($, watch, generation, now);
-  if (watch.pollingSince === now) watch.pollingSince = undefined;
+  await poll($, watch, t, generation, now);
+  if (t.pollingSince === now) t.pollingSince = undefined;
 }
 
 async function tick($: EngineInterface, watch: Watch, generation: number): Promise<void> {
@@ -571,24 +824,33 @@ async function tick($: EngineInterface, watch: Watch, generation: number): Promi
   const gapMs = now - (watch.tickedAt ?? now);
   watch.tickedAt = now;
   if (gapMs > LATE_MS) {
-    const delayMs = watch.due - watch.polledAt;
-    emit($, "poll.late", { gapMs, delayMs, lateMs: Math.max(0, now - watch.due) });
+    const { due, polledAt } = watch.branch;
+    emit($, "poll.late", { gapMs, delayMs: due - polledAt, lateMs: Math.max(0, now - due) });
   }
-  if (watch.pollingSince !== undefined) {
-    if (now - watch.pollingSince < STUCK_MS) return;
-    emit($, "poll.stuck", { ms: now - watch.pollingSince }, false);
-  }
-  if (now < watch.due - TICK_MS / 2) return;
-  await pollNow($, watch, generation, now);
+  let inFlight = 0;
+  const ready = entriesOf(watch).filter((t) => {
+    if (t.pollingSince !== undefined) {
+      if (now - t.pollingSince < STUCK_MS) {
+        inFlight += 1;
+        return false;
+      }
+      emit($, "poll.stuck", { pr: t.snapshot?.pr, ms: now - t.pollingSince }, false);
+    }
+    return now >= t.due - TICK_MS / 2;
+  });
+  const picked = ready.toSorted((a, b) => a.due - b.due).slice(0, Math.max(0, PARALLEL - inFlight));
+  await Promise.all(picked.map((t) => pollNow($, watch, t, generation, now)));
 }
 
 // A refresh skips the probe, so it reads everything GitHub has now.
 async function refresh($: EngineInterface, watch: Watch): Promise<void> {
-  if (watch.isStopped || watch.pollingSince !== undefined) return;
+  if (watch.isStopped) return;
   const now = await $.clock.now();
-  emit($, "pane.refresh", { pr: watch.snapshot?.pr });
-  watch.isFullDue = true;
-  await pollNow($, watch, watch.generation, now);
+  const idle = entriesOf(watch).filter((t) => t.pollingSince === undefined);
+  if (idle.length === 0) return;
+  emit($, "pane.refresh", { prs: idle.flatMap((t) => (t.snapshot ? [t.snapshot.pr] : [])) });
+  for (const t of idle) t.isFullDue = true;
+  await Promise.all(idle.map((t) => pollNow($, watch, t, watch.generation, now)));
   $.ui.invalidate("ui.render");
 }
 
@@ -601,20 +863,79 @@ function start($: EngineInterface, watch: Watch): void {
   void tick($, watch, generation);
 }
 
+// A turn ends a backoff, so the next poll comes the unbacked wait after the
+// last one, which sees a push the turn just made.
+function unback($: EngineInterface, t: Tracked): void {
+  if (t.error === undefined && t.streak > 0) schedule($, t, 0, "turn");
+  // A failing watch retries at the first error wait, not its stretched one.
+  else if (t.error !== undefined) t.due = Math.min(t.due, t.polledAt + POLL_MS.error);
+}
+
 // A turn proves the session is awake, so a ticker silent past a few periods has
-// died and is started again. A turn also ends a backoff, so the next poll comes
-// the unbacked wait after the last one, which sees a push the turn just made.
+// died and is started again.
 async function wake($: EngineInterface, watch: Watch): Promise<void> {
   const now = await $.clock.now();
   if (watch.isStopped) return;
   const silentMs = now - (watch.tickedAt ?? now);
-  if (watch.error === undefined && watch.streak > 0) schedule($, watch, 0, "turn");
-  // A failing watch retries at the first error wait, not its stretched one.
-  else if (watch.error !== undefined)
-    watch.due = Math.min(watch.due, watch.polledAt + POLL_MS.error);
+  for (const t of entriesOf(watch)) unback($, t);
   if (silentMs > LATE_MS) {
-    emit($, "watch.revived", { silentMs, pr: watch.snapshot?.pr });
+    emit($, "watch.revived", { silentMs, pr: watch.branch.snapshot?.pr });
     start($, watch);
+  }
+}
+
+/** Adds a PR to the watch, or raises its reason to stay; the reply says which. */
+function track(
+  $: EngineInterface,
+  watch: Watch,
+  ref: PrRef,
+  origin: Exclude<Origin, "branch">,
+): string {
+  const name = `${ref.owner}/${ref.repo}#${ref.pr}`;
+  const existing = entriesOf(watch).find((t) => t.key === ref.key);
+  if (existing !== undefined) {
+    if (existing.origin !== "branch") return `Already tracking ${name}`;
+    existing.origin = origin;
+    persist($, watch);
+    return `Tracking ${name}, which stays after the branch moves`;
+  }
+  const t = trackedOf(origin, false, ref);
+  watch.others.set(ref.key, t);
+  emit($, "pr.tracking", { key: ref.key, origin });
+  if (!watch.isStopped) void pollNow($, watch, t, watch.generation, 0);
+  return `Tracking ${name}`;
+}
+
+function untrack(
+  $: EngineInterface,
+  watch: Watch,
+  match: (t: Tracked) => boolean,
+  label: string,
+): string {
+  const found = entriesOf(watch).filter((t) => t.key !== undefined && match(t));
+  if (found.length === 0) return `Not tracking ${label}`;
+  if (found.length > 1) return `${label} matches several PRs; pass its URL`;
+  const [t] = found;
+  if (t?.key === undefined) return `Not tracking ${label}`;
+  if (t.isBranch) {
+    t.origin = "branch";
+    persist($, watch);
+    return `${label} is this branch's PR, so it stays while the branch is checked out`;
+  }
+  watch.others.delete(t.key);
+  emit($, "pr.untracked", { pr: t.snapshot?.pr, key: t.key, reason: "command" });
+  persist($, watch);
+  render($, watch);
+  return `Stopped tracking ${label}`;
+}
+
+async function restore($: EngineInterface, watch: Watch): Promise<void> {
+  const { value = [] } = await $.state.get({ plugin: "github", key: "tracked" });
+  for (const { url, origin } of value) {
+    const ref = parsePrUrl(url);
+    if (ref !== undefined && !entriesOf(watch).some((t) => t.key === ref.key)) {
+      watch.others.set(ref.key, trackedOf(origin, false, ref));
+    }
   }
 }
 
@@ -628,10 +949,11 @@ async function hasGh($: EngineInterface): Promise<boolean> {
 }
 
 /**
- * Watches the current branch's pull request with `gh` and shows its CI and
- * review state at the end of the prompt footer. What `decide` promotes is sent
- * to the model, along with a block already present when a PR is first seen.
- * Every other change is only shown and logged.
+ * Watches the current branch's pull request, and every other PR this session
+ * opens or names with `/pr track`, with `gh`, and shows their CI and review
+ * state at the end of the prompt footer. What `decide` promotes is sent to the
+ * model, along with a block already present when a PR is first seen. Every
+ * other change is only shown and logged.
  */
 export function register(on: On, options: PluginOptions): void {
   const { noise, error: noiseError } = noiseOf(
@@ -640,29 +962,16 @@ export function register(on: On, options: PluginOptions): void {
     String(options.ignoreBody ?? ""),
   );
   const watch: Watch = {
-    snapshot: undefined,
-    last: undefined,
-    etags: new Map(),
-    fullAt: 0,
-    isFullDue: false,
-    extras: undefined,
-    me: undefined,
+    branch: trackedOf("branch", true),
+    others: new Map(),
+    ended: [],
+    me: new Map(),
     noise,
-    undelivered: undefined,
-    held: [],
-    error: undefined,
-    errors: 0,
     ticker: undefined,
     tickedAt: undefined,
-    polledAt: 0,
-    due: 0,
-    pollingSince: undefined,
-    polls: 0,
-    streak: 0,
-    none: undefined,
     turns: new Map(),
+    footer: undefined,
     isMutedOpen: false,
-    line: undefined,
     generation: 0,
     isStopped: true,
   };
@@ -687,16 +996,24 @@ export function register(on: On, options: PluginOptions): void {
     emit($, "session.start", { active: true });
     // The watch runs without the command, so a refusal only logs.
     $.command
-      .register({ name: "pr", description: "Show what the PR watcher sees" })
+      .register({
+        name: "pr",
+        description: "Show what the PR watcher sees, or track or untrack a PR",
+        argumentHint: "[track <url> | untrack <url|#n>]",
+      })
       .catch((error: unknown) => {
         emit($, "command.register", { error: String(error) }, false);
       });
     if (noiseError !== undefined) emit($, "ignoreBody.invalid", { error: noiseError }, false);
     if (watch.isStopped) {
       watch.isStopped = false;
-      watch.me = undefined;
+      watch.me.clear();
       watch.generation += 1;
-      Object.assign(watch, { tickedAt: undefined, due: 0, pollingSince: undefined, streak: 0 });
+      watch.tickedAt = undefined;
+      await restore($, watch);
+      for (const t of entriesOf(watch)) {
+        Object.assign(t, { due: 0, pollingSince: undefined, streak: 0 });
+      }
       start($, watch);
     } else {
       void wake($, watch);
@@ -704,10 +1021,14 @@ export function register(on: On, options: PluginOptions): void {
     return started;
   });
 
-  on("ui.render", { component: "PromptHint" }, ($, e, next) => {
-    if (watch.line === undefined) return next(e);
-    const tail = e.props.tail === undefined ? watch.line : `${e.props.tail} · ${watch.line}`;
-    return next({ ...e, props: { ...e.props, tail } });
+  on("ui.render", { component: "PromptHint" }, async ($, e, next) => {
+    const footer = watch.footer;
+    if (footer === undefined) return next(e);
+    if (e.viewport === undefined) {
+      const tail = e.props.tail === undefined ? footer.tail : `${e.props.tail} · ${footer.tail}`;
+      return next({ ...e, props: { ...e.props, tail } });
+    }
+    return drawFooter($, e, footer.chips, await next(e));
   });
 
   on("session.end", ($, e, next) => {
@@ -715,12 +1036,26 @@ export function register(on: On, options: PluginOptions): void {
       watch.isStopped = true;
       watch.generation += 1;
       watch.ticker?.cancel();
-      show($, watch, undefined);
+      watch.footer = undefined;
+      $.ui.invalidate("ui.render");
     }
     return next(e);
   });
 
-  on("command.run", { command: "pr" }, async ($) => {
+  on("command.run", { command: "pr" }, async ($, e) => {
+    const command = parsePrCommand(e.args);
+    if (command.kind === "invalid") return { text: `/pr: ${command.reason}` };
+    if (command.kind === "track") return { text: track($, watch, command.ref, "manual") };
+    if (command.kind === "untrack") {
+      if ("ref" in command) {
+        const { ref } = command;
+        return {
+          text: untrack($, watch, (t) => t.key === ref.key, `${ref.owner}/${ref.repo}#${ref.pr}`),
+        };
+      }
+      const { pr } = command;
+      return { text: untrack($, watch, (t) => t.snapshot?.pr === pr, `#${pr}`) };
+    }
     // A second /pr closes it: the close mark and its chord do not reach every terminal.
     if ((await $.ui.panes()).some((pane) => pane.id === PANE)) {
       await $.ui.close({ id: PANE });
@@ -728,7 +1063,7 @@ export function register(on: On, options: PluginOptions): void {
       return {};
     }
     const opened = await $.ui.open({ id: PANE, title: "PR", closeOnEscape: true });
-    emit($, "pane.open", { placed: opened.isPlaced, pr: watch.snapshot?.pr });
+    emit($, "pane.open", { placed: opened.isPlaced, pr: watch.branch.snapshot?.pr });
     return opened.isPlaced ? {} : { text: `/pr: the pane is not drawn (${opened.reason})` };
   }).catch(($, e, next) => {
     emit($, "pane.open", { error: next.error.message }, false);
@@ -736,12 +1071,7 @@ export function register(on: On, options: PluginOptions): void {
   });
 
   on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) =>
-    drawPane(
-      $,
-      e,
-      { ...watch, isBusy: isBusy(watch), isPolling: watch.pollingSince !== undefined },
-      await $.clock.now(),
-    ),
+    drawPane($, e, seenOf(watch), await $.clock.now()),
   );
 
   on("ui.press", { plugin: "github" }, ($, e, next) => {
@@ -751,10 +1081,25 @@ export function register(on: On, options: PluginOptions): void {
     }
     if (e.element !== MUTED) return next(e);
     watch.isMutedOpen = !watch.isMutedOpen;
-    emit($, "pane.muted", { open: watch.isMutedOpen, count: watch.snapshot?.muted.length });
+    const count = seenOf(watch).prs[0]?.snapshot.muted.length;
+    emit($, "pane.muted", { open: watch.isMutedOpen, count });
     $.ui.invalidate("ui.render");
     return { element: e.element };
   });
+
+  // Not tool.call: a Bash hook there turns off moving a command to the background.
+  on("classic.PostToolUse", ($, e, next) => {
+    const bash = bashOf(e);
+    if (bash !== undefined && !watch.isStopped) {
+      const found = prUrlsOf(bash.command, bash.output);
+      for (const { ref, origin } of found) track($, watch, ref, origin);
+      if (found.length > 0) {
+        emit($, "discover", { origin: found[0]?.origin, count: found.length });
+        persist($, watch);
+      }
+    }
+    return next(e);
+  }).catch(($, e, next) => next(e));
 
   on("turn.start", async ($, e, next) => {
     // Every span is kept: a full read rescans every post, old ones included.
@@ -769,7 +1114,7 @@ export function register(on: On, options: PluginOptions): void {
     render($, watch);
     if (e.agentId === undefined) {
       // No probed resource moves when a thread is resolved, which a turn often does.
-      watch.isFullDue = true;
+      for (const t of entriesOf(watch)) t.isFullDue = true;
       void wake($, watch);
     }
     return next(e);

@@ -830,11 +830,22 @@ function quoterOf(trusted: ReadonlySet<string>): (author: string, quotes: Quote[
   };
 }
 
+/** `owner/repo#n` from a PR URL. */
+export function nameOf(url: string): string {
+  const [, owner = "", repo = "", , pr = ""] = new URL(url).pathname.split("/");
+  return `${owner}/${repo}#${pr}`;
+}
+
+// A named PR is one of several, so its commands need the repository too.
+const selectorOf = (snapshot: Snapshot, isNamed: boolean) =>
+  isNamed ? `${snapshot.pr} -R ${nameOf(snapshot.url).split("#")[0]}` : String(snapshot.pr);
+
 function paragraphOf(
   snapshot: Snapshot,
   decision: Exclude<Promoted, { kind: "feedback" }>,
+  isNamed: boolean,
 ): string {
-  const pr = `PR #${snapshot.pr}`;
+  const pr = isNamed ? nameOf(snapshot.url) : `PR #${snapshot.pr}`;
   const base = snapshot.base === "" ? "its base branch" : `\`${snapshot.base}\``;
   switch (decision.kind) {
     case "pr.merged":
@@ -867,35 +878,36 @@ function paragraphOf(
     case "ci.failed":
       return [
         `CI failed on ${pr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
-        `Read the failure with \`gh pr checks ${snapshot.pr}\` and \`gh run view <run> --log-failed\`.`,
+        `Read the failure with \`gh pr checks ${selectorOf(snapshot, isNamed)}\` and \`gh run view <run> --log-failed\`.`,
       ].join("\n");
     default:
       return decision satisfies never;
   }
 }
 
-export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
+export function messageOf(snapshot: Snapshot, promoted: Promoted[], isNamed = false): string {
   const paragraphs: string[] = [];
   const feedback: string[] = [];
   const quote = quoterOf(new Set(snapshot.trusted));
   for (const decision of promoted) {
     if (decision.kind === "feedback") {
       feedback.push(
-        feedbackLineOf(`PR #${snapshot.pr}`, decision),
+        feedbackLineOf(isNamed ? nameOf(snapshot.url) : `PR #${snapshot.pr}`, decision),
         ...quote(decision.author, decision.quotes),
       );
-    } else paragraphs.push(paragraphOf(snapshot, decision));
+    } else paragraphs.push(paragraphOf(snapshot, decision, isNamed));
   }
   if (feedback.length > 0) {
     paragraphs.push(
       [
         ...feedback,
         snapshot.url,
-        `Read it with \`gh pr view ${snapshot.pr} --comments\`.`,
+        `Read it with \`gh pr view ${selectorOf(snapshot, isNamed)} --comments\`.`,
         ...(feedback.some((line) => line.startsWith(">")) ? [QUOTED] : []),
       ].join("\n"),
     );
   }
+  if (isNamed && !paragraphs.some((p) => p.includes(snapshot.url))) paragraphs.push(snapshot.url);
   if (snapshot.state === "OPEN") {
     paragraphs.push(
       "The github plugin watches this PR's checks, reviews, comments, and mergeability, so polling them is unnecessary.",
@@ -946,7 +958,7 @@ export const SEP = "  ";
 // The lead is padded to its longest word, so the glyphs after it hold still as it changes.
 const LEAD_WIDTH = "merging".length;
 
-/** A theme color the pane draws a status part in; the footer tail is dim text only. */
+/** A theme color the footer and pane draw a status part in. */
 export type Tone = "success" | "error" | "warning" | "merged" | "suggestion" | "claude" | "subtle";
 
 export interface Part {
@@ -1019,7 +1031,7 @@ export function statusPartsOf(snapshot: Snapshot, isBusy = false, isStale = fals
   return { lead: LEADS[ballOf(snapshot)](isBusy), parts };
 }
 
-// The footer already links the PR, so the state rides after it on that line.
+// The plain footer text, for a surface that reports no viewport.
 export function statusOf(snapshot: Snapshot, isBusy = false, isStale = false): string {
   const { lead, parts } = statusPartsOf(snapshot, isBusy, isStale);
   const details = parts.map((part) => part.text).join(SEP);

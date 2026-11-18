@@ -60,6 +60,8 @@ interface World {
   extras?: Record<string, unknown>;
   /** The extras query fails, as a GraphQL rate limit makes it. */
   isExtrasFailing?: boolean;
+  /** Each PR read by number, keyed by what follows `gh pr view`, such as `9 -R github.com/o/r`. */
+  byNumber?: Record<string, unknown>;
 }
 
 // GitHub types the review app's login as a bot.
@@ -118,6 +120,7 @@ function worldOf(on: On, world: World) {
   });
   on("session.end", ($, e) => ({ sessionId: e.sessionId }));
   on("session.cwd", () => ({ value: "/work" }));
+  on("classic.PostToolUse", () => ({}));
   on("ui.render", { component: "PromptHint" }, ($, e) => {
     tails.push(e.props.tail);
     return $.ui.resolve(e).Text({ children: e.props.hint });
@@ -219,8 +222,12 @@ function worldOf(on: On, world: World) {
     }
     views.push(argv);
     if (world.slowMs !== undefined) await clock.sleep(world.slowMs);
-    const stdout = typeof world.view === "string" ? "" : JSON.stringify(world.view);
-    const stderr = typeof world.view === "string" ? world.view : "";
+    const selector = argv.includes(" -R ")
+      ? argv.slice("gh pr view ".length).split(" --json")[0]
+      : undefined;
+    const view = selector === undefined ? world.view : world.byNumber?.[selector];
+    const stdout = typeof view === "string" ? "" : JSON.stringify(view);
+    const stderr = typeof view === "string" ? view : "";
     return {
       value: {
         exitCode: stderr === "" ? 0 : 1,
@@ -249,6 +256,24 @@ const HINT = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
 
 const GH_OK = { exitCode: 0, stdout: "gh version 2.80.0\n", stderr: "" };
 
+const runOf = (args: string) => ({
+  command: "pr",
+  args,
+  origin: { kind: "composer" as const },
+  presentation: { isFullscreen: false, columns: 120 },
+});
+
+const URL_9 = "https://github.com/o/r/pull/9";
+const VIEW_9 = "9 -R github.com/o/r";
+
+const other = (conclusion: string, fields: Record<string, unknown> = {}) => ({
+  ...pr(conclusion),
+  number: 9,
+  url: URL_9,
+  headRefOid: "ddddddd4444",
+  ...fields,
+});
+
 describe("register", () => {
   test("a new failure wakes the model once; the baseline and green stay quiet", async ($, on) => {
     const world: World = { branch: "topic", gh: GH_OK, view: pr("") };
@@ -261,6 +286,7 @@ describe("register", () => {
       head: "aaaaaaa1111",
       phase: "pending",
       state: "OPEN",
+      origin: "branch",
     });
     expect(await w.shown($)).toBe("ci      │ \u{f444} 0/1");
 
@@ -1296,5 +1322,224 @@ describe("register", () => {
     expect(w.named("poll.late")).toEqual([]);
     await w.clock.advance(POLL_MS.pending);
     expect(w.views.length).toBe(3);
+  });
+
+  describe("several PRs", () => {
+    test("two PRs poll on their own schedules", async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        gh: GH_OK,
+        view: pr(""),
+        byNumber: { [VIEW_9]: other("SUCCESS") },
+      };
+      const w = worldOf(on, world);
+
+      await $.session.start(START);
+      await w.clock.settle();
+      expect((await $.command.run(runOf(`track ${URL_9}`))).text).toBe("Tracking o/r#9");
+      await w.clock.settle();
+      const reads = () => ({
+        branch: w.views.filter((v) => !v.includes(" -R ")).length,
+        other: w.views.filter((v) => v.includes(VIEW_9)).length,
+      });
+      expect(reads()).toEqual({ branch: 1, other: 1 });
+
+      await w.clock.advance(POLL_MS.settled);
+      expect(reads()).toEqual({ branch: 4, other: 2 });
+      expect(w.named("pr.tracked").map((e) => e.detail?.origin)).toEqual(["branch", "manual"]);
+      expect(await w.shown($)).toBe("#7 ci      │ \u{f444} 0/1 · #9 author  │ \u{f49e}");
+    });
+
+    test("a failure on a PR away from the branch names it", async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        gh: GH_OK,
+        view: pr("SUCCESS"),
+        byNumber: { [VIEW_9]: other("") },
+      };
+      const w = worldOf(on, world);
+
+      await $.session.start(START);
+      await w.clock.settle();
+      await $.command.run(runOf(`track ${URL_9}`));
+      await w.clock.settle();
+      world.byNumber = { [VIEW_9]: other("FAILURE") };
+      await w.clock.advance(POLL_MS.pending);
+
+      expect(w.submits).toHaveLength(1);
+      expect(w.submits[0]).toContain("CI failed on o/r#9 at ddddddd: ci / test.");
+      expect(w.submits[0]).toContain("`gh pr checks 9 -R o/r`");
+      expect(w.submits[0]).toContain(URL_9);
+    });
+
+    test("a tracked PR the branch moves onto shares one entry", async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        gh: GH_OK,
+        view: pr("SUCCESS"),
+        byNumber: { [VIEW_9]: other("SUCCESS"), "7 -R github.com/o/r": pr("SUCCESS") },
+      };
+      const w = worldOf(on, world);
+
+      await $.session.start(START);
+      await w.clock.settle();
+      expect((await $.command.run(runOf("track https://github.com/o/r/pull/7"))).text).toBe(
+        "Tracking o/r#7, which stays after the branch moves",
+      );
+      await $.command.run(runOf(`track ${URL_9}`));
+      await w.clock.settle();
+      world.view = other("SUCCESS");
+      await w.clock.advance(POLL_MS.settled);
+      const viaRepo = w.views.filter((v) => v.includes(VIEW_9)).length;
+      await w.clock.advance(POLL_MS.settled * 2);
+
+      expect(w.views.filter((v) => v.includes(VIEW_9)).length).toBe(viaRepo);
+      expect(w.views.filter((v) => v.includes("7 -R github.com/o/r")).length).toBeGreaterThan(0);
+      expect(w.named("pr.tracked").filter((e) => e.detail?.pr === 9)).toHaveLength(1);
+      expect(w.named("pr.untracked")).toEqual([]);
+    });
+
+    test("a merged PR away from the branch is announced once, then retired", async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        gh: GH_OK,
+        view: pr("SUCCESS"),
+        byNumber: { [VIEW_9]: other("SUCCESS") },
+      };
+      const w = worldOf(on, world);
+
+      await $.session.start(START);
+      await w.clock.settle();
+      await $.command.run(runOf(`track ${URL_9}`));
+      await w.clock.settle();
+      world.byNumber = { [VIEW_9]: other("SUCCESS", { state: "MERGED" }) };
+      await w.clock.advance(POLL_MS.settled);
+      expect(w.submits).toEqual([`o/r#9 merged: ${URL_9}`]);
+      expect(await w.shown($)).toContain("#9");
+
+      await w.clock.advance(POLL_MS.closed);
+      expect(w.named("pr.untracked").map((e) => e.detail?.reason)).toEqual(["ended"]);
+      expect(await w.shown($)).toBe("author  │ \u{f49e}");
+      expect(w.submits).toHaveLength(1);
+    });
+
+    test("tracked PRs survive /clear and come back after a restart", async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        gh: GH_OK,
+        view: pr("SUCCESS"),
+        byNumber: { [VIEW_9]: other("SUCCESS") },
+      };
+      const w = worldOf(on, world);
+
+      await $.session.start(START);
+      await w.clock.settle();
+      await $.command.run(runOf(`track ${URL_9}`));
+      await w.clock.settle();
+      await $.session.end({ reason: "clear", sessionId: "s1", resume: { id: "s1" } });
+      await w.clock.advance(POLL_MS.settled);
+      expect(await w.shown($)).toContain("#9");
+
+      await $.session.end({ reason: "prompt_input_exit", sessionId: "s1", resume: { id: "s1" } });
+      const before = w.views.filter((v) => v.includes(VIEW_9)).length;
+      await $.session.start(START);
+      await w.clock.settle();
+      expect(w.views.filter((v) => v.includes(VIEW_9)).length).toBe(before + 1);
+    });
+
+    test("a PR in another repository never reads as a foreign push", async ($, on) => {
+      const VIEW_3 = "3 -R github.com/x/y";
+      const elsewhere = (head: string) => ({
+        ...pr("SUCCESS"),
+        number: 3,
+        url: "https://github.com/x/y/pull/3",
+        headRefOid: head,
+      });
+      const world: World = {
+        branch: "topic",
+        gh: GH_OK,
+        view: pr("SUCCESS"),
+        foreign: ["eeeeeee5555", "fffffff6666"],
+        byNumber: { [VIEW_3]: elsewhere("eeeeeee5555") },
+      };
+      const w = worldOf(on, world);
+
+      await $.session.start(START);
+      await w.clock.settle();
+      await $.command.run(runOf("track https://github.com/x/y/pull/3"));
+      await w.clock.settle();
+      world.byNumber = { [VIEW_3]: elsewhere("fffffff6666") };
+      await w.clock.advance(POLL_MS.settled);
+
+      expect(w.views.filter((v) => v.includes(VIEW_3)).length).toBe(2);
+      expect(w.named("promote").map((e) => e.detail?.kind)).toEqual([]);
+      expect(w.submits).toEqual([]);
+    });
+
+    test("a PR created in Bash is tracked, and untrack by number stops it", async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        gh: GH_OK,
+        view: pr("SUCCESS"),
+        byNumber: { [VIEW_9]: other("SUCCESS") },
+      };
+      const w = worldOf(on, world);
+
+      await $.session.start(START);
+      await w.clock.settle();
+      await $.classic.PostToolUse({
+        tool_name: "Bash",
+        tool_input: { command: "gh pr create --fill --head other" },
+        tool_response: { stdout: `${URL_9}\n`, stderr: "" },
+        tool_use_id: "u1",
+      });
+      await w.clock.settle();
+      expect(w.named("discover").map((e) => e.detail)).toEqual([{ origin: "created", count: 1 }]);
+      expect(w.named("pr.tracked").map((e) => e.detail?.origin)).toEqual(["branch", "created"]);
+
+      expect((await $.command.run(runOf("untrack #9"))).text).toBe("Stopped tracking #9");
+      expect(w.named("pr.untracked").map((e) => e.detail?.reason)).toEqual(["command"]);
+      expect(await w.shown($)).toBe("author  │ \u{f49e}");
+    });
+
+    test("the pane details the PR that needs the author and refreshes them all", async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        gh: GH_OK,
+        view: pr(""),
+        byNumber: { [VIEW_9]: other("FAILURE", { title: "Other change" }) },
+      };
+      const w = worldOf(on, world);
+
+      await $.session.start(START);
+      await w.clock.settle();
+      await $.command.run(runOf(`track ${URL_9}`));
+      await w.clock.settle();
+      const pane = await $.ui.mount({
+        plugin: "github",
+        surface: "terminal",
+        component: "Pane",
+        requestId: "pr",
+        props: {
+          title: "PR",
+          isFocused: true,
+          bodyColumns: 60,
+          placement: "dock",
+          scroll: { offset: 0, bodyRows: 30 },
+          view: {},
+        },
+      });
+
+      const texts = (await pane.findAll({ type: "Text" })).map((t) => t.text);
+      expect(texts.findIndex((t) => t.includes("o/r#9 Other change"))).toBe(0);
+      expect(texts.some((t) => t.includes("o/r#7"))).toBe(true);
+      expect(texts.filter((t) => t.startsWith("Checks"))).toHaveLength(1);
+
+      const views = w.views.length;
+      await pane.press({ key: "refresh" });
+      await w.clock.settle();
+      expect(w.views.length - views).toBe(2);
+      await pane.unmount();
+    });
   });
 });

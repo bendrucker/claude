@@ -22,7 +22,7 @@ import {
   spawnDetached,
   startResumer,
 } from "./resume";
-import { closedRow, closedRows } from "./rows";
+import { closedRow, closedRows, eventCounts, parkedRow } from "./rows";
 
 export interface Deps extends ResumeDeps {
   sender: () => Promise<Sender | null>;
@@ -171,6 +171,56 @@ function withdrawClose(row: ClosedRow, resumer: number | null, cause: unknown, d
     throw new CloseError(`${summary}. Kill process ${resumer} by hand before this session exits.`);
 }
 
+export interface ParkOptions {
+  session: string;
+  pr: string;
+  summary?: string;
+}
+
+export interface ParkReport {
+  pane: Pane;
+  row: ClosedRow;
+}
+
+function parkable(
+  deps: Deps,
+  action: "park" | "restore",
+): { pane: Pane; act: (target: string) => Promise<void> } {
+  const host = hostMuxer(deps);
+  const act = action === "park" ? host.parkPane : host.restorePane;
+  if (act == null)
+    throw new CloseError(
+      `${host.kind} cannot ${action} a pane. Run close --handoff to keep watching the PR in the background.`,
+      2,
+    );
+  return { pane: { mux: host.kind, target: host.ownPane() }, act };
+}
+
+export async function parkSession(options: ParkOptions, deps: Deps): Promise<ParkReport> {
+  const { pane, act } = parkable(deps, "park");
+  await act(pane.target);
+  const facts = await gitFacts(deps.run, deps.cwd);
+  const row = parkedRow(
+    facts,
+    {
+      ts: deps.now().toISOString(),
+      session: options.session,
+      fork: null,
+      pr: options.pr,
+      summary: options.summary ?? null,
+    },
+    pane,
+  );
+  appendDispatch(row, deps.dataDir);
+  return { pane, row };
+}
+
+export async function restoreSession(deps: Deps): Promise<Pane> {
+  const { pane, act } = parkable(deps, "restore");
+  await act(pane.target);
+  return pane;
+}
+
 export async function attachSession(
   fork: string,
   deps: Deps,
@@ -199,6 +249,26 @@ export function createProgram(deps: Deps): Command {
     .option("--pr <url>", "pull request the background session watches")
     .option("--summary <text>", "one to three lines on what the session did")
     .action((options) => guarded(async () => void (await closeSession(options, deps))));
+
+  const park = new Command("park")
+    .description("Minimize this session's pane while it keeps running to watch its PR.")
+    .requiredOption("--session <id>", "this session's id")
+    .requiredOption("--pr <url>", "pull request this session watches")
+    .option("--summary <text>", "one to three lines on what the session did")
+    .action((options) =>
+      guarded(async () => {
+        deps.out(JSON.stringify(await parkSession(options, deps)));
+      }),
+    );
+
+  const restore = new Command("restore")
+    .description("Show this session's parked pane again, without focusing it.")
+    .requiredOption("--session <id>", "this session's id")
+    .action(() =>
+      guarded(async () => {
+        deps.out(JSON.stringify({ pane: await restoreSession(deps) }));
+      }),
+    );
 
   const attach = new Command("attach")
     .description("Open an unfocused pane attached to a background session.")
@@ -237,17 +307,24 @@ export function createProgram(deps: Deps): Command {
     .action((options) => guarded(async () => void (await resumeSession(options, deps))));
 
   const report = new Command("report")
-    .description("Print the ledger's close rows as JSON lines.")
+    .description("Print the ledger's close, park, and end rows as JSON lines.")
     .option("--left-behind", "only branches whose latest row has dirty or unpushed work")
+    .option("--count", "print one line counting the rows per event instead")
     .action((options) => {
-      for (const row of closedRows(deps.dataDir, options.leftBehind === true))
-        deps.out(JSON.stringify(row));
+      const rows = closedRows(deps.dataDir, options.leftBehind === true);
+      if (options.count === true) {
+        deps.out(JSON.stringify(eventCounts(rows)));
+        return;
+      }
+      for (const row of rows) deps.out(JSON.stringify(row));
     });
 
   return new Command("close")
     .description("Close an agent's own pane, handing the session to the background first.")
     .enablePositionalOptions()
     .addCommand(close)
+    .addCommand(park)
+    .addCommand(restore)
     .addCommand(attach)
     .addCommand(ended)
     .addCommand(resume)

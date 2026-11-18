@@ -1,0 +1,12 @@
+allow_tools: [Bash, Read, Skill]
+stage: [packages/eval-stubs]
+graders:
+  skill-fired: "*"
+  session-arg: "*"
+  closed: ["no-pr*", "ci-green*"]
+  no-park: ["no-pr*", "ci-green*"]
+  no-handoff: "no-pr*"
+  handed-off: "ci-green*"
+  parked: [ci-pending, ci-failing-ho]
+  no-close: [ci-pending, ci-failing-ho]
+  babysat: [ci-pending, ci-failing-ho]

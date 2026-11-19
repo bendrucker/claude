@@ -200,10 +200,6 @@ Rex's `SessionStart` entry is absent from the tracked file. `rex skill setup` ad
 
 **Drop the drop-in** if dotfiles stops deploying `~/.claude-repo`, or drop the `bun install` if Claude Code starts installing in-place dependencies itself.
 
-`auto-mode@bendrucker` collects enhancements for auto mode. Its first mod records every tool call's permission verdict, the only record of asks that end in approval. Revisit the verdict mod around 2026-11-09.
-
-**Keep it** if a change has drawn on the `classifier_verdicts` view by then, such as tuning which blocks the escalation mod asks about, or a finding in a session review. **Drop it** otherwise: remove the mod, and the plugin with it if nothing else has joined, and let `mod-events` retention expire the recorded events.
-
 `prependPlugins` is empty in `managed/settings.json`. On a machine with managed settings, Claude Code seats its built-in `sec-default@builtin` outermost unless this list is set. Seated there, it skips user-tier plugin hooks like `plan` and `plannotator`, and these self-authored managed settings don't need its guard. An empty list counts as set, so it leaves sec-default unseated (verified against CLI 2.1.304). **List a plugin** here when a managed plugin should run outermost.
 
 `enabledPlugins` in `managed/settings.json` enables `herdr`, `load`, and `plan`, which hook events Claude Code passes over for plugins a user installs (the `classic.*` events and ones like `session.compact` and `prompt.attachment`) whenever managed settings are present. A plugin counts as the organization's own, and runs those hooks, only when managed settings enable it and declare its marketplace as a local directory that lists it by a relative path, which the local drop-in does (verified against CLI 2.1.327). **Move a plugin** here when `/plugin` warns that its hooks "do not run here". **Move them back** to `user/settings.json` if Claude Code stops passing over these events for user-installed plugins.

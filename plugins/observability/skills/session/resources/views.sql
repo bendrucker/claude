@@ -1104,31 +1104,6 @@ SELECT
 FROM plan_calls
 GROUP BY host, session_id;
 
--- One row per tool call the auto-mode mod recorded, from its `tool.verdict` events.
--- `duration_ms` spans the decider and the tool. `interactive` marks a tool that waits
--- on the person, whose wall time is the person's.
-CREATE OR REPLACE VIEW classifier_verdicts AS
-SELECT
-  host,
-  session_id,
-  attributes->>'tool_use_id'                              AS tool_use_id,
-  attributes->>'agent_id'                                 AS agent_id,
-  attributes->>'tool'                                     AS tool,
-  TRY_CAST(attributes->>'interactive' AS BOOLEAN)         AS interactive,
-  attributes->>'decision'                                 AS decision,
-  attributes->>'rule'                                     AS rule,
-  attributes->>'hook'                                     AS hook,
-  attributes->>'setting'                                  AS setting,
-  attributes->>'ceiling'                                  AS ceiling,
-  attributes->>'reason'                                   AS reason,
-  TRY_CAST(attributes->>'read_only' AS BOOLEAN)           AS read_only,
-  epoch_ms(TRY_CAST(attributes->>'started_at' AS BIGINT)) AS started_at,
-  TRY_CAST(attributes->>'check_ms' AS BIGINT)             AS check_ms,
-  duration_ms,
-  attributes->>'outcome'                                  AS outcome
-FROM mod_events
-WHERE event_name = 'auto-mode.tool.verdict';
-
 -- The field registry: which JSON paths each record type carries, when they were first and
 -- last written, and by which harness version. Paths stop two levels down (`$.key`, and
 -- `$.key.child` under each top-level object) plus `$.message.usage`'s children. A child that

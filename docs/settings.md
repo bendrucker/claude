@@ -192,6 +192,8 @@ Keep each command exactly as `install` writes it. `claude-sync` treats hooks mat
 
 Rex's `SessionStart` entry is absent from the tracked file. `rex skill setup` adds it to the deployed copy, as [`user/README.md`](../user/README.md#rex) describes. Rex is on trial as a second multiplexer beside herdr, which keeps sibling-agent dispatch, pane metadata, and review attention.
 
+The [rex-agent-resume](https://github.com/YangJonghun/rex-agent-resume) `SessionStart` entry records each Claude session against its Rex block in `~/.local/state/rex-agent-resume/agents/`. After a Rex server restart, the watcher dotfiles starts from Rex's `init.lua` reads those records and types `claude --resume <id>` back into each pane. The watcher discovers only the sessions already running when it starts, and this hook covers the ones started later. The matcher is the one upstream's installer writes. The command skips the script when its clone is absent, so a machine without it gets no hook error. The script itself exits early outside Rex. **Delete it** with the Rex trial below, or if the agents directory stops gaining records for new sessions.
+
 **End the trial** around 2026-12-15 by removing the skill's ignore entry, the Rex socket grant, and the `claude-sync` setup step in dotfiles, then running `rex skill remove --agent claude`, if the session index shows Rex hosting no sessions in the two weeks before. Bash calls starting `rex ` mark one. **Keep it** past that date only by moving a herdr-only integration over, since two multiplexers both used for layout but only one of them used for dispatch is not a steady state.
 
 ## Plugins

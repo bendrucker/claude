@@ -11,3 +11,4 @@ graders:
   limit-contrast-phrases: "work-*"
   limit-hidden-words: "work-*"
   limit-list-items: "work-*"
+  limit-wall-lists: "work-*"

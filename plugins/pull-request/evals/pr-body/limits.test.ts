@@ -13,6 +13,7 @@ test("passes a short body on every row", () => {
     "PR-LIMIT contrast-phrases=pass (0 of 1)",
     "PR-LIMIT hidden-words=pass (0 of 60)",
     "PR-LIMIT list-items=pass (0 of 5)",
+    "PR-LIMIT wall-lists=pass (0 of 0)",
   ]);
 });
 

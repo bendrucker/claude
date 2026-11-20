@@ -31,20 +31,13 @@ Edit only what Ben accepts. Re-read a file immediately before editing it, since 
 
 ## Gather Evidence
 
-Refresh the session index once, then compute per-file activity for the target directory:
-
-```bash
-bun /Users/ben/.claude-repo/plugins/observability/skills/session/scripts/refresh.ts
-duckdb -readonly -json -init /Users/ben/.claude-repo/plugins/observability/skills/session/resources/limits.sql \
-  -cmd "SET VARIABLE dir = '<memory-dir without trailing slash>'" \
-  ~/.local/share/claude-sessions/session.duckdb < ${CLAUDE_SKILL_DIR}/scripts/memory-activity.sql
-```
+Load the `observability:session` skill for every session-index step. Refresh the index once through it, then run `${CLAUDE_SKILL_DIR}/scripts/memory-activity.sql` with its querying conventions and `SET VARIABLE dir = '<memory-dir without trailing slash>'`.
 
 Each row gives a file's writes, last write, reads, and recalls (`relevant_memories` injections). A file with no row was written before the index's retention floor or outside any indexed session.
 
 Read `MEMORY.md` and list the memory files. Compare the index with the directory yourself. A pointer to a missing file, a file with no pointer, and a hook that contradicts its file's `description` are each a finding.
 
-Split the memory files into shards of about 12 and dispatch one `analyst` agent per shard, all in one message. Give each agent the brief in [references/checks.md](references/checks.md) verbatim, followed by its file paths, the memory directory, today's date, and its files' rows from the activity query. Each agent returns one verdict block per file. With 12 or fewer files, run the checks inline instead.
+Split the memory files into shards of about 12 and dispatch one `analyst` agent per shard, all in one message. Give each agent the brief in [references/checks.md](references/checks.md) verbatim, followed by its file paths, the memory directory, today's date, its files' rows from the activity query, and the session skill's read-only query command and `search` command with every path resolved. Each agent returns one verdict block per file. With 12 or fewer files, run the checks inline instead.
 
 ## Verdicts
 

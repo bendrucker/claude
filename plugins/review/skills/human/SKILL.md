@@ -2,7 +2,7 @@
 name: review:human
 description: >-
   Request Ben's own review of the working diff or a document before it leaves the machine, for architecture and slop rather than bugs. Runs after the mechanical passes (code-review or simplify, comments:audit). Use for "get my review", "let me look at this first", or as the last pre-PR pass.
-argument-hint: "[--doc <file>] [--kind <kind>] [--base <ref>] [--browser] [--summary <text>]"
+argument-hint: "[--doc <file>] [--kind <kind>] [--base <ref>] [--batch] [--browser] [--summary <text>]"
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts:*)"
   - Bash(rex do review_reply:*)
@@ -26,7 +26,7 @@ The host is herdr when the herdr pane is set, else Rex when the Rex block is set
 | Host | Diff | `--doc <file>` |
 |---|---|---|
 | herdr | reviewr split. Follow Request | plannotator-tui split. Follow Request |
-| Rex | Hunk split. Follow Request | plannotator-tui split, gated. Follow Rex Document Gate |
+| Rex | Hunk split. Follow Request, then Rex Live Notes unless `--batch` | plannotator-tui split, gated. Follow Rex Document Gate |
 | none, or `--browser` | Follow Browser Gate | Follow Browser Gate |
 
 In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
@@ -38,8 +38,9 @@ Request after the mechanical passes have run. `/ship` orders them. Standalone on
 ## Request
 
 1. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts raise --kind <kind> --summary "<repo> <branch>: <what to review>"`. The kind is `code` for the diff and `doc` for a document, unless the caller passes a more specific `--kind` (`plan`, `pr-body`). A caller's `--kind` and `--summary` pass through verbatim. Outside herdr it is a no-op.
-2. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --diff`, adding `--base <ref>` when the caller resolved one, or `open --doc <file>` for a document. Under herdr, `open --diff` re-uses a reviewr sidebar already up over this working tree, and `open --doc` reloads the plannotator-tui pane it opened earlier for the same file, keeping Ben's annotations.
-3. End the turn with one line naming the surface and saying Send resumes the work, with no recap of the change. reviewr and plannotator-tui deliver into this pane once it is idle, so Send lands only after the turn ends.
+2. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --diff`, adding `--base <ref>` when the caller resolved one and `--batch` when given, or `open --doc <file>` for a document. Under herdr, `open --diff` re-uses a reviewr sidebar already up over this working tree, and `open --doc` reloads the plannotator-tui pane it opened earlier for the same file, keeping Ben's annotations.
+3. Under Rex without `--batch`, start `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts watch` with `Monitor` at `timeout_ms: 1800000`.
+4. End the turn with one line naming the surface and saying how notes arrive: each saved note under Rex live, Send otherwise. Leave out any recap of the change. reviewr and plannotator-tui deliver into this pane once it is idle, so Send lands only after the turn ends.
 
 ## Resume
 
@@ -48,6 +49,12 @@ With herdr, the next user turn holds the comment batch plus Ben's own remarks. E
 With Rex, the next turn starts with its kind. On `[review: changes]`, follow the message's instructions and end the turn, and the review continues. `[review: approved]` and `[review: dismissed]` both end the review.
 
 Until Ben says approve, ship, or no further comments, act on the batch and request again. When he does, run `attention.ts close --diff`, or `close --doc <file>`, which quits the herdr split and is a no-op under Rex. Exit 2 means the surface stayed open holding unsent comments or a draft: tell Ben and leave it. Any other failure: relay its stderr to Ben.
+
+## Rex Live Notes
+
+Each `watch` event is one saved note, `[review: comment] <path:lines> (id <id>) | <quoted lines> | <body>`, where ` ⏎ ` stands for a newline. On each event, fix the code, answer in Hunk with `rex do review_reply id=<id> text="<what changed>"`, and end the turn.
+
+`[review: closed]` means the review ended and `watch` exited. When the monitor expires with the review still open, start `watch` again. A `[review: changes]` turn from Send carries only notes `watch` missed: handle it as Resume says.
 
 ## Rex Document Gate
 

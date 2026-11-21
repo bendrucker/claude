@@ -346,10 +346,33 @@ export function sessionHost(env: Record<string, string | undefined> = process.en
   return { kind: "none" };
 }
 
-export function rexDiffArgs(block: string, base?: string): string[] {
+export function rexDiffArgs(block: string, base?: string, batch = false): string[] {
   const args = ["do", "review_changes", `block=${block}`];
   if (base != null && base !== "") args.push(`revisions=${base}..HEAD`);
+  if (batch) args.push("mode=batch");
   return args;
+}
+
+export type ClaimOutcome =
+  | { kind: "lines"; lines: string[] }
+  | { kind: "closed" }
+  | { kind: "retry" };
+
+// `rex do` prints a string result JSON-quoted.
+export function claimOutcome(exitCode: number, stdout: string, stderr: string): ClaimOutcome {
+  if (exitCode !== 0) {
+    return stderr.includes("no review is open") ? { kind: "closed" } : { kind: "retry" };
+  }
+  const text = stdout.trim();
+  if (text === "") return { kind: "lines", lines: [] };
+  let result: unknown;
+  try {
+    result = JSON.parse(text);
+  } catch {
+    return { kind: "retry" };
+  }
+  if (typeof result !== "string") return { kind: "retry" };
+  return { kind: "lines", lines: result.split("\n").filter((line) => line.trim() !== "") };
 }
 
 export function docResultPath(block: string, home = homedir()): string {
@@ -546,12 +569,32 @@ async function closeDoc(paneId: string, file: string): Promise<void> {
   await writeDocPanes(recordPath, panes);
 }
 
-function rexOpenDiff(block: string, base: string | undefined): void {
-  const result = Bun.spawnSync(["rex", ...rexDiffArgs(block, base)], {
+function rexOpenDiff(block: string, base: string | undefined, batch: boolean): void {
+  const result = Bun.spawnSync(["rex", ...rexDiffArgs(block, base, batch)], {
     stdio: ["ignore", "inherit", "inherit"],
   });
   if (result.exitCode !== 0) process.exit(1);
   console.log(`opened Hunk beside ${block}`);
+}
+
+// Each stdout line is one Monitor event.
+function rexWatch(block: string): never {
+  for (;;) {
+    const result = Bun.spawnSync(["rex", "do", "review_claim", "-b", block], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const outcome = claimOutcome(
+      result.exitCode,
+      result.stdout.toString(),
+      result.stderr.toString(),
+    );
+    if (outcome.kind === "closed") {
+      console.log("[review: closed]");
+      process.exit(0);
+    }
+    if (outcome.kind === "lines") for (const line of outcome.lines) console.log(line);
+    Bun.sleepSync(1000);
+  }
 }
 
 // Blocks until Ben quits plannotator-tui, so the skill runs it in the background.
@@ -652,6 +695,10 @@ const openCmd = command(
         type: String,
         description: "Under Rex, review <base>..HEAD instead of the working diff",
       },
+      batch: {
+        type: Boolean,
+        description: "Under Rex, hold notes for Send instead of delivering each to `watch`",
+      },
     },
   },
   async (parsed) => {
@@ -665,7 +712,7 @@ const openCmd = command(
     if (doc != null && !(await Bun.file(doc).exists())) fail(`no such file: ${doc}`);
     if (host.kind === "rex") {
       if (doc != null) await rexGateDoc(host.block, doc);
-      else rexOpenDiff(host.block, parsed.flags.base);
+      else rexOpenDiff(host.block, parsed.flags.base, parsed.flags.batch === true);
       process.exit(0);
     }
     if (doc != null) {
@@ -723,9 +770,26 @@ const closeCmd = command(
   },
 );
 
+const watchCmd = command(
+  {
+    name: "watch",
+    help: {
+      description: "Under Rex, print each Hunk note as Ben saves it until the review closes",
+    },
+  },
+  () => {
+    const host = sessionHost();
+    if (host.kind !== "rex") fail("watch needs a Rex block: herdr delivers notes on Send");
+    rexWatch(host.block);
+  },
+);
+
 if (import.meta.main) {
   await cli(
-    { name: "attention", commands: [raiseCmd, clearCmd, promptCmd, openCmd, closeCmd] },
+    {
+      name: "attention",
+      commands: [raiseCmd, clearCmd, promptCmd, openCmd, closeCmd, watchCmd],
+    },
     (parsed) => {
       parsed.showHelp();
       process.exit(1);

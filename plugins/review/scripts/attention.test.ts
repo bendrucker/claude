@@ -2,6 +2,8 @@ import { describe, expect, mock, test } from "bun:test";
 import { join } from "node:path";
 import { z } from "zod";
 import {
+  type ClaimOutcome,
+  claimOutcome,
   clearArgs,
   currentPane,
   docOpenArgs,
@@ -262,6 +264,44 @@ describe("Rex targets", () => {
     ],
   ])("diff: %s", (_name, base, expected) => {
     expect(rexDiffArgs("block:01a1", base)).toEqual(expected);
+  });
+
+  test("a batch diff asks Rex to hold notes for Send", () => {
+    expect(rexDiffArgs("block:01a1", "origin/main", true)).toEqual([
+      "do",
+      "review_changes",
+      "block=block:01a1",
+      "revisions=origin/main..HEAD",
+      "mode=batch",
+    ]);
+  });
+});
+
+describe("claimOutcome", () => {
+  test.each<[string, number, string, string, ClaimOutcome]>([
+    [
+      "a JSON-quoted result splits into one event per note",
+      0,
+      '"[review: comment] a.ts:1 (id x)\\n[review: comment] b.ts:2 (id y)\\n"\n',
+      "",
+      {
+        kind: "lines",
+        lines: ["[review: comment] a.ts:1 (id x)", "[review: comment] b.ts:2 (id y)"],
+      },
+    ],
+    ["nothing new prints an empty string", 0, '""\n', "", { kind: "lines", lines: [] }],
+    ["a nil result prints nothing", 0, "", "", { kind: "lines", lines: [] }],
+    [
+      "a closed review ends the watch",
+      1,
+      "",
+      "Error: review: no review is open for block:01a1\n",
+      { kind: "closed" },
+    ],
+    ["any other failure retries", 1, "", "Error: connection refused\n", { kind: "retry" }],
+    ["unquoted output retries", 0, "garbage\n", "", { kind: "retry" }],
+  ])("%s", (_name, exitCode, stdout, stderr, expected) => {
+    expect(claimOutcome(exitCode, stdout, stderr)).toEqual(expected);
   });
 
   test("a document gates plannotator-tui in a wide split right of the block", () => {

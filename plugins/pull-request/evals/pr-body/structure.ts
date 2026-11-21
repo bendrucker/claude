@@ -310,10 +310,10 @@ export function measureStructure(body: string): Structure {
 }
 
 // One-sided limits fitted against Ben's edits and hand-written PRs: a body
-// fails only by exceeding them, so terseness is never penalized. Only prose
-// words are capped, since his edits cut prose and leave lists alone.
+// fails only by exceeding them, so terseness is never penalized. Visible
+// words, prose and lists together, are capped.
 export const LIMITS = {
-  proseWords: 120,
+  visibleWords: 150,
   maxBlockWords: 40,
   proseCodeSpans: 6,
   pathSpans: 1,

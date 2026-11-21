@@ -10,7 +10,7 @@ graders:
   writing-fired: "!quiet-*"
   no-attribution: "!quiet-*"
   title-length: "!quiet-*"
-  limit-prose-words: "!quiet-*"
+  limit-visible-words: "!quiet-*"
   limit-max-block: "!quiet-*"
   limit-prose-code-spans: "!quiet-*"
   limit-path-spans: "!quiet-*"

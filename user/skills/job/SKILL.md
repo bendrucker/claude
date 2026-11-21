@@ -14,6 +14,10 @@ allowed-tools:
   - Bash(claude --bg:*)
   - Bash(herdr agent list:*)
   - Bash(herdr agent focus:*)
+  - Read(~/.config/claude-job-skill/**)
+  - Bash(cat ~/.config/claude-job-skill/config.json)
+  - Bash(echo:*)
+  - Bash(date:*)
 ---
 
 # Job

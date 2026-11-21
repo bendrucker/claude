@@ -4,6 +4,7 @@ description: Drive Ben's open Hunk diff session from the CLI to walk him through
 allowed-tools:
   - Bash(hunk session:*)
   - Bash(hunk skill:*)
+  - Bash(echo:*)
 ---
 
 # Hunk Review

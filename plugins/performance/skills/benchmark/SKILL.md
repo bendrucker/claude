@@ -5,6 +5,10 @@ description: >-
   made it faster, or building a benchmark harness. To hill-climb or
   repeatedly optimize toward a target, use performance:hill-climb.
 argument-hint: "[<command>]"
+allowed-tools:
+  - Bash(hyperfine --version)
+  - Bash(bun --version)
+  - Bash(echo:*)
 ---
 
 # Benchmark

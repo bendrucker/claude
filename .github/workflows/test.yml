@@ -163,6 +163,9 @@ jobs:
       - name: Check permission rules
         run: bun scripts/check-permission-rules.ts
 
+      - name: Check bang injection permissions
+        run: bun scripts/check-bang-permissions.ts
+
       - name: Check Vale test names
         run: bun scripts/check-vale-test-names.ts
 

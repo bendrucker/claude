@@ -13,6 +13,7 @@ allowed-tools:
   - Bash(glab:*)
   - Bash(git:*)
   - Agent
+  - Bash(echo:*)
 ---
 
 # Review Follow-Up

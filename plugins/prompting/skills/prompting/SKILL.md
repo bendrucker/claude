@@ -1,13 +1,17 @@
 ---
 name: prompting
 description: "Write a document a model executes: a product prompt, a system prompt, a skill, a tool or agent description, a CLAUDE.md or AGENTS.md, a reference file behind a pointer. Use when authoring or revising any of those, when deciding what belongs in a prompt versus behind a pointer, when a prompt produces different behavior from run to run, or when a prompt makes the model take the wrong approach."
+allowed-tools:
+  - Edit(//tmp/claude/prompting-skill/**)
+  - Bash(mkdir -p /tmp/claude/prompting-skill)
+  - Bash(touch /tmp/claude/prompting-skill/*)
 ---
 
 # Prompting
 
 Rules for any document a model executes. Each rule targets variance: the same document should drive the same process on every run.
 
-!`mkdir -p /tmp/claude/prompting-skill 2>/dev/null; touch "/tmp/claude/prompting-skill/${CLAUDE_SESSION_ID}" 2>/dev/null`
+!`mkdir -p /tmp/claude/prompting-skill 2>/dev/null; touch /tmp/claude/prompting-skill/${CLAUDE_SESSION_ID} 2>/dev/null`
 
 To rewrite an existing document, see [references/conversion.md](references/conversion.md).
 

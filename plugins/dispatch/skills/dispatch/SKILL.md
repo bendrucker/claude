@@ -7,6 +7,7 @@ effort: low
 allowed-tools:
   - Bash(claude-dispatch:*)
   - Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh:*)
+  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help)"
 ---
 
 # Dispatch

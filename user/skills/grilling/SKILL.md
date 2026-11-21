@@ -5,6 +5,9 @@ argument-hint: "[<what to grill>]"
 allowed-tools:
   - AskUserQuestion
   - Agent
+  - Read(~/.claude-repo/user/skills/ask/SKILL.md)
+  - "Bash(grep '^- ' ~/.claude-repo/user/skills/ask/SKILL.md)"
+  - Bash(echo:*)
 ---
 
 # Grilling
@@ -17,7 +20,7 @@ Map the subject as a design tree: every decision branches into the decisions tha
 
 Every round's questions follow my standing `AskUserQuestion` rules:
 
-!`grep '^- ' ~/.claude/skills/ask/SKILL.md 2>/dev/null || echo '- **Fallback: no rule bullets found in ~/.claude/skills/ask/SKILL.md.** One question per open decision, a recommended option on every question, and split the batch when a follow-up depends on an earlier answer.'`
+!`grep '^- ' ~/.claude-repo/user/skills/ask/SKILL.md 2>/dev/null || echo '- **Fallback: no rule bullets found in ~/.claude-repo/user/skills/ask/SKILL.md.** One question per open decision, a recommended option on every question, and split the batch when a follow-up depends on an earlier answer.'`
 
 ## Rounds
 

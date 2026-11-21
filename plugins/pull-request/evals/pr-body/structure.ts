@@ -33,6 +33,9 @@ export interface Structure {
   headings: number;
   headingsPer100: number;
   visibleTables: number;
+  wallLists: number;
+  nestedLists: number;
+  mermaidFigures: number;
   visibleImages: number;
   visibleCodeLines: number;
   collapsedBlocks: number;
@@ -53,6 +56,12 @@ const PATH_SPAN =
 // Contrast connectives Claude stacks to justify a decision. Ben's own PRs
 // rarely use two.
 const CONTRAST = /\b(?:instead of|rather than|so that|without)\b/gi;
+
+const parsedWallMin = Number(process.env.WALL_MIN_ITEMS);
+export const WALL_MIN_ITEMS =
+  Number.isInteger(parsedWallMin) && parsedWallMin > 0 ? parsedWallMin : 5;
+
+const WALL_MEAN_WORDS = 14;
 
 const wordSeg = new Intl.Segmenter("en", { granularity: "word" });
 const sentenceSeg = new Intl.Segmenter("en", { granularity: "sentence" });
@@ -96,6 +105,9 @@ interface Acc {
   listWords: number;
   headings: number;
   visibleTables: number;
+  wallLists: number;
+  nestedLists: number;
+  mermaidFigures: number;
   visibleImages: number;
   visibleCodeLines: number;
   collapsedBlocks: number;
@@ -116,8 +128,19 @@ function countInlineCode(node: Nodes, path = false): number {
   return "children" in node ? node.children.reduce((n, c) => n + countInlineCode(c, path), 0) : 0;
 }
 
+function isWall(list: List): boolean {
+  const items = list.children;
+  if (items.length < WALL_MIN_ITEMS) return false;
+  if (items.some((item) => item.children.some((c) => c.type === "list"))) return false;
+  const texts = items.map(ownText);
+  if (mean(texts.map(countWords)) < WALL_MEAN_WORDS) return false;
+  const dense = texts.filter((t) => /[,;]/.test(t) || sentences(t).length >= 2).length;
+  return dense * 2 >= items.length;
+}
+
 function visitList(list: List, acc: Acc): void {
   acc.listSizes.push(list.children.length);
+  if (isWall(list)) acc.wallLists++;
   for (const item of list.children) {
     if (item.checked !== null && item.checked !== undefined) acc.checkboxes++;
     const text = ownText(item);
@@ -131,7 +154,11 @@ function visitList(list: List, acc: Acc): void {
     acc.pathSpans += own.reduce((n, c) => n + countInlineCode(c, true), 0);
     acc.visibleImages += countImages(item);
     acc.proseText.push(text);
-    for (const child of item.children) if (child.type === "list") visitList(child, acc);
+    for (const child of item.children) {
+      if (child.type !== "list") continue;
+      acc.nestedLists++;
+      visitList(child, acc);
+    }
   }
 }
 
@@ -152,8 +179,9 @@ function visitChildren(children: RootContent[], acc: Acc, collapsed: boolean): v
     }
     const hidden = collapsed || depth > 0;
     if (hidden) {
-      if (node.type === "code") acc.fenceWords += countWords(node.value);
-      else acc.collapsedWords += countWords(toString(node));
+      if (node.type === "code") {
+        if (node.lang !== "mermaid") acc.fenceWords += countWords(node.value);
+      } else acc.collapsedWords += countWords(toString(node));
       continue;
     }
     // oxlint-disable-next-line typescript/switch-exhaustiveness-check -- other block types carry no prose
@@ -192,7 +220,8 @@ function visitChildren(children: RootContent[], acc: Acc, collapsed: boolean): v
         break;
       case "code":
         acc.visibleCodeLines += node.value.split("\n").length;
-        acc.fenceWords += countWords(node.value);
+        if (node.lang === "mermaid") acc.mermaidFigures++;
+        else acc.fenceWords += countWords(node.value);
         break;
       case "blockquote":
         visitChildren(node.children, acc, false);
@@ -223,6 +252,9 @@ export function measureStructure(body: string): Structure {
     listWords: 0,
     headings: 0,
     visibleTables: 0,
+    wallLists: 0,
+    nestedLists: 0,
+    mermaidFigures: 0,
     visibleImages: 0,
     visibleCodeLines: 0,
     collapsedBlocks: 0,
@@ -261,6 +293,9 @@ export function measureStructure(body: string): Structure {
     headings: acc.headings,
     headingsPer100: per100(acc.headings, v),
     visibleTables: acc.visibleTables,
+    wallLists: acc.wallLists,
+    nestedLists: acc.nestedLists,
+    mermaidFigures: acc.mermaidFigures,
     visibleImages: acc.visibleImages,
     visibleCodeLines: acc.visibleCodeLines,
     collapsedBlocks: acc.collapsedBlocks,
@@ -297,6 +332,7 @@ export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
 export const GUARDS = {
   hiddenWords: 60,
   maxItemsPerList: 5,
+  wallLists: 0,
 } as const satisfies Partial<Structure>;
 
 export type GuardKey = keyof typeof GUARDS;

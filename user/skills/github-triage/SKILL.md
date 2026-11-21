@@ -10,6 +10,8 @@ allowed-tools:
   - Bash(gh pr view:*)
   - Bash(gh pr merge:*)
   - Bash(gh repo view:*)
+  - Bash(jq:*)
+  - Bash(column:*)
 ---
 
 # GitHub Triage

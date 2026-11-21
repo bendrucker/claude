@@ -7,10 +7,14 @@ allowed-tools:
   - Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts:*)
   - Bash(glab mr:*)
   - Bash(glab api:*)
+  - Edit(//tmp/claude/gitlab-skill/**)
+  - Bash(mkdir -p /tmp/claude/gitlab-skill)
+  - Bash(touch /tmp/claude/gitlab-skill/*)
+  - Bash(echo:*)
 ---
 # Merge Requests
 
-Scripts directory (absolute, for invocations from other skills where `${CLAUDE_SKILL_DIR}` points elsewhere): !`mkdir -p /tmp/claude/gitlab-skill 2>/dev/null; touch "/tmp/claude/gitlab-skill/${CLAUDE_SESSION_ID}" 2>/dev/null; echo "${CLAUDE_SKILL_DIR}/scripts"`
+Scripts directory (absolute, for invocations from other skills where `${CLAUDE_SKILL_DIR}` points elsewhere): !`mkdir -p /tmp/claude/gitlab-skill 2>/dev/null; touch /tmp/claude/gitlab-skill/${CLAUDE_SESSION_ID} 2>/dev/null; echo "${CLAUDE_SKILL_DIR}/scripts"`
 
 ## Arguments
 

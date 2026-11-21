@@ -15,6 +15,7 @@ allowed-tools:
   - Bash(which:*)
   - Glob
   - Grep
+  - Bash(echo:*)
 ---
 
 # Apple Shortcuts

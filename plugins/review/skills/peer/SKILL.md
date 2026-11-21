@@ -21,6 +21,8 @@ allowed-tools:
   - WebFetch
   - Skill(code-review)
   - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/:*)"
+  - Bash(grep .)
+  - Bash(echo:*)
 ---
 
 # Peer Review

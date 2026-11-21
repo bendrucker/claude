@@ -6,6 +6,7 @@ allowed-tools:
   - Bash(gh issue:*)
   - Bash(gh pr:*)
   - Bash(grep:*)
+  - Bash(echo:*)
 ---
 
 # Attachments

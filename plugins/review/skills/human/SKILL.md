@@ -8,6 +8,8 @@ allowed-tools:
   - Bash(rex do review_reply:*)
   - Bash(plannotator review:*)
   - Bash(plannotator annotate:*)
+  - "Bash([:*)"
+  - Bash(printf:*)
 ---
 
 # Human Review

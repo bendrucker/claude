@@ -37,6 +37,8 @@ herdr, the Herdr app, and Rex host sessions here. Open panes, tabs, and splits w
 
 In a Rex tab still labeled `Window <id>`, once the task is clear, rename the tab with `rex window rename` to two to four Title Case words naming the task, and leave the Rex session label as it is.
 
+To show me an image (PNG, JPEG, or SVG), open a pane and render it with `chafa -f kitty -s <cols>x<rows> <file>` sized to the pane. Rex, herdr, kitty, Ghostty, and WezTerm all support kitty graphics, but chafa detects that by terminal name and falls back to block art in Rex without `-f kitty`.
+
 ## Configuration Repos
 
 Edit `bendrucker/claude` at `~/src/bendrucker/claude`. `claude-sync` updates `~/.claude-repo` from `main`, so a merged change goes live only after that sync runs. Dotfiles are deployed at `~/.dotfiles`.

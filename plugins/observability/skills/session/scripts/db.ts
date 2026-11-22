@@ -655,7 +655,8 @@ export async function ensureIndex(
   // reconcilePinned already cleared the fingerprint when it rewrote raw.
   let derivedInvalidated = pinnedRederived;
 
-  for (const entry of await enumerateHosts(options)) {
+  const hosts = await enumerateHosts(options);
+  for (const entry of hosts) {
     const source = transcripts(entry.host, entry.root, importSql);
     // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
     const diff = await diffSource(db, source);
@@ -680,7 +681,13 @@ export async function ensureIndex(
     lap("import");
   }
 
-  const telemetryChanged = await ensureTelemetry(db, getLocalRoot(options.projectsDir), LOCAL_HOST);
+  // An imported host's telemetry sits beside its projects/ as `local`'s does, so a pulled
+  // cloud session's mod events index under that host.
+  let telemetryChanged = 0;
+  for (const entry of hosts) {
+    // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh.
+    telemetryChanged += await ensureTelemetry(db, entry.root, entry.host);
+  }
   lap("telemetry");
 
   // A stale views_hash, a re-derived raw, or a missing table rebuilds content_items in

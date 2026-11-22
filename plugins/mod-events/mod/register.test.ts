@@ -225,6 +225,13 @@ describe("session.start", () => {
     expect(line?.attributes.clients).toEqual([]);
     expect(line?.resource["claude_code.surface"]).toBe("ssh");
   });
+
+  test("a cloud session is cloud", async ($, on) => {
+    const w = world(on, { ...HOME, CLAUDE_CODE_REMOTE: "true" }, PS_MOSH);
+    await $.session.start({ surface: "terminal", isInteractive: false, cwd: "/work" });
+    const [line] = w.lines(`${ROOT}/s1/mod-events.1000.0.jsonl`);
+    expect(line?.resource["claude_code.surface"]).toBe("cloud");
+  });
 });
 
 describe("surfaceOf", () => {
@@ -259,6 +266,13 @@ describe("surfaceOf", () => {
       "903 902 herdr",
     ].join("\n");
     expect(surfaceOf(ps, undefined, "herdr")).toEqual({ surface: "ssh", clients: ["ssh"] });
+  });
+
+  test("CLAUDE_CODE_REMOTE outranks the multiplexer's clients", () => {
+    expect(surfaceOf(PS_MOSH, "10.0.0.2 5000 10.0.0.1 22", "herdr", "true")).toEqual({
+      surface: "cloud",
+      clients: [],
+    });
   });
 
   test("no ps output and no SSH_CONNECTION is local", () => {

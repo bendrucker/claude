@@ -29,7 +29,7 @@ Each line is one OTel log record with the data model's field names, flat rather 
 - `severity_text` is `INFO` (9), or `WARN` (13) when `ok` is false. A failing mod degrades the session without ending it, so nothing logs `ERROR`.
 - `event_name` is `<mod>.<event>`.
 - `attributes` holds `detail`, plus `duration_ms` from `ms` and `session.id`. Both keys match Claude Code's native OTel events, so a backend can join a mod's records to the session's own telemetry.
-- `resource` carries `service.name` (`claude-code`, as the native exporter uses) and `service.version`. Once the session's heartbeat has judged it, it also carries `claude_code.surface` (`local`, `mosh`, or `ssh`).
+- `resource` carries `service.name` (`claude-code`, as the native exporter uses) and `service.version`. Once the session's heartbeat has judged it, it also carries `claude_code.surface` (`local`, `mosh`, `ssh`, or `cloud`).
 - `scope.name` is the mod. The engine doesn't expose a calling plugin's version, so `scope` has no `version`.
 
 `$.fs` can only replace a file whole, so each event rewrites its chunk. The new text always extends the old, and a rolled chunk is never written again, so a tailer's fingerprint and offset stay valid. `$.fs.write` truncates and then writes in place rather than renaming a temp file over the chunk, and `$.fs` has no rename. A tailer polling inside that window reads an empty file. The collector's `filelog` receiver skips a file whose fingerprint is empty, then resumes at its offset once the bytes are back.

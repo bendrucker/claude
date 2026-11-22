@@ -19,7 +19,7 @@ interface Log {
   chunks: Map<string, { chunk: Chunk; n: number }>;
 }
 
-export type Surface = "local" | "mosh" | "ssh";
+export type Surface = "local" | "mosh" | "ssh" | "cloud";
 
 interface Process {
   pid: number;
@@ -56,13 +56,15 @@ function summarize(clients: Surface[], isSsh: boolean): Surface {
 /**
  * Classifies each attached multiplexer client by its ancestry. The server is
  * the `multiplexer` process whose parent is launchd, and every other one is a
- * client.
+ * client. A cloud session (`CLAUDE_CODE_REMOTE`) has no clients to classify.
  */
 export function surfaceOf(
   ps: string | undefined,
   sshConnection: string | undefined,
   multiplexer: string,
+  remote?: string,
 ): { surface: Surface; clients: Surface[] } {
+  if (remote === "true") return { surface: "cloud", clients: [] };
   const clients: Surface[] = [];
   if (ps !== undefined) {
     const table = parsePs(ps);
@@ -184,7 +186,8 @@ async function readSurface(
   $: EngineInterface,
   multiplexer: string,
 ): Promise<ReturnType<typeof surfaceOf>> {
-  const [ssh, ps] = await Promise.all([
+  const [remote, ssh, ps] = await Promise.all([
+    $.env.get("CLAUDE_CODE_REMOTE"),
     $.env.get("SSH_CONNECTION"),
     multiplexer === ""
       ? undefined
@@ -193,7 +196,7 @@ async function readSurface(
           .then((r) => (r.exitCode === 0 ? r.stdout : undefined))
           .catch(() => undefined),
   ]);
-  return surfaceOf(ps, ssh, multiplexer);
+  return surfaceOf(ps, ssh, multiplexer, remote);
 }
 
 /**

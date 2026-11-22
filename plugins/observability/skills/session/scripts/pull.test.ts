@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
-import { plan } from "./pull";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { localFiles, plan } from "./pull";
 
 const DAY = 86_400_000;
 
@@ -24,4 +27,21 @@ test("keeps a session by its newest upload and fetches only what grew", () => {
 test("fetches a new session and drops nothing when the bucket is empty of locals", () => {
   const objects = [{ key: "cse_new/a.jsonl", size: 3, lastModified: 9 * DAY }];
   expect(plan(objects, new Map(), [], 5 * DAY)).toEqual({ fetch: ["cse_new"], drop: [] });
+});
+
+test("keys local mod events as the bucket does", async () => {
+  const host = mkdtempSync(join(tmpdir(), "pull-"));
+  await Bun.write(join(host, "projects", "cse_1", "a.jsonl"), "12");
+  await Bun.write(join(host, "mod-events", "cse_1", "plan.1.0.jsonl"), "123");
+  expect(localFiles(join(host, "projects"), join(host, "mod-events"))).toEqual(
+    new Map([
+      ["cse_1/a.jsonl", 2],
+      ["cse_1/mod-events/plan.1.0.jsonl", 3],
+    ]),
+  );
+});
+
+test("reads a host with no mod events", () => {
+  const host = mkdtempSync(join(tmpdir(), "pull-"));
+  expect(localFiles(join(host, "projects"), join(host, "mod-events"))).toEqual(new Map());
 });

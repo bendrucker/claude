@@ -20,6 +20,8 @@ const RunLogFields = z.object({
   // Absent on entries logged before file edits moved to PostToolUse.
   event: z.enum(["PreToolUse", "PostToolUse"]).optional(),
   tool: z.string(),
+  // With session_id, finds the tool call in the transcript, whose input holds the text the run linted.
+  tool_use_id: z.string().optional(),
   ext: z.string(),
   duration_ms: z.number(),
   outcome: RunOutcome,

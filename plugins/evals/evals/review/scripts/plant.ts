@@ -33,6 +33,9 @@ function isPull(v: unknown): v is { body: string } {
 const CANDIDATE = new Set(["35952318935", "35952324529"]);
 const HOLDOUT_CANDIDATE = new Set(["35952866833", "35952879887"]);
 
+/** The holdout cases that lose one run to a slipped grader under `holdout-unstarred`. */
+const SLIPPED = new Set(["cli-dispatch", "config-move", "webhook-retry-design"]);
+
 function rescore(run: Run, arm: string): void {
   const counted = run.graders.filter((g) => g.scored && (arm === "with" || !g.withOnly));
   const total = counted.reduce((s, g) => s + g.weight, 0);
@@ -68,6 +71,11 @@ const BODY: Partial<Record<string, (body: string) => string>> = {
       "both columns regraded against the suite's current graders",
       "the baseline from the suite commit and the candidate from this branch",
     ),
+  "holdout-unstarred": (body) =>
+    body.replace(
+      "Holdout, run once at the end with the skill at the suite commit against this branch: 0.90 to 0.92 with the skill,",
+      "Holdout, run once at the end with the skill at the suite commit against this branch: held at 0.90 with the skill,",
+    ),
   unregistered: (body) => body.replace(/#### Hypothesis\n[\s\S]*?(?=#### Result)/, ""),
 };
 
@@ -99,6 +107,18 @@ const RUNS: Partial<Record<string, (id: string, result: Result) => void>> = {
         if (close) close.passed = false;
         const second = scored[i % Math.max(scored.length, 1)];
         if (second) second.passed = false;
+        rescore(run, "with");
+      }
+    }
+  },
+  "holdout-unstarred"(id, result) {
+    if (!HOLDOUT_CANDIDATE.has(id)) return;
+    for (const c of result.cases) {
+      if (!SLIPPED.has(c.name)) continue;
+      const run = c.arms.with?.[0];
+      const first = run?.graders.find((g) => g.scored && g.name !== "short-close");
+      if (run && first) {
+        first.passed = false;
         rescore(run, "with");
       }
     }

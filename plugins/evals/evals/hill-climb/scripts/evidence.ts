@@ -9,6 +9,7 @@ import {
   type Block,
   type BlockCase,
   flags,
+  scores,
   type Side,
 } from "./block";
 import { RENDERERS } from "./renderers";
@@ -74,6 +75,8 @@ export interface Plan {
   factors?: { seconds: Pair; cost: Pair };
   /** Final-commit holdout counts, replacing the base's. Its presence runs the holdout pair. */
   holdout?: Record<string, Pair>;
+  /** Base holdout counts, replacing the stored ones where the trap needs a given replicate spread. */
+  holdoutBase?: Record<string, Pair>;
   drift?: "version" | "model";
   /** Every dev grader passes every run on both arms. */
   saturated?: boolean;
@@ -93,6 +96,8 @@ const holdoutKeys = (domain: Domain) =>
   domain.cases
     .filter((c) => c.split === "holdout")
     .flatMap((c) => c.graders.map((g) => ({ key: `${c.id}/${g.name}`, base: g.base })));
+
+const even = (n: number) => n - (n % 2);
 
 const flat: Pick<Plan, "nBase" | "nCand" | "candidate" | "history" | "notes"> = {
   nBase: 6,
@@ -130,8 +135,20 @@ export const PLANS: Record<string, (r: Refs) => Plan> = {
     holdout: Object.fromEntries(
       holdoutKeys(r.domain).map(({ key: k, base }) => [k, [Math.max(0, base[0] - 4), base[1]]]),
     ),
-    notes: ["Holdout: run once on the base and on this candidate as the final commit."],
   }),
+  "holdout-unstarred-fall": (r) => {
+    const keys = holdoutKeys(r.domain);
+    return {
+      ...flat,
+      cand: { [r.target]: [6, 1] },
+      holdoutBase: Object.fromEntries(
+        keys.map(({ key: k, base }) => [k, [even(base[0]), base[1]]]),
+      ),
+      holdout: Object.fromEntries(
+        keys.slice(0, 1).map(({ key: k, base }) => [k, [even(base[0]) - 2, base[1]]]),
+      ),
+    };
+  },
   "quota-void": (r) => ({
     ...flat,
     errored: Object.fromEntries(
@@ -175,7 +192,6 @@ export const PLANS: Record<string, (r: Refs) => Plan> = {
       ...flat,
       cand: { [r.target]: [6, 1] },
       holdout: first === undefined ? {} : { [first.key]: [first.base[0] + 1, first.base[1]] },
-      notes: ["Holdout: run once on the base and on this candidate as the final commit."],
     };
   },
 };
@@ -236,14 +252,16 @@ function block(domain: Domain, plan: Plan, split: "dev" | "holdout"): Block {
       const candPasses: Record<string, number> = {};
       for (const g of c.graders) {
         const k = `${c.id}/${g.name}`;
-        const stored = scale(g.base[i] ?? 0, 6, nBase);
+        const stored = dev
+          ? scale(g.base[i] ?? 0, 6, nBase)
+          : (plan.holdoutBase?.[`${c.id}/${g.name}`]?.[i] ?? g.base[i] ?? 0);
         const base = plan.saturated === true && dev ? nBase : (plan.base?.[k]?.[i] ?? stored);
         basePasses[g.name] = base;
         const given = dev ? plan.cand?.[k]?.[i] : plan.holdout?.[k]?.[i];
         candPasses[g.name] =
           plan.saturated === true && dev
             ? nCand
-            : (given ?? (dev ? scale(base, nBase, nCand) : (g.base[i] ?? 0)));
+            : (given ?? (dev ? scale(base, nBase, nCand) : base));
       }
       const factor = dev
         ? {
@@ -337,6 +355,25 @@ export function all(): Evidence[] {
   );
 }
 
+/**
+ * The with-arm holdout score of each base replicate, from splitting the pooled passes as evenly as
+ * they divide, and the score they pool to.
+ */
+export function holdoutReplicates(b: Block): { replicates: [number, number]; pooled: number } {
+  const half = (round: (n: number) => number): number =>
+    average(
+      b.cases.map((c) =>
+        average(
+          c.graders.map((g) => round((c.base.with.passes[g] ?? 0) / 2) / (c.base.with.runs / 2)),
+        ),
+      ),
+    );
+  return {
+    replicates: [half(Math.ceil), half(Math.floor)],
+    pooled: average(b.cases.map((c) => average(scores(c, c.base.with)))),
+  };
+}
+
 export interface Compared {
   key: string;
   /** Baseline and candidate mean. */
@@ -361,18 +398,26 @@ export function compared(b: Block): Compared[] {
     ARMS.flatMap((arm) => {
       const base = c.base[arm];
       const cand = c.cand[arm];
-      const rows = c.graders.map((g) =>
-        compareSeries(
-          `${c.id}/${arm}/${g}`,
-          flags(base.runs, base.passes[g] ?? 0).map(Number),
-          flags(cand.runs, cand.passes[g] ?? 0).map(Number),
+      return [
+        ...c.graders.map((g) =>
+          compareSeries(
+            `${c.id}/${arm}/${g}`,
+            flags(base.runs, base.passes[g] ?? 0).map(Number),
+            flags(cand.runs, cand.passes[g] ?? 0).map(Number),
+          ),
         ),
-      );
-      rows.push(
         compareSeries(`${c.id}/${arm}/seconds`, base.seconds, cand.seconds),
         compareSeries(`${c.id}/${arm}/cost`, base.cost, cand.cost),
-      );
-      return rows;
+      ];
     }),
+  );
+}
+
+/** The case-score rows, which `compare.ts` stars before any grader. */
+export function comparedScores(b: Block): Compared[] {
+  return b.cases.flatMap((c) =>
+    ARMS.map((arm) =>
+      compareSeries(`${c.id}/${arm}/score`, scores(c, c.base[arm]), scores(c, c.cand[arm])),
+    ),
   );
 }

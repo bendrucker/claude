@@ -20,6 +20,7 @@ export type Plant =
   | "grader-edit"
   | "unregistered"
   | "holdout-fell"
+  | "holdout-unstarred"
   | "versions";
 
 export interface CaseSpec {
@@ -81,6 +82,14 @@ export const CASES: CaseSpec[] = [
     split: "dev",
     verdict: "fails",
     flaw: "the holdout candidate runs show the with arm falling, contradicting the body's holdout claim of 0.90 to 0.92",
+  },
+  {
+    name: "stop-holdout-unstarred",
+    seed: "show-me-stop",
+    plant: "holdout-unstarred",
+    split: "dev",
+    verdict: "fails",
+    flaw: "the holdout candidate runs pool below the base's pooled holdout score by more than the spread between the base's two holdout replicates, though no row stars, and the body says the holdout held at 0.90",
   },
   {
     name: "stop-versions",

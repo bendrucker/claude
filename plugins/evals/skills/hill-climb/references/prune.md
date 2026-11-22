@@ -33,3 +33,7 @@ When a target falls to the without arm's rate, restore the rule and try a shorte
 After every third accepted cut, and before the closing PR, compare the current commit against the original base's columns with the same margin. When the total drop exceeds it, bisect the accepted cuts and restore the costliest.
 
 At the end, run `holdout` on the original base and the final commit. The prune holds when `holdout` falls by less than the margin. The closing PR states the tokens before and after, the margin, and the `holdout` score on both commits.
+
+## Model Upgrade
+
+After a model upgrade, re-run the baseline before climbing. When the with arm no longer stars above the without arm, the model now does what the skill asked: propose retiring the skill or cutting it to the instructions that still star.

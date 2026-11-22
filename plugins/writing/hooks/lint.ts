@@ -61,6 +61,7 @@ export async function dispatch(
     tool: input.tool_name,
     ext: hasPath ? getExtension(filePath) : "",
   };
+  if (input.tool_use_id !== "") base.tool_use_id = input.tool_use_id;
   if (hasPath) base.target = targetOf(filePath);
 
   const finish = (

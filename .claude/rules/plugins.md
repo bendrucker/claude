@@ -47,7 +47,7 @@ Deleting a plugin's `commands/`, `agents/`, or `hooks/` directory requires remov
 
 ## Integration Tests
 
-When plugin code drives another program, such as a multiplexer, a TUI, an external CLI, or Claude Code itself, write a test against the real program in the same change. A unit test over a stubbed CLI proves only what the stub was told. Drive the program the way a user would: start it in a scratch session or server the test owns, send input, and assert on the captured screen or the files it writes. Write the test even when it spends API tokens or needs this machine's apps. Keep such a test out of the default run (`*.integration.ts`, or `e2e-*.ts` for a `claude -p` run), and run it yourself before opening the PR. [`testing.md`](testing.md) covers the mechanics.
+When plugin code drives another program, such as a multiplexer, a TUI, an external CLI, or Claude Code itself, commit a test file that runs the real program, in the same change, in addition to any manual live run. A unit test over a stubbed CLI proves only what the stub was told. Drive the program the way a user would: start it in a scratch session or server the test owns, send input, and assert on the captured screen or the files it writes. Write the test even when it spends API tokens or needs this machine's apps. Keep such a test out of the default run (`*.integration.ts`, or `e2e-*.ts` for a `claude -p` run), and run it yourself before opening the PR. [`testing.md`](testing.md) covers the mechanics.
 
 ## Dependencies
 

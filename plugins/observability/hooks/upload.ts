@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
-// Copies a cloud session's transcripts to S3, one object per file overwritten
-// in place, so the Mac's index can import cloud sessions as a host. A reclaimed
+// Copies a cloud session's transcripts and mod events to S3, one object per
+// file overwritten in place, so the Mac's index can import cloud sessions as a
+// host. A reclaimed
 // VM never runs SessionEnd, so Stop uploads too, at most once per interval:
 // a session abandoned mid-interval loses at most that much of its tail.
 
@@ -45,24 +46,44 @@ export function parseTarget(url: string, region: string | undefined): Target | u
   return { base: `https://${host}`, prefix: prefix ?? "" };
 }
 
-// The main transcript plus its subagents' transcripts.
-export function sessionFiles(transcript: string): string[] {
-  const subagents = join(dirname(transcript), basename(transcript, ".jsonl"), "subagents");
-  let entries: string[] = [];
+// Where the mod events of one session sit under its prefix. pull.ts moves them
+// out of the transcripts, into the host's own mod-events directory.
+export const MOD_EVENTS = "mod-events";
+
+// The main transcript, its subagents' transcripts, and the session's mod
+// events, each with its key relative to the session.
+export function sessionFiles(transcript: string, modEventsDir?: string): [string, string][] {
+  const root = dirname(transcript);
+  const subagents = join(root, basename(transcript, ".jsonl"), "subagents");
+  const files = [transcript, ...jsonlIn(subagents)].map((file): [string, string] => [
+    file,
+    relative(root, file),
+  ]);
+  if (modEventsDir === undefined) return files;
+  return [
+    ...files,
+    ...jsonlIn(modEventsDir).map((file): [string, string] => [
+      file,
+      `${MOD_EVENTS}/${basename(file)}`,
+    ]),
+  ];
+}
+
+function jsonlIn(dir: string): string[] {
   try {
-    entries = readdirSync(subagents)
+    return readdirSync(dir)
       .filter((name) => name.endsWith(".jsonl"))
-      .map((name) => join(subagents, name));
+      .map((name) => join(dir, name));
   } catch {
-    // No subagents ran.
+    // Nothing ran there.
+    return [];
   }
-  return [transcript, ...entries];
 }
 
 // Keyed by remote session. A reopened session restores its full history into a
 // fresh container, so its first upload overwrites the object with a superset.
-export function objectKey(t: Target, session: string, root: string, file: string): string {
-  return [t.prefix, session, relative(root, file)].filter((p) => p !== "").join("/");
+export function objectKey(t: Target, session: string, key: string): string {
+  return [t.prefix, session, key].filter((p) => p !== "").join("/");
 }
 
 async function main(): Promise<void> {
@@ -79,6 +100,8 @@ async function main(): Promise<void> {
   if (input.transcript_path === "") return;
   const session = env.CLAUDE_CODE_REMOTE_SESSION_ID ?? input.session_id;
   const root = dirname(input.transcript_path);
+  // The mod-events plugin writes beside projects/, keyed by the local session id.
+  const modEvents = join(dirname(dirname(root)), MOD_EVENTS, input.session_id);
 
   const statePath = join(
     tmpdir(),
@@ -95,17 +118,15 @@ async function main(): Promise<void> {
 
   const failures: string[] = [];
   await Promise.all(
-    sessionFiles(input.transcript_path).map(async (file) => {
+    sessionFiles(input.transcript_path, modEvents).map(async ([file, rel]) => {
       const body = Bun.file(file);
       if (!(await body.exists()) || state.sizes[file] === body.size) return;
-      const key = `${target.base}/${objectKey(target, session, root, file)}`;
+      const key = `${target.base}/${objectKey(target, session, rel)}`;
       const res = await fetch(key, { method: "PUT", body }).catch((error: unknown) =>
         error instanceof Error ? error : new Error(String(error)),
       );
       if (res instanceof Error || !res.ok) {
-        failures.push(
-          `${relative(root, file)}: ${res instanceof Error ? res.message : res.status}`,
-        );
+        failures.push(`${rel}: ${res instanceof Error ? res.message : res.status}`);
         return;
       }
       state.sizes[file] = body.size;

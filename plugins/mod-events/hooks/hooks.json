@@ -1,4 +1,4 @@
 {
-  "description": "Provides `$.modEvents.emit`, which appends each mod's events to per-session JSONL, and records at session start whether the session is local or reached over mosh or ssh",
+  "description": "Provides `$.modEvents.emit`, which appends each mod's events to per-session JSONL, and records at session start whether the session is local, reached over mosh or ssh, or a cloud session",
   "modules": ["../mod/register.ts"]
 }

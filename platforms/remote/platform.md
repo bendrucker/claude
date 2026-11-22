@@ -4,6 +4,7 @@
 - This config fast-forwards from `main` at session start, so a merged change to `bendrucker/claude` goes live in the next session.
 - Device tools run in a sandbox beside my machine, not on it. Assume none of the machine's tools and no package installs there. Open databases on a mount read-only, since the machine may be writing them.
 - When work needs my Mac, attach a folder with `list_computer_folders` and `request_computer_folder`. When none is usable, ask me to fix that setup and name the fix the listing gives, rather than handing me the command.
+- The AWS cloud environment carries broader AWS access than this one, including reads of the eval-corpus bucket where cloud transcripts upload. Work that needs it runs in a `create_session` on that environment (find its id with `list_environments`), since a running session can't move onto its unrestricted network.
 - Escalate a blocker here through the tool that grants it: a host the proxy refuses through `update_environment` or `create_environment`, a missing key through `request_credential`, an environment question through `read_documentation`, and a repo change through a `create_session` PR to `bendrucker/claude` or `bendrucker/dotfiles`.
 
 ## The Claude App

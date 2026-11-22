@@ -16,7 +16,7 @@ type CaseTruth = z.output<typeof CaseTruth>;
  * cite a profile entry, and an off-CPU run scores the reciprocal rank of its first candidate
  * targeting the true lead.
  */
-export function scoreReply(reply: string, truth: CaseTruth, profile: string): ScoredRun {
+function scoreReply(reply: string, truth: CaseTruth, profile: string): ScoredRun {
   if (truth.kind === "offcpu") {
     const rank = leadRank(reply, truth);
     return { score: 1 / rank, graders: [{ name: "lead@1", passed: rank === 1 }] };

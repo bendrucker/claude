@@ -146,7 +146,7 @@ export interface ProcessRow {
   threads: number;
 }
 
-export function processRows(profile: Profile): ProcessRow[] {
+function processRows(profile: Profile): ProcessRow[] {
   const spans = new Map<
     string,
     { name: string; start: number; end: number; cpu: number; threads: number }

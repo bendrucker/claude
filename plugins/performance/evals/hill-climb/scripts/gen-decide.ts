@@ -41,7 +41,7 @@ interface Domain {
   small: Lead;
 }
 
-export const DOMAINS: Domain[] = [
+const DOMAINS: Domain[] = [
   {
     id: "cli",
     target: "ripcfg --version",
@@ -266,7 +266,7 @@ const BOUND = [
   ["profile", "share", "cum", "critical path"],
 ];
 
-export const TRAPS: Trap[] = [
+const TRAPS: Trap[] = [
   {
     id: "noise-floor",
     decisions: ["reject"],

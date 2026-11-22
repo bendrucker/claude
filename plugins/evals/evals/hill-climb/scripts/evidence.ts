@@ -9,7 +9,6 @@ import {
   type Block,
   type BlockCase,
   flags,
-  scores,
   type Side,
 } from "./block";
 import { RENDERERS } from "./renderers";
@@ -362,26 +361,18 @@ export function compared(b: Block): Compared[] {
     ARMS.flatMap((arm) => {
       const base = c.base[arm];
       const cand = c.cand[arm];
-      return [
-        ...c.graders.map((g) =>
-          compareSeries(
-            `${c.id}/${arm}/${g}`,
-            flags(base.runs, base.passes[g] ?? 0).map(Number),
-            flags(cand.runs, cand.passes[g] ?? 0).map(Number),
-          ),
+      const rows = c.graders.map((g) =>
+        compareSeries(
+          `${c.id}/${arm}/${g}`,
+          flags(base.runs, base.passes[g] ?? 0).map(Number),
+          flags(cand.runs, cand.passes[g] ?? 0).map(Number),
         ),
+      );
+      rows.push(
         compareSeries(`${c.id}/${arm}/seconds`, base.seconds, cand.seconds),
         compareSeries(`${c.id}/${arm}/cost`, base.cost, cand.cost),
-      ];
+      );
+      return rows;
     }),
-  );
-}
-
-/** The case-score rows, which `compare.ts` stars before any grader. */
-export function comparedScores(b: Block): Compared[] {
-  return b.cases.flatMap((c) =>
-    ARMS.map((arm) =>
-      compareSeries(`${c.id}/${arm}/score`, scores(c, c.base[arm]), scores(c, c.cand[arm])),
-    ),
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ARMS } from "./block";
-import { all, type Compared, compared, comparedScores, type Evidence } from "./evidence";
+import { all, type Compared, compared, type Evidence } from "./evidence";
 import { renderBlock } from "./renderers";
 import { prompt } from "./prompt";
 
@@ -78,7 +78,6 @@ describe("the planted stars", () => {
       for (const arm of ARMS)
         for (const side of [c.base[arm], c.cand[arm]])
           expect(Object.values(side.passes).every((p) => p === side.runs)).toBe(true);
-    expect(comparedScores(e.dev).every((r) => r.base === 1 && r.cand === 1)).toBe(true);
   });
 });
 

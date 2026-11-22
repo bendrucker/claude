@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { Argument, Command, Option } from "@commander-js/extra-typings";
 import { z } from "zod";
 
-export const TYPES = [
+const TYPES = [
   "contention",
   "slow-command",
   "failing-command",
@@ -92,7 +92,7 @@ export function ledgerPath(): string {
   return join(state, "friction", "ledger.jsonl");
 }
 
-export function normalizeTarget(target: string): string {
+function normalizeTarget(target: string): string {
   return target.trim().toLowerCase().replaceAll(/\s+/g, " ");
 }
 
@@ -103,7 +103,7 @@ export function fingerprint(type: string, target: string): string {
     .slice(0, 12);
 }
 
-export function localDay(date = new Date()): string {
+function localDay(date = new Date()): string {
   return date.toLocaleDateString("en-CA");
 }
 

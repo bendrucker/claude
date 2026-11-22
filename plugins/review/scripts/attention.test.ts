@@ -1,4 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import {
@@ -22,6 +24,7 @@ import {
   quitSurface,
   type SurfaceControl,
   raiseArgs,
+  readDocResult,
   recordedDocPanes,
   reviewGlyph,
   reviewrOpenArgs,
@@ -307,6 +310,17 @@ describe("docResult", () => {
     ["truncated", '{"decision":', null],
   ])("%s", (_name, text, expected) => {
     expect(docResult(text)).toEqual(expected);
+  });
+});
+
+describe("readDocResult", () => {
+  // A BunFile opened before its file existed reads the later file as empty,
+  // which lost every first-round decision.
+  test("reads a result written after a missing read", async () => {
+    const path = join(await mkdtemp(join(tmpdir(), "review-doc-")), "result.json");
+    expect(await readDocResult(path)).toBeNull();
+    await Bun.write(path, '{"decision":"annotated","feedback":"cut this"}');
+    expect(await readDocResult(path)).toEqual({ decision: "annotated", feedback: "cut this" });
   });
 });
 

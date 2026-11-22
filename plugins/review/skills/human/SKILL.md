@@ -57,7 +57,7 @@ Until Ben says approve, ship, or no further comments, act on the batch and reque
 
 1. Run `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --doc <file>` with `run_in_background: true`.
 2. End the turn with one line saying the review is open right of this pane and its decision resumes the work.
-3. When the task completes, its output is `{"decision": ..., "feedback": ...}`. `approved` ends the review. Any other decision means fold the feedback's annotations in and run the gate again. Exit 2 means plannotator-tui exited without writing a decision: report its stderr and stop.
+3. When the task completes, its output is `{"decision": ..., "feedback": ...}`. `approved` ends the review. Any other decision means fold the feedback's annotations in and run the gate again. Finish every edit to the file, lint fixes included, before running `open --doc` again, since an edit after reopening leaves the pane on a stale draft until Ben presses `r`. Exit 2 means plannotator-tui exited without writing a decision: report its stderr and stop.
 
 ## Browser Gate
 

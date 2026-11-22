@@ -393,6 +393,13 @@ export function docResult(text: string): DocResult | null {
   return parsed.success ? parsed.data : null;
 }
 
+// A BunFile caches the size it first saw, so a handle opened before the file
+// existed reads it as empty. Each read opens a fresh one.
+export async function readDocResult(path: string): Promise<DocResult | null> {
+  const file = Bun.file(path);
+  return (await file.exists()) ? docResult(await file.text()) : null;
+}
+
 // Attention is best effort: a herdr that is down or slow must not fail the
 // skill that asked for it.
 function herdr(args: string[]): boolean {
@@ -558,13 +565,16 @@ function rexOpenDiff(block: string, base: string | undefined): void {
 async function rexGateDoc(block: string, file: string): Promise<void> {
   const resultPath = docResultPath(block);
   mkdirSync(dirname(resultPath), { recursive: true });
-  const result = Bun.file(resultPath);
-  if (await result.exists()) await result.delete();
+  const stale = Bun.file(resultPath);
+  if (await stale.exists()) await stale.delete();
   const split = Bun.spawnSync(["rex", ...rexDocArgs(block, file, resultPath)], {
-    stdio: ["ignore", "ignore", "inherit"],
+    stdio: ["ignore", "ignore", "pipe"],
   });
-  const outcome = (await result.exists()) ? docResult(await result.text()) : null;
+  const outcome = await readDocResult(resultPath);
   if (outcome == null) {
+    // `--require-approval` exits 1 on any decision but approval, which rex reports as an
+    // error. Print it only when no decision came back.
+    process.stderr.write(split.stderr);
     console.error(`plannotator-tui left no decision (rex split exited ${split.exitCode})`);
     process.exit(2);
   }

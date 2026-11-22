@@ -1376,6 +1376,50 @@ describe("outcomes query", () => {
   });
 });
 
+describe("subagent-effort query", () => {
+  // Same delegation-session spawns: the Explore spawn's transcript records high effort on
+  // opus, the pinned github:logs spawn records low effort on haiku, and the override
+  // spawns' transcripts record no effort field. The fork is excluded.
+  const EffortRow = z.object({
+    subagent_type: z.string(),
+    effort: z.string().nullable(),
+    model: z.string().nullable(),
+    spawns: z.bigint(),
+    median_output_tokens: z.bigint().nullable(),
+    median_wall_s: z.number().nullable(),
+    est_cost_usd: z.number().nullable(),
+  });
+
+  async function effortRows() {
+    return (await runQuery(db, "subagent-effort", EffortRow, filterParams())).filter((r) =>
+      ["Explore", "github:logs", "general-purpose"].includes(r.subagent_type),
+    );
+  }
+
+  it("reports the effort each subagent transcript ran at", async () => {
+    const rows = await effortRows();
+    expect(rows.find((r) => r.subagent_type === "Explore")).toMatchObject({
+      effort: "high",
+      model: "opus",
+    });
+    expect(rows.find((r) => r.subagent_type === "github:logs")).toMatchObject({
+      effort: "low",
+      model: "haiku",
+    });
+  });
+
+  it("leaves effort null when the transcript does not record it", async () => {
+    const rows = await effortRows();
+    const generic = rows.filter((r) => r.subagent_type === "general-purpose");
+    expect(generic.every((r) => r.effort === null)).toBe(true);
+  });
+
+  it("sums tokens from the subagent's own transcript", async () => {
+    const rows = await effortRows();
+    expect(Number(rows.find((r) => r.subagent_type === "Explore")?.median_output_tokens)).toBe(500);
+  });
+});
+
 describe("delegation query", () => {
   // delegation-session (opus main model) spawns five Agent calls: an Explore call
   // left to inherit (actual model opus, via its subagent transcript), which lands

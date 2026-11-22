@@ -6,8 +6,6 @@ argument-hint: "[--doc <file>] [--kind <kind>] [--base <ref>] [--reviewer hunk|p
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts:*)"
   - Bash(rex do review_reply:*)
-  - Bash(plannotator review:*)
-  - Bash(plannotator annotate:*)
   - "Bash([:*)"
   - Bash(printf:*)
 ---
@@ -54,13 +52,22 @@ Until Ben says approve, ship, or no further comments, act on the batch and reque
 
 ## Rex Live Notes
 
-Each `watch` event is one saved note, `[review: comment] <path:lines> (id <id>) | <quoted lines> | <body>`, where ` ⏎ ` stands for a newline. On each event, fix the code or document, answer in the reviewer with `rex do review_reply id=<id> text="<what changed>"`, and end the turn. When the event says `reply here`, the reviewer takes no replies, so answer in the turn's text instead. `[review: comment edited]` replaces an earlier note with the same id, so act on the new body. `[review: retracted]` withdraws a note: revert any change made only for it.
+Each `watch` event is one saved note, `[review: comment] <path:lines> (id <id>) | <quoted lines> | <body>`, where ` ⏎ ` stands for a newline. Answer each note with one of:
+
+- a fix, with a reply that states the `path:line` you changed
+- an answer to its question, with no edit
+- a pushback, with the reason
+- one clarifying question
+
+Send the reply with `rex do review_reply id=<id> text="<reply>"` and end the turn. When the event says `reply here`, the reviewer takes no replies, so answer in the turn's text instead. `[review: comment edited]` replaces an earlier note with the same id, so act on the new body. `[review: retracted]` withdraws a note: revert any change made only for it.
+
+To walk Ben through the diff in Hunk or leave notes of your own there, load `hunk:review`.
 
 `[review: closed] <outcome>` means the review ended and `watch` exited. When the monitor expires with the review still open, start `watch` again. A `[review: changes]` turn from Send carries only notes `watch` missed: handle it as Resume says.
 
 ## Browser Gate
 
 1. `attention.ts raise --kind <kind> --summary "..."`
-2. `plannotator review --git --json`, adding `--base <ref>` when the caller resolved one, or `plannotator annotate <file> --gate --json --require-approval`
-3. `attention.ts clear`
-4. Act on the decision. `approved` ends the review. `annotated` means act on the annotations and run the gate again. `dismissed`, or exit 1 from the annotate gate, means not approved: fold the feedback in and run the gate again. Exit 2 is a startup error: report it and stop.
+2. Load `plannotator:gate` and run its gate on the diff, passing `--base <ref>` when the caller resolved one, or on the file.
+3. `attention.ts clear` after each gate returns.
+4. Act on the decision as `plannotator:gate` says, until it reports approval or a startup error.

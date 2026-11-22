@@ -160,6 +160,10 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop them** when `Artifact` loads deferred behind ToolSearch, or when relaunching to publish becomes routine.
 
+`PLANNOTATOR_PLAN_REVIEW=false` turns off plan review in the upstream `plannotator@plannotator` plugin, which [`plannotator`](../plugins/plannotator) depends on. Its `ExitPlanMode` and `EnterPlanMode` hooks then pass through, so plan approval stays in Claude Code's own dialog, and its inbox and review commands stay on. The hooks run the `plannotator` binary on `PATH`, which honors the variable from 0.29.1. It is in managed settings because the plugin dependency installs on every platform.
+
+**Drop it** to route plan approval through Plannotator, or when the `plannotator` plugin drops its upstream dependency.
+
 ## Hooks
 
 Why a hook entry in `user/settings.json` or `managed/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).

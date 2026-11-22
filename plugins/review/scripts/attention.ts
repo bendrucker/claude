@@ -353,26 +353,64 @@ export function rexDiffArgs(block: string, base?: string, batch = false): string
   return args;
 }
 
-export type ClaimOutcome =
-  | { kind: "lines"; lines: string[] }
-  | { kind: "closed" }
-  | { kind: "retry" };
+export const CLOSED = "[review: closed]";
 
-// `rex do` prints a string result JSON-quoted.
-export function claimOutcome(exitCode: number, stdout: string, stderr: string): ClaimOutcome {
-  if (exitCode !== 0) {
-    return stderr.includes("no review is open") ? { kind: "closed" } : { kind: "retry" };
+// The reviewer pane appends one line per note here and a closed line last.
+export function eventsPath(block: string, home = homedir()): string {
+  return join(home, ".local", "state", "rex-review", "blocks", `${block}.events`);
+}
+
+type Read = { missing: true } | { missing: false; offset: number; lines: string[] };
+
+// Whole lines written since `offset`. A shorter file is a new review's, read from the top.
+async function readFrom(path: string, offset: number): Promise<Read> {
+  const file = Bun.file(path);
+  if (!(await file.exists())) return { missing: true };
+  const start = file.size < offset ? 0 : offset;
+  const bytes = await file.slice(start).bytes();
+  // A partial last line waits for the rest of its write.
+  const end = bytes.lastIndexOf(0x0a) + 1;
+  const text = new TextDecoder().decode(bytes.subarray(0, end));
+  return {
+    missing: false,
+    offset: start + end,
+    lines: text.split("\n").filter((l) => l.trim() !== ""),
+  };
+}
+
+// Prints lines appended after the call until a closed line. A missing file
+// means no review is open, after a grace period for one that is opening.
+export async function tailEvents(
+  path: string,
+  emit: (line: string) => void,
+  { pollMs = 200, graceMs = 5_000 } = {},
+): Promise<void> {
+  const file = Bun.file(path);
+  const exists = await file.exists();
+  if (exists && ((await file.text()).trimEnd().split("\n").at(-1) ?? "").startsWith(CLOSED)) {
+    emit(CLOSED);
+    return;
   }
-  const text = stdout.trim();
-  if (text === "") return { kind: "lines", lines: [] };
-  let result: unknown;
-  try {
-    result = JSON.parse(text);
-  } catch {
-    return { kind: "retry" };
+  let offset = exists ? file.size : 0;
+  let seen = exists;
+  const deadline = Date.now() + graceMs;
+  for (;;) {
+    // oxlint-disable-next-line no-await-in-loop -- each read starts where the last ended.
+    const read = await readFrom(path, offset);
+    if (read.missing && (seen || Date.now() >= deadline)) {
+      emit(CLOSED);
+      return;
+    }
+    if (!read.missing) {
+      seen = true;
+      offset = read.offset;
+      const closed = read.lines.findIndex((line) => line.startsWith(CLOSED));
+      for (const line of closed === -1 ? read.lines : read.lines.slice(0, closed + 1)) emit(line);
+      if (closed !== -1) return;
+    }
+    // oxlint-disable-next-line no-await-in-loop -- polling waits between reads.
+    await Bun.sleep(pollMs);
   }
-  if (typeof result !== "string") return { kind: "retry" };
-  return { kind: "lines", lines: result.split("\n").filter((line) => line.trim() !== "") };
 }
 
 export function docResultPath(block: string, home = homedir()): string {
@@ -624,26 +662,6 @@ function rexOpenDiff(block: string, base: string | undefined, batch: boolean): v
   console.log(`opened Hunk beside ${block}`);
 }
 
-// Each stdout line is one Monitor event.
-function rexWatch(block: string): never {
-  for (;;) {
-    const result = Bun.spawnSync(["rex", "do", "review_claim", "-b", block], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    const outcome = claimOutcome(
-      result.exitCode,
-      result.stdout.toString(),
-      result.stderr.toString(),
-    );
-    if (outcome.kind === "closed") {
-      console.log("[review: closed]");
-      process.exit(0);
-    }
-    if (outcome.kind === "lines") for (const line of outcome.lines) console.log(line);
-    Bun.sleepSync(1000);
-  }
-}
-
 // Blocks until Ben quits plannotator-tui, so the skill runs it in the background.
 async function rexGateDoc(block: string, file: string): Promise<void> {
   const resultPath = docResultPath(block);
@@ -847,10 +865,14 @@ const watchCmd = command(
       description: "Under Rex, print each Hunk note as Ben saves it until the review closes",
     },
   },
-  () => {
+  async () => {
     const host = sessionHost();
     if (host.kind !== "rex") fail("watch needs a Rex block: herdr delivers notes on Send");
-    rexWatch(host.block);
+    // Each stdout line is one Monitor event.
+    await tailEvents(eventsPath(host.block), (line) => {
+      console.log(line);
+    });
+    process.exit(0);
   },
 );
 

@@ -1,6 +1,10 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["local>bendrucker/renovate-config:application", "schedule:weekly", ":preserveSemverRanges"],
+  extends: [
+    "local>bendrucker/renovate-config:application",
+    "schedule:weekly",
+    ":preserveSemverRanges",
+  ],
   minimumReleaseAge: "7 days",
   internalChecksFilter: "strict",
   customManagers: [

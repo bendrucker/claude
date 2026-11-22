@@ -5,10 +5,8 @@ import { $ } from "bun";
 import { BashInput, PreToolUse } from "./hook-input";
 
 /**
- * The sandbox denies every `.git/config` write, so a sandboxed `git push -u`
- * lands the push, fails the upstream write, and still exits 0. Hooks run
- * outside the sandbox, so this one records the tracking first and lets the
- * command run unchanged. Rewriting it would make auto mode refuse the call.
+ * A sandboxed `git push -u` can't write `.git/config` but still lands the push
+ * and exits 0. Hooks run outside the sandbox, so this one records the tracking.
  */
 
 const UPSTREAM_FLAGS = new Set(["-u", "--set-upstream"]);

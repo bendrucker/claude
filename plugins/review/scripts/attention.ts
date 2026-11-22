@@ -346,98 +346,90 @@ export function sessionHost(env: Record<string, string | undefined> = process.en
   return { kind: "none" };
 }
 
-export function rexDiffArgs(block: string, base?: string): string[] {
+export const reviewers = ["hunk", "plannotator"] as const;
+export type Reviewer = (typeof reviewers)[number];
+
+export function isReviewer(value: string): value is Reviewer {
+  return (reviewers as readonly string[]).includes(value);
+}
+
+export interface RexReview {
+  base?: string | undefined;
+  batch?: boolean;
+  reviewer?: Reviewer | undefined;
+  doc?: string | undefined;
+}
+
+// A document always opens in plannotator-tui, which the review CLI picks from `doc`.
+export function rexReviewArgs(block: string, review: RexReview = {}): string[] {
   const args = ["do", "review_changes", `block=${block}`];
-  if (base != null && base !== "") args.push(`revisions=${base}..HEAD`);
+  if (review.doc != null) args.push(`doc=${resolve(review.doc)}`);
+  else {
+    if (review.base != null && review.base !== "") args.push(`revisions=${review.base}..HEAD`);
+    if (review.reviewer != null) args.push(`reviewer=${review.reviewer}`);
+  }
+  args.push(`mode=${review.batch === true ? "batch" : "live"}`);
   return args;
 }
 
-export function docResultPath(block: string, home = homedir()): string {
-  return `${markerPath(block, home)}.result.json`;
+export const CLOSED = "[review: closed]";
+
+// The reviewer pane appends one line per note here and a closed line last.
+export function eventsPath(block: string, home = homedir()): string {
+  return join(home, ".local", "state", "rex-review", "blocks", `${block}.events`);
 }
 
-export function rexDocArgs(block: string, file: string, resultFile: string): string[] {
-  const path = resolve(file);
-  return [
-    "split",
-    "-b",
-    block,
-    "--split=right",
-    "--ratio=75",
-    "--cwd",
-    dirname(path),
-    "--json",
-    "--",
-    "plannotator-tui",
-    path,
-    "--gate",
-    "--json",
-    "--require-approval",
-    "--result-file",
-    resultFile,
-  ];
-}
+type Read = { missing: true } | { missing: false; offset: number; lines: string[] };
 
-// The gate pane open for each file. A second request for the file reloads that pane.
-export function rexGatePanesPath(block: string, home = homedir()): string {
-  return `${markerPath(block, home)}.gate.json`;
-}
-
-const SplitCreated = z.object({ block_ids: z.array(z.string()).min(1) });
-
-export function splitBlock(stdout: string): string | null {
-  let json: unknown;
-  try {
-    json = JSON.parse(stdout);
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-    return null;
-  }
-  const parsed = SplitCreated.safeParse(json);
-  return parsed.success ? (parsed.data.block_ids[0] ?? null) : null;
-}
-
-const RexProcess = z.object({ foreground: z.object({ name: z.string() }).nullish() });
-
-export function rexGateRunning(processInfo: string): boolean {
-  let json: unknown;
-  try {
-    json = JSON.parse(processInfo);
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-    return false;
-  }
-  const parsed = RexProcess.safeParse(json);
-  return parsed.success && (parsed.data.foreground?.name.startsWith(DOC_PROCESS) ?? false);
-}
-
-// `r` re-reads the file and re-anchors the notes. False when the pane no longer runs the gate.
-function reloadRexGate(gate: string): boolean {
-  const info = Bun.spawnSync(["rex", "do", "com.superlogical.terminal.process", "-b", gate]);
-  if (info.exitCode !== 0 || !rexGateRunning(info.stdout.toString())) return false;
-  return Bun.spawnSync(["rex", "send", "-b", gate, "r"]).exitCode === 0;
-}
-
-const DocResult = z.object({ decision: z.string(), feedback: z.string().nullish() });
-export type DocResult = z.infer<typeof DocResult>;
-
-export function docResult(text: string): DocResult | null {
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-    return null;
-  }
-  const parsed = DocResult.safeParse(json);
-  return parsed.success ? parsed.data : null;
-}
-
-// A BunFile caches the size it first saw, so a handle opened before the file
-// existed reads it as empty. Each read opens a fresh one.
-export async function readDocResult(path: string): Promise<DocResult | null> {
+// Whole lines written since `offset`. A shorter file is a new review's, read from the top.
+async function readFrom(path: string, offset: number): Promise<Read> {
   const file = Bun.file(path);
-  return (await file.exists()) ? docResult(await file.text()) : null;
+  if (!(await file.exists())) return { missing: true };
+  const start = file.size < offset ? 0 : offset;
+  const bytes = await file.slice(start).bytes();
+  // A partial last line waits for the rest of its write.
+  const end = bytes.lastIndexOf(0x0a) + 1;
+  const text = new TextDecoder().decode(bytes.subarray(0, end));
+  return {
+    missing: false,
+    offset: start + end,
+    lines: text.split("\n").filter((l) => l.trim() !== ""),
+  };
+}
+
+// Prints lines appended after the call until a closed line. A missing file
+// means no review is open, after a grace period for one that is opening.
+export async function tailEvents(
+  path: string,
+  emit: (line: string) => void,
+  { pollMs = 200, graceMs = 5_000 } = {},
+): Promise<void> {
+  const file = Bun.file(path);
+  const exists = await file.exists();
+  if (exists && ((await file.text()).trimEnd().split("\n").at(-1) ?? "").startsWith(CLOSED)) {
+    emit(CLOSED);
+    return;
+  }
+  let offset = exists ? file.size : 0;
+  let seen = exists;
+  const deadline = Date.now() + graceMs;
+  for (;;) {
+    // oxlint-disable-next-line no-await-in-loop -- each read starts where the last ended.
+    const read = await readFrom(path, offset);
+    if (read.missing && (seen || Date.now() >= deadline)) {
+      emit(CLOSED);
+      return;
+    }
+    if (!read.missing) {
+      seen = true;
+      offset = read.offset;
+      const closed = read.lines.findIndex((line) => line.startsWith(CLOSED));
+      for (const line of closed === -1 ? read.lines : read.lines.slice(0, closed + 1)) emit(line);
+      if (closed !== -1) return;
+    }
+    // oxlint-disable-next-line no-await-in-loop -- polling waits between reads.
+    await Bun.sleep(pollMs);
+  }
 }
 
 // Attention is best effort: a herdr that is down or slow must not fail the
@@ -593,52 +585,14 @@ async function closeDoc(paneId: string, file: string): Promise<void> {
   await writeDocPanes(recordPath, panes);
 }
 
-function rexOpenDiff(block: string, base: string | undefined): void {
-  const result = Bun.spawnSync(["rex", ...rexDiffArgs(block, base)], {
+function rexOpen(block: string, review: RexReview): void {
+  const result = Bun.spawnSync(["rex", ...rexReviewArgs(block, review)], {
     stdio: ["ignore", "inherit", "inherit"],
   });
   if (result.exitCode !== 0) process.exit(1);
-  console.log(`opened Hunk beside ${block}`);
-}
-
-// Blocks until Ben quits plannotator-tui, so the skill runs it in the background.
-async function rexGateDoc(block: string, file: string): Promise<void> {
-  const resultPath = docResultPath(block);
-  mkdirSync(dirname(resultPath), { recursive: true });
-  const stale = Bun.file(resultPath);
-  if (await stale.exists()) await stale.delete();
-  const path = canonical(resolve(file));
-  const recordPath = rexGatePanesPath(block);
-  const panes = await readDocPanes(recordPath);
-  let gate = panes[path];
-  if (gate != null && !reloadRexGate(gate)) gate = undefined;
-  if (gate == null) {
-    const split = Bun.spawnSync(["rex", ...rexDocArgs(block, path, resultPath)], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    gate = splitBlock(split.stdout.toString()) ?? undefined;
-    if (gate == null) {
-      process.stderr.write(split.stderr);
-      console.error(`rex split opened no pane (exited ${split.exitCode})`);
-      process.exit(2);
-    }
-    panes[path] = gate;
-    await writeDocPanes(recordPath, panes);
-  } else {
-    console.error(`reloaded ${gate}`);
-  }
-  const wait = Bun.spawnSync(["rex", "wait", gate], { stdio: ["ignore", "ignore", "pipe"] });
-  delete panes[path];
-  await writeDocPanes(recordPath, panes);
-  const outcome = await readDocResult(resultPath);
-  if (outcome == null) {
-    // `--require-approval` exits 1 on any decision but approval, which rex reports as an
-    // error. Print it only when no decision came back.
-    process.stderr.write(wait.stderr);
-    console.error(`plannotator-tui left no decision (rex wait exited ${wait.exitCode})`);
-    process.exit(2);
-  }
-  console.log(JSON.stringify(outcome));
+  const surface =
+    review.doc != null || review.reviewer === "plannotator" ? "plannotator-tui" : "Hunk";
+  console.log(`opened ${surface} beside ${block}`);
 }
 
 function fail(message: string): never {
@@ -722,6 +676,14 @@ const openCmd = command(
         type: String,
         description: "Under Rex, review <base>..HEAD instead of the working diff",
       },
+      batch: {
+        type: Boolean,
+        description: "Under Rex, hold notes for Send instead of delivering each to `watch`",
+      },
+      reviewer: {
+        type: String,
+        description: `Under Rex, the diff reviewer: ${reviewers.join(" or ")}`,
+      },
     },
   },
   async (parsed) => {
@@ -733,9 +695,16 @@ const openCmd = command(
     if (host.kind === "none") fail("no herdr pane or Rex block: run the browser gate");
     const doc = parsed.flags.doc;
     if (doc != null && !(await Bun.file(doc).exists())) fail(`no such file: ${doc}`);
+    const { reviewer } = parsed.flags;
+    if (reviewer != null && !isReviewer(reviewer))
+      fail(`--reviewer must be ${reviewers.join(" or ")}`);
     if (host.kind === "rex") {
-      if (doc != null) await rexGateDoc(host.block, doc);
-      else rexOpenDiff(host.block, parsed.flags.base);
+      rexOpen(host.block, {
+        doc: doc ?? undefined,
+        base: parsed.flags.base,
+        batch: parsed.flags.batch === true,
+        reviewer: reviewer ?? undefined,
+      });
       process.exit(0);
     }
     if (doc != null) {
@@ -793,9 +762,30 @@ const closeCmd = command(
   },
 );
 
+const watchCmd = command(
+  {
+    name: "watch",
+    help: {
+      description: "Under Rex, print each Hunk note as Ben saves it until the review closes",
+    },
+  },
+  async () => {
+    const host = sessionHost();
+    if (host.kind !== "rex") fail("watch needs a Rex block: herdr delivers notes on Send");
+    // Each stdout line is one Monitor event.
+    await tailEvents(eventsPath(host.block), (line) => {
+      console.log(line);
+    });
+    process.exit(0);
+  },
+);
+
 if (import.meta.main) {
   await cli(
-    { name: "attention", commands: [raiseCmd, clearCmd, promptCmd, openCmd, closeCmd] },
+    {
+      name: "attention",
+      commands: [raiseCmd, clearCmd, promptCmd, openCmd, closeCmd, watchCmd],
+    },
     (parsed) => {
       parsed.showHelp();
       process.exit(1);

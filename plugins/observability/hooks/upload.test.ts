@@ -33,20 +33,35 @@ describe("sessionFiles", () => {
     await Bun.write(join(root, "abc", "subagents", "agent-1.jsonl"), "{}\n");
     await Bun.write(join(root, "abc", "subagents", "agent-1.meta.json"), "{}");
     expect(sessionFiles(transcript)).toEqual([
-      transcript,
-      join(root, "abc", "subagents", "agent-1.jsonl"),
+      [transcript, "abc.jsonl"],
+      [join(root, "abc", "subagents", "agent-1.jsonl"), "abc/subagents/agent-1.jsonl"],
     ]);
   });
 
   test("is just the transcript when there are no subagents", () => {
     const root = mkdtempSync(join(tmpdir(), "upload-"));
-    expect(sessionFiles(join(root, "abc.jsonl"))).toEqual([join(root, "abc.jsonl")]);
+    expect(sessionFiles(join(root, "abc.jsonl"))).toEqual([[join(root, "abc.jsonl"), "abc.jsonl"]]);
+  });
+
+  test("keys the session's mod events under mod-events/", async () => {
+    const root = mkdtempSync(join(tmpdir(), "upload-"));
+    const events = join(root, "mod-events", "abc");
+    await Bun.write(join(events, "plan.1.0.jsonl"), "{}\n");
+    expect(sessionFiles(join(root, "abc.jsonl"), events)).toEqual([
+      [join(root, "abc.jsonl"), "abc.jsonl"],
+      [join(events, "plan.1.0.jsonl"), "mod-events/plan.1.0.jsonl"],
+    ]);
+  });
+
+  test("skips a missing mod-events directory", () => {
+    const root = mkdtempSync(join(tmpdir(), "upload-"));
+    expect(sessionFiles(join(root, "abc.jsonl"), join(root, "none"))).toHaveLength(1);
   });
 });
 
 test("objectKey nests files under the session", () => {
   const target = { base: "https://b", prefix: "transcripts/cloud" };
-  expect(objectKey(target, "cse_1", "/p", "/p/abc/subagents/agent-1.jsonl")).toBe(
+  expect(objectKey(target, "cse_1", "abc/subagents/agent-1.jsonl")).toBe(
     "transcripts/cloud/cse_1/abc/subagents/agent-1.jsonl",
   );
 });

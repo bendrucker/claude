@@ -37,6 +37,7 @@ The query lines are generated from those headers. Edit the header, then regenera
 - `skill-auto-vs-explicit` [`min_calls`]: Per skill, how invocations split between the model choosing it (`model_auto`), another skill chaining into it (`chained`), and the user typing its slash command (`explicit`).
 - `stats`: Tool usage breakdown with error rates and aggregate totals.
 - `stop-hook-noop-detector`: Stop hooks that cost wall-clock and produce nothing, ranked as removal candidates.
+- `subagent-effort`: Spawn count, model, tokens, cost, and wall time per subagent type and the effort level it actually ran at.
 - `text-export` [`role`, `model`, `min_chars`]: Dump cleaned prose from `text_content`, one row per text item, TSV-friendly.
 - `tool-failure-rates` [`min_calls`, `limit`]: Per-tool failure rates over calls that ran, with the failures grouped by normalized signature and dated so a fixed failure reads as stopped.
 - `top-sessions` [`sort`, `limit`]: Sessions ranked by spend, one row per session, carrying `msgs`, `out_tokens`, `avg_out`, `cost_usd_est`, and `last_activity`.

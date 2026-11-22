@@ -194,7 +194,7 @@ async function removeIfEmpty(dir: string): Promise<void> {
 }
 
 /**
- * Indexes this machine's debug logs and mod events, which live beside its projects
+ * Indexes a host's debug logs and mod events, which live beside its projects
  * directory, then prunes past each source's cap. Returns how many files changed.
  */
 export async function ensureTelemetry(

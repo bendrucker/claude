@@ -51,7 +51,15 @@ When plugin code drives another program, such as a multiplexer, a TUI, an extern
 
 ## Dependencies
 
-A skill that loads a skill from another plugin creates a plugin dependency. Declare it in the `dependencies` array of the depending plugin's `plugin.json`, as a bare plugin name resolved against this marketplace. Declare it only when the skill is unusable without the target, since `dependencies` requires the named plugin to be enabled and cannot express a choice between two providers.
+A skill that loads a skill from another plugin creates a plugin dependency. Declare it in the `dependencies` array of the depending plugin's `plugin.json`. `dependencies` requires each listed plugin to be enabled and cannot express a choice between two providers, so declare one only in these cases:
+
+- A skill is unusable without the target.
+- A tool plugin layers Ben's conventions for one external tool over that tool's upstream plugin. Write the upstream as `<plugin>@<marketplace>` and add its marketplace to `allowCrossMarketplaceDependenciesOn` in `.claude-plugin/marketplace.json`. Put the marketplace in `extraKnownMarketplaces` in `user/settings.json`, pinned to a tag.
+- A workflow plugin routes to the tool plugins for the reviewers, viewers, or CLIs it opens, as `review` depends on `hunk` and `plannotator`. Write a plugin in this marketplace as its bare name.
+
+Keep instructions specific to one tool in that tool's plugin, and keep the workflow plugin's skills to routing and the steps every tool shares.
+
+When the upstream provides no instructions of its own, a tool plugin injects the text bundled with the installed binary through a `!` line. That text matches the installed version.
 
 Plugin-specific code dependencies go in the plugin's own `plugins/<name>/package.json`, which the root `workspaces` globs pick up. Plugin runtime code imports only from its own directory and the npm registry, because Claude Code caches each plugin alone and a `workspace:` or `file:` specifier into `packages/` doesn't resolve there. Plugins that need the same code each carry a copy, which a checkout-only test under `packages/` can pin together. Checkout-only code, such as eval harnesses and repo tooling, imports `packages/` by relative path. Run `bun scripts/check-plugin-imports.ts` to verify.
 

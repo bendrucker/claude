@@ -1,16 +1,16 @@
 import { describe, expect, mock, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import {
+  CLOSED,
   clearArgs,
+  eventsPath,
   currentPane,
   docOpenArgs,
   docPanePath,
   type DocPanes,
-  docResult,
-  docResultPath,
   existingReviewr,
   isKind,
   kinds,
@@ -24,17 +24,15 @@ import {
   quitSurface,
   type SurfaceControl,
   raiseArgs,
-  readDocResult,
   recordedDocPanes,
   reviewGlyph,
   reviewrOpenArgs,
-  rexDiffArgs,
-  rexDocArgs,
-  rexGateRunning,
-  splitBlock,
+  rexReviewArgs,
+  type RexReview,
   sessionHost,
   type Host,
   surfaceState,
+  tailEvents,
   type ReviewrLookup,
   type SurfaceState,
 } from "./attention";
@@ -256,73 +254,116 @@ describe("sessionHost", () => {
   });
 });
 
-describe("Rex targets", () => {
-  test.each<[string, string | undefined, string[]]>([
-    ["working diff", undefined, ["do", "review_changes", "block=block:01a1"]],
-    ["empty base", "", ["do", "review_changes", "block=block:01a1"]],
-    [
-      "against a base",
-      "origin/main",
-      ["do", "review_changes", "block=block:01a1", "revisions=origin/main..HEAD"],
-    ],
-  ])("diff: %s", (_name, base, expected) => {
-    expect(rexDiffArgs("block:01a1", base)).toEqual(expected);
+describe("rexReviewArgs", () => {
+  test.each<{ name: string; review: RexReview; expected: string[] }>([
+    { name: "working diff", review: {}, expected: ["mode=live"] },
+    { name: "empty base", review: { base: "" }, expected: ["mode=live"] },
+    {
+      name: "against a base",
+      review: { base: "origin/main" },
+      expected: ["revisions=origin/main..HEAD", "mode=live"],
+    },
+    {
+      name: "plannotator diff in batch",
+      review: { reviewer: "plannotator", batch: true },
+      expected: ["reviewer=plannotator", "mode=batch"],
+    },
+    {
+      name: "a document passes its absolute path and drops diff options",
+      review: { doc: "/repo/tmp/pr-body.md", base: "origin/main", reviewer: "hunk" },
+      expected: ["doc=/repo/tmp/pr-body.md", "mode=live"],
+    },
+  ])("$name", ({ review, expected }) => {
+    expect(rexReviewArgs("block:01a1", review)).toEqual([
+      "do",
+      "review_changes",
+      "block=block:01a1",
+      ...expected,
+    ]);
   });
 
-  test("a document gates plannotator-tui in a wide split right of the block", () => {
-    expect(rexDocArgs("block:01a1", "/repo/tmp/pr-body.md", "/home/r.json")).toMatchInlineSnapshot(`
-      [
-        "split",
-        "-b",
-        "block:01a1",
-        "--split=right",
-        "--ratio=75",
-        "--cwd",
-        "/repo/tmp",
-        "--json",
-        "--",
-        "plannotator-tui",
-        "/repo/tmp/pr-body.md",
-        "--gate",
-        "--json",
-        "--require-approval",
-        "--result-file",
-        "/home/r.json",
-      ]
-    `);
-  });
-
-  test("the result file sits beside the block's marker", () => {
-    expect(docResultPath("block:01a1", "/home")).toBe(
-      "/home/.cache/claude/review-human/block-01a1.result.json",
+  test("a relative document resolves against the working directory", () => {
+    expect(rexReviewArgs("block:01a1", { doc: "design.md" })).toContain(
+      `doc=${join(process.cwd(), "design.md")}`,
     );
   });
 });
 
-describe("docResult", () => {
-  test.each<[string, string, ReturnType<typeof docResult>]>([
-    ["approved", '{"decision":"approved","feedback":""}', { decision: "approved", feedback: "" }],
-    [
-      "annotated",
-      String.raw`{"decision":"annotated","feedback":"> quote\n\ncut this"}`,
-      { decision: "annotated", feedback: "> quote\n\ncut this" },
-    ],
-    ["no feedback field", '{"decision":"dismissed"}', { decision: "dismissed" }],
-    ["no decision", '{"feedback":"x"}', null],
-    ["truncated", '{"decision":', null],
-  ])("%s", (_name, text, expected) => {
-    expect(docResult(text)).toEqual(expected);
-  });
-});
+describe("tailEvents", () => {
+  const A = "[review: comment] a.ts:1 (id x) | one";
+  const B = "[review: comment] b.ts:2 (id y) | two";
+  const OLD = "[review: comment] old.ts:1 (id o) | before the watch";
 
-describe("readDocResult", () => {
-  // A BunFile opened before its file existed reads the later file as empty,
-  // which lost every first-round decision.
-  test("reads a result written after a missing read", async () => {
-    const path = join(await mkdtemp(join(tmpdir(), "review-doc-")), "result.json");
-    expect(await readDocResult(path)).toBeNull();
-    await Bun.write(path, '{"decision":"annotated","feedback":"cut this"}');
-    expect(await readDocResult(path)).toEqual({ decision: "annotated", feedback: "cut this" });
+  // Runs the tail against a scratch file, applying each write after the tail starts.
+  async function tail(
+    initial: string | undefined,
+    writes: ((path: string) => Promise<void>)[],
+  ): Promise<string[]> {
+    const path = join(await mkdtemp(join(tmpdir(), "events-")), "block.events");
+    if (initial !== undefined) await Bun.write(path, initial);
+    const lines: string[] = [];
+    const done = tailEvents(
+      path,
+      (line) => {
+        lines.push(line);
+      },
+      { pollMs: 5, graceMs: 100 },
+    );
+    for (const change of writes) {
+      // oxlint-disable-next-line no-await-in-loop -- each write lands after the tail has read the last.
+      await Bun.sleep(20).then(() => change(path));
+    }
+    await done;
+    return lines;
+  }
+
+  const write = (text: string) => async (path: string) => {
+    await Bun.write(path, text);
+  };
+
+  test.each<{ name: string; initial?: string; writes: string[]; expected: string[] }>([
+    {
+      name: "notes after the start arrive in order and the closed line ends the tail",
+      initial: `${OLD}\n`,
+      writes: [`${OLD}\n${A}\n`, `${OLD}\n${A}\n${B}\n${CLOSED} approved\n`],
+      expected: [A, B, `${CLOSED} approved`],
+    },
+    {
+      name: "a partial line waits for its newline",
+      initial: "",
+      writes: [A.slice(0, 10), `${A}\n${CLOSED} closed\n`],
+      expected: [A, `${CLOSED} closed`],
+    },
+    {
+      name: "a file that appears during the grace period is read from the top",
+      writes: [`${A}\n${CLOSED} dismissed\n`],
+      expected: [A, `${CLOSED} dismissed`],
+    },
+    {
+      name: "a truncated file is a new review read from the top",
+      initial: `${OLD}\n${OLD}\n`,
+      writes: [`${B}\n${CLOSED} approved\n`],
+      expected: [B, `${CLOSED} approved`],
+    },
+    { name: "a missing file reports closed", writes: [], expected: [CLOSED] },
+    {
+      name: "a file ending in a closed line is a finished review",
+      initial: `${OLD}\n${CLOSED} approved\n`,
+      writes: [],
+      expected: [CLOSED],
+    },
+  ])("$name", async ({ initial, writes, expected }) => {
+    expect(await tail(initial, writes.map(write))).toEqual(expected);
+  });
+
+  test("a deleted file reports closed", async () => {
+    expect(await tail("", [write(`${A}\n`), (path) => rm(path)])).toEqual([A, CLOSED]);
+  });
+
+  test("eventsPath sits beside the block's review pointer", () => {
+    expect(eventsPath("block:01a1", "/home")).toBe(
+      "/home/.local/state/rex-review/blocks/block:01a1.events",
+    );
   });
 });
 
@@ -582,26 +623,5 @@ describe("quitSurface", () => {
     const control = makeControl(states, quits);
     expect(quitSurface("wE5:p4", control)).toEqual(expected);
     expect(control.quitCalls).toBe(quitCalls);
-  });
-});
-
-describe("splitBlock", () => {
-  test.each<[string, string, string | null]>([
-    ["first block", '{"block_ids":["block:01a2"],"window_id":"window:1"}', "block:01a2"],
-    ["no blocks", '{"block_ids":[]}', null],
-    ["error text", "Error: no such block", null],
-  ])("%s", (_name, stdout, expected) => {
-    expect(splitBlock(stdout)).toBe(expected);
-  });
-});
-
-describe("rexGateRunning", () => {
-  test.each<[string, string, boolean]>([
-    ["plannotator-tui in front", '{"foreground":{"pid":7,"name":"plannotator-tui"}}', true],
-    ["shell in front", '{"foreground":{"pid":7,"name":"zsh"}}', false],
-    ["exited", '{"last_exit":1,"foreground":null}', false],
-    ["empty output", "", false],
-  ])("%s", (_name, processInfo, expected) => {
-    expect(rexGateRunning(processInfo)).toBe(expected);
   });
 });

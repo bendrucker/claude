@@ -4,27 +4,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
-import { dropFlag, parseUpstreamPush, processInput } from "./push-upstream";
+import { parseUpstreamPush, processInput } from "./push-upstream";
 
 describe("parseUpstreamPush", () => {
   test.each([
-    ["git push -u origin HEAD", "git push origin HEAD"],
-    ["git push --set-upstream origin feat", "git push origin feat"],
-    ["git push -u origin HEAD 2>&1 | tail -3", "git push origin HEAD 2>&1 | tail -3"],
-    [
-      "git add . && git push -u origin HEAD && gh pr create",
-      "git add . && git push origin HEAD && gh pr create",
-    ],
-    ["git push origin -u HEAD:refs/heads/feat", "git push origin HEAD:refs/heads/feat"],
-    ["git push --force-with-lease -u origin +HEAD", "git push --force-with-lease origin +HEAD"],
-    [
-      "git -c 'credential.helper=!gh auth git-credential' push -u origin HEAD",
-      "git -c 'credential.helper=!gh auth git-credential' push origin HEAD",
-    ],
-  ])("%s", (command, rewritten) => {
-    const push = parseUpstreamPush(command);
-    expect(push).not.toBeNull();
-    if (push) expect(dropFlag(command, push.flag)).toBe(rewritten);
+    "git push -u origin HEAD",
+    "git push --set-upstream origin feat",
+    "git push -u origin HEAD 2>&1 | tail -3",
+    "git add . && git push -u origin HEAD && gh pr create",
+    "git push origin -u HEAD:refs/heads/feat",
+    "git push --force-with-lease -u origin +HEAD",
+    "git -c 'credential.helper=!gh auth git-credential' push -u origin HEAD",
+  ])("%s", (command) => {
+    expect(parseUpstreamPush(command)).not.toBeNull();
   });
 
   test.each([
@@ -73,12 +65,12 @@ describe("processInput", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  function input(command: string, permissionMode = "default"): PreToolUseHookInput {
+  function input(command: string): PreToolUseHookInput {
     return {
       session_id: "test",
       transcript_path: "",
       cwd: worktree,
-      permission_mode: permissionMode,
+      permission_mode: "auto",
       hook_event_name: "PreToolUse",
       tool_name: "Bash",
       tool_input: { command, description: "push" },
@@ -90,25 +82,30 @@ describe("processInput", () => {
     return (await $`git -C ${worktree} config --get-regexp ^branch\.feat\.`.quiet()).text();
   }
 
-  test("records tracking in the shared config and drops -u", async () => {
+  test("records tracking in the shared config and leaves the command unchanged", async () => {
     const output = await processInput(input("git push -u origin HEAD 2>&1 | tail -3"));
-    expect(output?.hookSpecificOutput).toMatchObject({
-      hookEventName: "PreToolUse",
-      updatedInput: { command: "git push origin HEAD 2>&1 | tail -3", description: "push" },
-    });
+    const hook = output?.hookSpecificOutput;
+    expect(hook).toHaveProperty("additionalContext");
+    expect(hook).not.toHaveProperty("updatedInput");
+    expect(hook).not.toHaveProperty("permissionDecision");
     expect(await tracking()).toBe("branch.feat.remote origin\nbranch.feat.merge refs/heads/feat\n");
   });
 
-  test("in auto mode, records tracking and denies with the command minus -u", async () => {
-    await $`git -C ${worktree} branch -q --set-upstream-to=base`.quiet();
-    const output = await processInput(input("git push -u origin HEAD", "auto"));
-    const hook = output?.hookSpecificOutput;
-    expect(hook).not.toHaveProperty("updatedInput");
-    expect(hook).toHaveProperty("permissionDecision", "deny");
-    expect(hook && "permissionDecisionReason" in hook && hook.permissionDecisionReason).toEndWith(
-      ": git push origin HEAD",
-    );
-    expect(await tracking()).toBe("branch.feat.remote origin\nbranch.feat.merge refs/heads/feat\n");
+  test("a push -u that cannot lock the config still lands and exits 0", async () => {
+    await $`git init -q --bare ${join(root, "remote.git")}`.quiet();
+    await processInput(input("git push -u origin HEAD"));
+    // A held lock fails -u's config write the way the sandbox's deny does.
+    await Bun.write(join(root, "main", ".git", "config.lock"), "");
+    try {
+      const push = await $`git -C ${worktree} push -u origin HEAD`.quiet().nothrow();
+      expect(push.stderr.toString()).toContain("could not lock config file");
+      expect(push.exitCode).toBe(0);
+      const remote = await $`git -C ${worktree} ls-remote origin refs/heads/feat`.quiet();
+      expect(remote.text()).toContain("refs/heads/feat");
+      expect(await tracking()).toBe("branch.feat.remote origin\nbranch.feat.merge refs/heads/feat\n");
+    } finally {
+      await rm(join(root, "main", ".git", "config.lock"), { force: true });
+    }
   });
 
   test("passes through a refspec naming another local branch", async () => {

@@ -366,7 +366,7 @@ export function rexDocArgs(block: string, file: string, resultFile: string): str
     "--ratio=75",
     "--cwd",
     dirname(path),
-    "--wait",
+    "--json",
     "--",
     "plannotator-tui",
     path,
@@ -376,6 +376,46 @@ export function rexDocArgs(block: string, file: string, resultFile: string): str
     "--result-file",
     resultFile,
   ];
+}
+
+// The gate pane open for each file. A second request for the file reloads that pane.
+export function rexGatePanesPath(block: string, home = homedir()): string {
+  return `${markerPath(block, home)}.gate.json`;
+}
+
+const SplitCreated = z.object({ block_ids: z.array(z.string()).min(1) });
+
+export function splitBlock(stdout: string): string | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(stdout);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    return null;
+  }
+  const parsed = SplitCreated.safeParse(json);
+  return parsed.success ? (parsed.data.block_ids[0] ?? null) : null;
+}
+
+const RexProcess = z.object({ foreground: z.object({ name: z.string() }).nullish() });
+
+export function rexGateRunning(processInfo: string): boolean {
+  let json: unknown;
+  try {
+    json = JSON.parse(processInfo);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    return false;
+  }
+  const parsed = RexProcess.safeParse(json);
+  return parsed.success && (parsed.data.foreground?.name.startsWith(DOC_PROCESS) ?? false);
+}
+
+// `r` re-reads the file and re-anchors the notes. False when the pane no longer runs the gate.
+function reloadRexGate(gate: string): boolean {
+  const info = Bun.spawnSync(["rex", "do", "com.superlogical.terminal.process", "-b", gate]);
+  if (info.exitCode !== 0 || !rexGateRunning(info.stdout.toString())) return false;
+  return Bun.spawnSync(["rex", "send", "-b", gate, "r"]).exitCode === 0;
 }
 
 const DocResult = z.object({ decision: z.string(), feedback: z.string().nullish() });
@@ -567,15 +607,35 @@ async function rexGateDoc(block: string, file: string): Promise<void> {
   mkdirSync(dirname(resultPath), { recursive: true });
   const stale = Bun.file(resultPath);
   if (await stale.exists()) await stale.delete();
-  const split = Bun.spawnSync(["rex", ...rexDocArgs(block, file, resultPath)], {
-    stdio: ["ignore", "ignore", "pipe"],
-  });
+  const path = canonical(resolve(file));
+  const recordPath = rexGatePanesPath(block);
+  const panes = await readDocPanes(recordPath);
+  let gate = panes[path];
+  if (gate != null && !reloadRexGate(gate)) gate = undefined;
+  if (gate == null) {
+    const split = Bun.spawnSync(["rex", ...rexDocArgs(block, path, resultPath)], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    gate = splitBlock(split.stdout.toString()) ?? undefined;
+    if (gate == null) {
+      process.stderr.write(split.stderr);
+      console.error(`rex split opened no pane (exited ${split.exitCode})`);
+      process.exit(2);
+    }
+    panes[path] = gate;
+    await writeDocPanes(recordPath, panes);
+  } else {
+    console.error(`reloaded ${gate}`);
+  }
+  const wait = Bun.spawnSync(["rex", "wait", gate], { stdio: ["ignore", "ignore", "pipe"] });
+  delete panes[path];
+  await writeDocPanes(recordPath, panes);
   const outcome = await readDocResult(resultPath);
   if (outcome == null) {
     // `--require-approval` exits 1 on any decision but approval, which rex reports as an
     // error. Print it only when no decision came back.
-    process.stderr.write(split.stderr);
-    console.error(`plannotator-tui left no decision (rex split exited ${split.exitCode})`);
+    process.stderr.write(wait.stderr);
+    console.error(`plannotator-tui left no decision (rex wait exited ${wait.exitCode})`);
     process.exit(2);
   }
   console.log(JSON.stringify(outcome));

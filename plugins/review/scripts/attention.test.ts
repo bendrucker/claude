@@ -30,6 +30,8 @@ import {
   reviewrOpenArgs,
   rexDiffArgs,
   rexDocArgs,
+  rexGateRunning,
+  splitBlock,
   sessionHost,
   type Host,
   surfaceState,
@@ -277,7 +279,7 @@ describe("Rex targets", () => {
         "--ratio=75",
         "--cwd",
         "/repo/tmp",
-        "--wait",
+        "--json",
         "--",
         "plannotator-tui",
         "/repo/tmp/pr-body.md",
@@ -580,5 +582,26 @@ describe("quitSurface", () => {
     const control = makeControl(states, quits);
     expect(quitSurface("wE5:p4", control)).toEqual(expected);
     expect(control.quitCalls).toBe(quitCalls);
+  });
+});
+
+describe("splitBlock", () => {
+  test.each<[string, string, string | null]>([
+    ["first block", '{"block_ids":["block:01a2"],"window_id":"window:1"}', "block:01a2"],
+    ["no blocks", '{"block_ids":[]}', null],
+    ["error text", "Error: no such block", null],
+  ])("%s", (_name, stdout, expected) => {
+    expect(splitBlock(stdout)).toBe(expected);
+  });
+});
+
+describe("rexGateRunning", () => {
+  test.each<[string, string, boolean]>([
+    ["plannotator-tui in front", '{"foreground":{"pid":7,"name":"plannotator-tui"}}', true],
+    ["shell in front", '{"foreground":{"pid":7,"name":"zsh"}}', false],
+    ["exited", '{"last_exit":1,"foreground":null}', false],
+    ["empty output", "", false],
+  ])("%s", (_name, processInfo, expected) => {
+    expect(rexGateRunning(processInfo)).toBe(expected);
   });
 });

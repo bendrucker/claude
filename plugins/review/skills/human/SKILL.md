@@ -53,7 +53,7 @@ Until Ben says approve, ship, or no further comments, act on the batch and reque
 
 ## Rex Document Gate
 
-`open --doc` under Rex opens plannotator-tui in a split right of this block, taking three quarters of its width, and blocks until Ben quits it, which can outlast the Bash timeout.
+`open --doc` under Rex opens plannotator-tui in a split right of this block, taking three quarters of its width, and blocks until Ben quits it, which can outlast the Bash timeout. Reopening the same file while its gate is open reloads that pane.
 
 1. Run `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --doc <file>` with `run_in_background: true`.
 2. End the turn with one line saying the review is open right of this pane and its decision resumes the work.

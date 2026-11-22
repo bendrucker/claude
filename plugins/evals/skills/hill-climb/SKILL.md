@@ -30,6 +30,8 @@ Before the first baseline, check the suite against every item in [references/sui
 
 ## Loop
 
+Open [references/pr-body.md](references/pr-body.md) before drafting any PR body.
+
 #### Baseline
 
 Run the suite on the base commit at least twice and pool the runs. Replicate the baseline as many times as each candidate: a single low baseline draw stars every candidate against it. Get replicates from separate invocations. Repeats inside one invocation share its drift.
@@ -57,17 +59,13 @@ Make one change per candidate, on its own branch off the base. Before running it
 
 Writing the target first keeps the decision from being fitted to whichever row happened to move.
 
-Size the change to clear the noise floor from `Ready the Suite`: rewrite the section behind a failure bucket or add the rule it lacks. A reworded line rarely moves a star.
+Write the instruction as the failing behavior in general terms, never with a `dev` case's nouns, phrases, or fixture details. Check every example the change names against the `holdout` fixtures, and swap out any a `holdout` case uses. Size and word the change, and count its tokens, per [references/candidate.md](references/candidate.md).
 
-Write the instruction as the failing behavior in general terms, never with a `dev` case's nouns, phrases, or fixture details. Write the requirement a grader checks, never the grader or the suite. Check every example the change names against the `holdout` fixtures, and swap out any a `holdout` case uses. A gain on that case would then measure the example rather than the rule.
-
-Count the tokens the change adds to the body. A skill body re-injects at every compaction, so an added sentence needs a starred target to stay.
-
-A removal is a candidate too, judged by whether the score holds rather than rises: follow [references/prune.md](references/prune.md). `/claude-api prompt-audit` proposes removals of text written for an older model's failures.
+A removal is a candidate too, judged by whether the score holds rather than rises: follow [references/prune.md](references/prune.md).
 
 #### Screen
 
-Screen each candidate before its full run. Run the base and the candidate concurrently on the target and guard cases only, with enough repeats in one invocation to star the smallest drop that would reject it, about 5 ÷ the drop rate a side at a ceiling base. Compare the two sides as in `Compare`. Drop or revise a candidate whose targets do not move in the predicted direction or whose guards fall, and re-screen the revision. Send the rest to verify. A screen never accepts a change. Size, invocations, and parallelism are in [references/screen.md](references/screen.md).
+Screen each candidate on its target and guard cases before its full run, per [references/screen.md](references/screen.md). A screen sends a candidate to verify or back for revision, and never accepts a change.
 
 #### Verify
 
@@ -88,7 +86,7 @@ About one row in ten stars by chance at the default alpha. Treat a starred row o
 
 #### Decide
 
-- **Accept.** Open a PR whose body states the hypothesis, the target, the starred rows, and links to every run pooled into each column, laid out per [references/pr-body.md](references/pr-body.md). When the harness reports cost, latency, or turns per run, put them beside the pass counts. An efficiency gain carries a change only when it was the pre-registered target. Before opening it, dispatch the review agent: an `Agent` call with `subagent_type: evals:review`, passing the climb log path and every result path pooled into each column, since the agent starts with no context. Resolve every check it marks `fails` or `can't tell`, and put its report in the body. Merge the suite before the first candidate PR, so candidates stack on main instead of on the suite branch.
+- **Accept.** Open a PR whose body states the hypothesis, the target, the starred rows, and links to every run pooled into each column. When the harness reports cost, latency, or turns per run, put them beside the pass counts. An efficiency gain carries a change only when it was the pre-registered target. Before opening it, dispatch the review agent: an `Agent` call with `subagent_type: evals:review`, passing the climb log path and every result path pooled into each column, since the agent starts with no context. Resolve every check it marks `fails` or `can't tell`, and put its report in the body.
 - **Reject.** Close the PR with the same evidence, so the null result stays findable. When the evidence is borderline, such as a lone star or a guard explained from traces, dispatch `evals:review` the same way first, so a misread doesn't close the hypothesis. A rejected hypothesis stays rejected until something new in the traces argues for it.
 
 The next candidate branches off the accepted change and re-baselines on it. Candidates may run in parallel off one base. When two are accepted, the second re-runs on top of the first before it merges.
@@ -99,7 +97,7 @@ After two null candidates in a row, stop editing. Re-read every remaining `dev` 
 
 #### Holdout
 
-After the last accepted change, run `holdout` on the original base and on the final commit, two replicates a side, each its own invocation, at matched run counts. The climb holds when the final commit's pooled with-arm `holdout` score is no lower than the base's minus the spread between the base's two `holdout` replicates. A fall past that spread fails the climb whether or not it stars. Compare the two and report a gain only where `holdout` stars. Otherwise report the result as a `dev` gain with no demonstrated holdout gain. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it. The climb's closing PR states the holdout score before and after, and lists each accepted commit with its starred gain, per [references/pr-body.md](references/pr-body.md). Before it states a holdout gain, dispatch `evals:review` with the holdout columns and resolve what it finds.
+After the last accepted change, run `holdout` on the original base and on the final commit, two replicates a side, each its own invocation, at matched run counts. The climb holds when the final commit's pooled with-arm `holdout` score is no lower than the base's minus the spread between the base's two `holdout` replicates. A fall past that spread fails the climb whether or not it stars. Compare the two and report a gain only where `holdout` stars. Otherwise report the result as a `dev` gain with no demonstrated holdout gain. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it. Before a PR states a holdout gain, dispatch `evals:review` with the holdout columns and resolve what it finds.
 
 ## Stopping
 
@@ -110,12 +108,8 @@ Stop when any of these holds, and say which:
 - The budget cannot cover another candidate at the baseline's replicate count. Skip `holdout` when nothing was accepted, since the final commit is the base.
 - A `Stall` review buckets every remaining failure as reach or floor.
 
-After a model upgrade, re-run the baseline before climbing. When the with arm no longer stars above the without arm, the model now does what the skill asked: propose retiring the skill or cutting it to the instructions that still star.
-
 ## Budget
 
-Price a candidate before launching it: cases × runs × 2 arms sessions, plus judge calls, each at the per-run cost the latest stored result measured. Re-price after a model or fixture change. CI and local runs draw on the same subscription quota. When the quota is tight, run one invocation at a time and cap the session's spend before the first run.
-
-Under a cap, divide it by the cost of one `dev` replicate before the first run. The loop needs two baseline replicates, a matching count per candidate, and a `holdout` pair at the end. When the cap cannot cover that, save in this order: verify only candidates that pass their screen, then drop the without arm on screens and scoped top-ups once the baseline shows it flat. Keep both arms on the baseline and the first candidate replicate, since the without arm is the drift check.
+Price each run and plan the climb under its spend cap before the first run, per [references/budget.md](references/budget.md).
 
 A run that hit a session or quota limit is void. Drop it from its column and re-run it. A column with a void run is not comparable until it is refilled.

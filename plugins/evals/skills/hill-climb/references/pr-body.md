@@ -1,8 +1,31 @@
 # PR Body
 
-A climb PR lets a reviewer read the verdict and the rows it rests on in one screen. Everything else sits one click away in a collapsed section.
+Lay out every PR a climb opens by this file: a suite PR, a candidate PR, and the closing PR. Each lets a reviewer read the verdict and the rows it rests on in one screen. Everything else sits one click away in a collapsed section.
 
-## Layout
+## Suite PR
+
+A suite PR adds or changes cases or graders and leaves the target alone. Merge it before the first candidate PR, so candidates stack on main instead of on the suite branch.
+
+- Open with two or three sentences: what the cases test and why a session could pass them wrongly.
+- Follow with one line per case: its name and what it plants. A table works when every case has the same fields.
+- State in one or two sentences how the graders run and how each case was shown to fail the wrong answer and pass the right one.
+- Give the baseline in one paragraph: the target's score, and where the suite opens headroom or doesn't.
+- Collapse fixes to the suite's tooling and any other detail in `<details>`, or leave them to the commits.
+
+```markdown
+Adds trap cases to the `git:conflicts` suite. A trap is a resolution that finishes cleanly but drops one side's change.
+
+| Case | Trap |
+| --- | --- |
+| `codemod-rename` | The branch's new caller keeps the old name |
+| `moved-edit` | The bug fix stays at the function's old location |
+
+Hidden tests in the bare origin's hooks grade behavior where the session can't read them. `grade-trap.sh <case> trap|resolved` shows each case failing its trap and passing the correct resolution.
+
+The current skill scores 1.00 on every case, so these cases guard a prune rather than open headroom.
+```
+
+## Candidate PR
 
 - Open with two or three sentences: the failure the traces showed, the instruction that changed, and the verdict.
 - Follow with `## Evidence`. Paste the output of `compare.ts --markdown` with a `--row` for each pre-registered target and guard and for `all/with`. It prints those rows first as `Targets and Guards`, then the `Starred` rows, then every full table inside `<details>`. Copy its cells as printed.
@@ -69,7 +92,7 @@ Candidate $43.08. Climb $316.35.
 
 ## Closing PR
 
-The climb's closing PR leads with a table of accepted commits, one row each, carrying the starred gain that accepted it. Follow it with the `holdout` comparison from `compare.ts --markdown`, base against final, with `--row` for each holdout tag and arm. Bold the holdout score, and write the gain as a holdout gain only when that row stars.
+The climb's closing PR leads with a table of accepted commits, one row each, carrying the starred gain that accepted it. State the `holdout` score before and after, and whether the climb held under the `Holdout` criterion in `SKILL.md`. Follow it with the `holdout` comparison from `compare.ts --markdown`, base against final, with `--row` for each holdout tag and arm. Bold the holdout score, and write the gain as a holdout gain only when that row stars.
 
 ```markdown
 | commit | change | starred gain |

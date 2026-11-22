@@ -71,6 +71,8 @@ Three grants are deliberate exceptions to the credential-store clause. Each hold
 
 `~/src/.worktrees` lets a session write to worktrees outside its own tree, such as a sibling session's worktree under Worktrunk's shared root, where `wt` creates every worktree. `~/src/*/*/.worktrees/**/*` is legacy and covers repo-local worktrees left under `<repo>/.worktrees`. It is a glob so the repository root beside `.worktrees` stays denied. `.git/config` stays denied inside both, per [Shared `.git/config`](#shared-gitconfig). **Drop the legacy entry**, along with `Edit(.worktrees/**)` in `managed/settings.json`, once `ls ~/src/*/*/.worktrees` is empty.
 
+The `~/src/*/*/.git/worktrees/*/…` entries cover the files git writes in a linked worktree's admin directory. They name files rather than the directory so `commondir`, `gitdir`, and `config.worktree`, which steer what config git loads, stay denied. **Drop them** if `.git/worktrees/` write denials hold steady three weeks after merge.
+
 `~/.herdr/worktrees` covers deleting a worktree rather than working in one. The session's own worktree is already writable through the sandbox's `.` entry, and removing a *different* one is what fails. `git worktree remove` checks for uncommitted changes, deregisters the admin entry, and only then deletes the files. A denied delete then orphans the directory: absent from `git worktree list`, no admin entry, and beyond git's reach. That happened twice on 2026-09-05, once through `gh pr merge --delete-branch`, which left 2.6 GB behind. **Drop it** when herdr stops placing worktrees under `~/.herdr`.
 
 The rest are tool caches and state directories holding no credential material:
@@ -218,7 +220,7 @@ Three paths hit this:
 
 - `~/.claude/plugins`. `~/.claude/plugins/data` sat in `allowWrite` for a while and never took effect.
 - `~/.claude/jobs`. The harness tells background-job sessions to write under `$CLAUDE_JOB_DIR/tmp` and injects the deny itself, so `user/settings.json` cannot narrow it. Jobs fall back to `$TMPDIR`, losing the per-job isolation the directory was meant to provide.
-- `~/.claude/projects`, holding the per-project memory directories. Only Bash runs under Seatbelt, so a `Write` from the tool layer lands while `rm` or `cp` on the same file returns `Operation not permitted`. Auto mode routing file edits through Bash is what makes the gap reachable so often. Verified inert against Claude Code 2.1.232.
+- `~/.claude/projects`, holding the per-project memory directories. Only Bash runs under Seatbelt, so a `Write` from the tool layer lands while `rm` or `cp` on the same file returns `Operation not permitted`. Auto mode routing file edits through Bash is what makes the gap reachable so often. Verified inert against Claude Code 2.1.232. **Retire** the `platforms/local/platform.md` line steering memory writes to `Write` if Bash `MEMORY.md` denials hold steady three weeks after merge.
 
 The session index lives in `~/.local/share/claude-sessions`, clear of this deny. Its writers still skip the sandbox, for writes elsewhere under `~/.claude` (see the session skill's `CLAUDE.md`).
 

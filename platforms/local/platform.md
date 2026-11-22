@@ -4,6 +4,7 @@
 
 - For an interactive GPT or Codex deep-dive, launch `copilot --max-ai-credits 120` through `herdr:herdr` in the `copilot-gpt` worktree. "Consult fable" means the same second opinion from a Fable session.
 - Never disable the sandbox for file writes.
+- Write memory files under `~/.claude/projects` with `Write` or `Edit`, never Bash. The sandbox denies every Bash write there.
 - Write shell for the BSD userland macOS ships, not GNU. For example, `sed -i ''` takes a suffix argument, and `date`, `stat`, and `readlink` lack the GNU flags.
 
 ## Decisions

@@ -1,4 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import {
@@ -22,11 +24,14 @@ import {
   quitSurface,
   type SurfaceControl,
   raiseArgs,
+  readDocResult,
   recordedDocPanes,
   reviewGlyph,
   reviewrOpenArgs,
   rexDiffArgs,
   rexDocArgs,
+  rexGateRunning,
+  splitBlock,
   sessionHost,
   type Host,
   surfaceState,
@@ -274,7 +279,7 @@ describe("Rex targets", () => {
         "--ratio=75",
         "--cwd",
         "/repo/tmp",
-        "--wait",
+        "--json",
         "--",
         "plannotator-tui",
         "/repo/tmp/pr-body.md",
@@ -307,6 +312,17 @@ describe("docResult", () => {
     ["truncated", '{"decision":', null],
   ])("%s", (_name, text, expected) => {
     expect(docResult(text)).toEqual(expected);
+  });
+});
+
+describe("readDocResult", () => {
+  // A BunFile opened before its file existed reads the later file as empty,
+  // which lost every first-round decision.
+  test("reads a result written after a missing read", async () => {
+    const path = join(await mkdtemp(join(tmpdir(), "review-doc-")), "result.json");
+    expect(await readDocResult(path)).toBeNull();
+    await Bun.write(path, '{"decision":"annotated","feedback":"cut this"}');
+    expect(await readDocResult(path)).toEqual({ decision: "annotated", feedback: "cut this" });
   });
 });
 
@@ -566,5 +582,26 @@ describe("quitSurface", () => {
     const control = makeControl(states, quits);
     expect(quitSurface("wE5:p4", control)).toEqual(expected);
     expect(control.quitCalls).toBe(quitCalls);
+  });
+});
+
+describe("splitBlock", () => {
+  test.each<[string, string, string | null]>([
+    ["first block", '{"block_ids":["block:01a2"],"window_id":"window:1"}', "block:01a2"],
+    ["no blocks", '{"block_ids":[]}', null],
+    ["error text", "Error: no such block", null],
+  ])("%s", (_name, stdout, expected) => {
+    expect(splitBlock(stdout)).toBe(expected);
+  });
+});
+
+describe("rexGateRunning", () => {
+  test.each<[string, string, boolean]>([
+    ["plannotator-tui in front", '{"foreground":{"pid":7,"name":"plannotator-tui"}}', true],
+    ["shell in front", '{"foreground":{"pid":7,"name":"zsh"}}', false],
+    ["exited", '{"last_exit":1,"foreground":null}', false],
+    ["empty output", "", false],
+  ])("%s", (_name, processInfo, expected) => {
+    expect(rexGateRunning(processInfo)).toBe(expected);
   });
 });

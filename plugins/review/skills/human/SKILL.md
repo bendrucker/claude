@@ -54,9 +54,9 @@ Until Ben says approve, ship, or no further comments, act on the batch and reque
 
 ## Rex Live Notes
 
-Each `watch` event is one saved note, `[review: comment] <path:lines> (id <id>) | <quoted lines> | <body>`, where ` ⏎ ` stands for a newline. On each event, fix the code, answer in Hunk with `rex do review_reply id=<id> text="<what changed>"`, and end the turn.
+Each `watch` event is one saved note, `[review: comment] <path:lines> (id <id>) | <quoted lines> | <body>`, where ` ⏎ ` stands for a newline. On each event, fix the code, answer in Hunk with `rex do review_reply id=<id> text="<what changed>"`, and end the turn. `[review: comment edited]` replaces an earlier note with the same id, so act on the new body. `[review: retracted]` withdraws a note: revert any change made only for it.
 
-`[review: closed]` means the review ended and `watch` exited. When the monitor expires with the review still open, start `watch` again. A `[review: changes]` turn from Send carries only notes `watch` missed: handle it as Resume says.
+`[review: closed] <outcome>` means the review ended and `watch` exited. When the monitor expires with the review still open, start `watch` again. A `[review: changes]` turn from Send carries only notes `watch` missed: handle it as Resume says.
 
 ## Rex Document Gate
 

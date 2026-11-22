@@ -1,12 +1,12 @@
 import { describe, expect, mock, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import {
-  type ClaimOutcome,
-  claimOutcome,
+  CLOSED,
   clearArgs,
+  eventsPath,
   currentPane,
   docOpenArgs,
   docPanePath,
@@ -37,6 +37,7 @@ import {
   sessionHost,
   type Host,
   surfaceState,
+  tailEvents,
   type ReviewrLookup,
   type SurfaceState,
 } from "./attention";
@@ -282,33 +283,85 @@ describe("Rex targets", () => {
   });
 });
 
-describe("claimOutcome", () => {
-  test.each<[string, number, string, string, ClaimOutcome]>([
-    [
-      "a JSON-quoted result splits into one event per note",
-      0,
-      '"[review: comment] a.ts:1 (id x)\\n[review: comment] b.ts:2 (id y)\\n"\n',
-      "",
-      {
-        kind: "lines",
-        lines: ["[review: comment] a.ts:1 (id x)", "[review: comment] b.ts:2 (id y)"],
+describe("tailEvents", () => {
+  const A = "[review: comment] a.ts:1 (id x) | one";
+  const B = "[review: comment] b.ts:2 (id y) | two";
+  const OLD = "[review: comment] old.ts:1 (id o) | before the watch";
+
+  // Runs the tail against a scratch file, applying each write after the tail starts.
+  async function tail(
+    initial: string | undefined,
+    writes: ((path: string) => Promise<void>)[],
+  ): Promise<string[]> {
+    const path = join(await mkdtemp(join(tmpdir(), "events-")), "block.events");
+    if (initial !== undefined) await Bun.write(path, initial);
+    const lines: string[] = [];
+    const done = tailEvents(
+      path,
+      (line) => {
+        lines.push(line);
       },
-    ],
-    ["nothing new prints an empty string", 0, '""\n', "", { kind: "lines", lines: [] }],
-    ["a nil result prints nothing", 0, "", "", { kind: "lines", lines: [] }],
-    [
-      "a closed review ends the watch",
-      1,
-      "",
-      "Error: review: no review is open for block:01a1\n",
-      { kind: "closed" },
-    ],
-    ["any other failure retries", 1, "", "Error: connection refused\n", { kind: "retry" }],
-    ["unquoted output retries", 0, "garbage\n", "", { kind: "retry" }],
-  ])("%s", (_name, exitCode, stdout, stderr, expected) => {
-    expect(claimOutcome(exitCode, stdout, stderr)).toEqual(expected);
+      { pollMs: 5, graceMs: 100 },
+    );
+    for (const change of writes) {
+      // oxlint-disable-next-line no-await-in-loop -- each write lands after the tail has read the last.
+      await Bun.sleep(20).then(() => change(path));
+    }
+    await done;
+    return lines;
+  }
+
+  const write = (text: string) => async (path: string) => {
+    await Bun.write(path, text);
+  };
+
+  test.each<{ name: string; initial?: string; writes: string[]; expected: string[] }>([
+    {
+      name: "notes after the start arrive in order and the closed line ends the tail",
+      initial: `${OLD}\n`,
+      writes: [`${OLD}\n${A}\n`, `${OLD}\n${A}\n${B}\n${CLOSED} approved\n`],
+      expected: [A, B, `${CLOSED} approved`],
+    },
+    {
+      name: "a partial line waits for its newline",
+      initial: "",
+      writes: [A.slice(0, 10), `${A}\n${CLOSED} closed\n`],
+      expected: [A, `${CLOSED} closed`],
+    },
+    {
+      name: "a file that appears during the grace period is read from the top",
+      writes: [`${A}\n${CLOSED} dismissed\n`],
+      expected: [A, `${CLOSED} dismissed`],
+    },
+    {
+      name: "a truncated file is a new review read from the top",
+      initial: `${OLD}\n${OLD}\n`,
+      writes: [`${B}\n${CLOSED} approved\n`],
+      expected: [B, `${CLOSED} approved`],
+    },
+    { name: "a missing file reports closed", writes: [], expected: [CLOSED] },
+    {
+      name: "a file ending in a closed line is a finished review",
+      initial: `${OLD}\n${CLOSED} approved\n`,
+      writes: [],
+      expected: [CLOSED],
+    },
+  ])("$name", async ({ initial, writes, expected }) => {
+    expect(await tail(initial, writes.map(write))).toEqual(expected);
   });
 
+  test("a deleted file reports closed", async () => {
+    expect(await tail("", [write(`${A}\n`), (path) => rm(path)])).toEqual([A, CLOSED]);
+  });
+
+  test("eventsPath sits beside the block's review pointer", () => {
+    expect(eventsPath("block:01a1", "/home")).toBe(
+      "/home/.local/state/rex-review/blocks/block:01a1.events",
+    );
+  });
+});
+
+describe("rexDocArgs", () => {
   test("a document gates plannotator-tui in a wide split right of the block", () => {
     expect(rexDocArgs("block:01a1", "/repo/tmp/pr-body.md", "/home/r.json")).toMatchInlineSnapshot(`
       [

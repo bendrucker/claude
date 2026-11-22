@@ -102,7 +102,9 @@ describe("processInput", () => {
       expect(push.exitCode).toBe(0);
       const remote = await $`git -C ${worktree} ls-remote origin refs/heads/feat`.quiet();
       expect(remote.text()).toContain("refs/heads/feat");
-      expect(await tracking()).toBe("branch.feat.remote origin\nbranch.feat.merge refs/heads/feat\n");
+      expect(await tracking()).toBe(
+        "branch.feat.remote origin\nbranch.feat.merge refs/heads/feat\n",
+      );
     } finally {
       await rm(join(root, "main", ".git", "config.lock"), { force: true });
     }

@@ -1,0 +1,1 @@
+Bumped `package.json` to 2.4.0 and moved the Unreleased entries under `## 2.4.0`. Publishing needs a touch on your security key, so I filed it in Things under `claude-code` with the steps and how to confirm it landed.

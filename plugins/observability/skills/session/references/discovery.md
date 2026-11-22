@@ -26,7 +26,7 @@ This table and the Tier-2 list below are generated from the `-- ---` headers on 
 | Permissions and sandbox | `already-allowed-still-prompting`, `sandbox-bypass-effective-command`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox_bypasses` |
 | Tool failures | `cli-health`, `tool-failure-rates` | `tool-failure-rates` |
 | Context tax | `catalog-reinjection-thrash-sessions`, `memory-loads` | `activity`, `hooks` (additionalContext) |
-| Tokens | `delegation`, `repeat-read-waste`, `top-sessions` | `stats`, `model-summary`, `skill-activity` |
+| Tokens | `delegation`, `repeat-read-waste`, `subagent-effort`, `top-sessions` | `stats`, `model-summary`, `skill-activity` |
 | Turns and compaction | `stop-hook-noop-detector` | `activity` (compactions, API errors) |
 | Skill economy | `skill-auto-vs-explicit` | `skill_calls`, `skill-activity` |
 | Planning | `plan-iterations` | `plan_sessions`, `plan_calls` |

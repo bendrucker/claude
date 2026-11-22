@@ -25,3 +25,9 @@ Code review workflows for Claude Code.
 ```sh
 bun test plugins/review
 ```
+
+`scripts/attention.integration.ts` drives a real Hunk and plannotator-tui review in Rex. It needs Rex with the dotfiles `review_changes` action:
+
+```sh
+bun test ./plugins/review/scripts/attention.integration.ts
+```

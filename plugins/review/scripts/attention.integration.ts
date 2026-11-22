@@ -13,9 +13,11 @@ function sh(...argv: string[]): string {
   return proc.stdout.toString().trim();
 }
 
-const ready = Bun.spawnSync(["rex", "actions"], { stdout: "pipe" })
-  .stdout.toString()
-  .includes("review_changes");
+const ready =
+  Bun.which("rex") !== null &&
+  Bun.spawnSync(["rex", "actions"], { stdout: "pipe" })
+    .stdout.toString()
+    .includes("review_changes");
 
 async function until<T>(
   what: string,

@@ -1,4 +1,4 @@
-import { DECISIONS, type Evidence } from "./evidence";
+import { DECISIONS, type Evidence, holdoutReplicates } from "./evidence";
 import { RENDERERS, renderBlock } from "./renderers";
 
 const files = (prefix: string, replicates: number) =>
@@ -21,9 +21,13 @@ function climbLog(e: Evidence): string {
       ? "Each column is one results file from `--tag dev --runs 3`, so 3 runs a side per case."
       : "Each results file ran `--tag dev --runs 3`, so each column pools 6 runs a side per case.";
   const holdout =
-    plan.holdout === undefined
+    plan.holdout === undefined || e.holdout === undefined
       ? "Holdout: not run. The climb is still open and no change has been accepted yet."
-      : "Holdout: `--tag holdout`, run on the original base and on this candidate as the final commit, 2 replicates of 3 runs a side each.";
+      : `Holdout: \`--tag holdout\`, run on the original base and on this candidate as the final commit, 2 replicates of 3 runs a side each. Pooled with-arm \`holdout\` score of each base replicate: ${holdoutReplicates(
+          e.holdout,
+        )
+          .replicates.map((s, i) => `\`holdout-base-${i + 1}\` ${s.toFixed(2)}`)
+          .join(", ")}.`;
   return [
     `# \`${domain.artifact}\` Climb`,
     "",

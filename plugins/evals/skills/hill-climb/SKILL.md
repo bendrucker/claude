@@ -81,7 +81,7 @@ Read the stars in this order:
 
 1. **Without arm.** The candidate cannot touch it. A star there is drift or a lucky draw, and a with-arm star of the same size is no evidence. Add runs to both columns, scoped to the cases in doubt. Pooled tag rows then mix unequal run counts per case, so read those cases' own rows. A case with no without arm scores its with-only graders. Check its drift against the with-arm spread between the two baseline replicates instead.
 2. **Indicators.** A with-arm gain on a case where the skill fired no more often than at baseline did not come from the skill's instructions.
-3. **Targets.** Accept only when a target grader is starred in the predicted direction. When the diff cannot explain the size of a gain, or a judge grader rises while the deterministic graders on the same case stay flat, read five traces before accepting.
+3. **Targets.** Accept only when a target grader is starred in the predicted direction. When the diff cannot explain the size of a gain, or a judge grader rises while the deterministic graders on the same case stay flat, read five traces before accepting. Leave cases at the ceiling on both arms out of a claimed gain.
 4. **Guards.** A starred regression on the with arm blocks the change until it is explained from traces or fixed. When several guards on one case drop together, check the case minimum first: one collapsed run fails every survival grader at once, and its trace shows whether the candidate caused it.
 
 About one row in ten stars by chance at the default alpha. Treat a starred row outside the pre-registered targets and guards as a lead for error analysis. It is not a result.
@@ -99,7 +99,7 @@ After two null candidates in a row, stop editing. Re-read every remaining `dev` 
 
 #### Holdout
 
-After the last accepted change, run `holdout` on the original base and on the final commit, pooled to the same run count and read against the same cases. The climb holds when the holdout score does not fall. Compare the two and report a gain only where `holdout` stars. Otherwise report the result as a `dev` gain with no demonstrated holdout gain. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it. The climb's closing PR states the holdout score before and after, and lists each accepted commit with its starred gain, per [references/pr-body.md](references/pr-body.md). Before it states a holdout gain, dispatch `evals:review` with the holdout columns and resolve what it finds.
+After the last accepted change, run `holdout` on the original base and on the final commit, two replicates a side, each its own invocation, at matched run counts. The climb holds when the final commit's pooled with-arm `holdout` score is no lower than the base's minus the spread between the base's two `holdout` replicates. A fall past that spread fails the climb whether or not it stars. Compare the two and report a gain only where `holdout` stars. Otherwise report the result as a `dev` gain with no demonstrated holdout gain. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it. The climb's closing PR states the holdout score before and after, and lists each accepted commit with its starred gain, per [references/pr-body.md](references/pr-body.md). Before it states a holdout gain, dispatch `evals:review` with the holdout columns and resolve what it finds.
 
 ## Stopping
 

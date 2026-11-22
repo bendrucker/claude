@@ -57,10 +57,10 @@ describe("the decide family", () => {
     expect(new Set(Object.values(count((c) => `${c.trap.id}/${c.split}`)))).toEqual(
       new Set([1, 2]),
     );
-    expect(count((c) => c.split)).toEqual({ dev: 22, holdout: 11 });
+    expect(count((c) => c.split)).toEqual({ dev: 24, holdout: 12 });
     expect(count((c) => c.trap.expected)).toEqual({
       "more-runs": 9,
-      reject: 12,
+      reject: 15,
       stall: 3,
       stop: 3,
       "re-baseline": 3,

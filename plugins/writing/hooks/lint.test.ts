@@ -132,6 +132,7 @@ describe("edited files", () => {
         "ext": "md",
         "outcome": "context",
         "tool": "Write",
+        "tool_use_id": "test",
       }
     `);
   });
@@ -159,6 +160,16 @@ describe("edited files", () => {
   it("hashes the file path so repeat writes correlate without the path", async () => {
     const { log } = await dispatch(await edited("hashed.md", "Plain.\n"));
     expect(log.target).toBe(targetOf(join(docs, "hashed.md")));
+  });
+
+  test.each<{ name: string; toolUseId: string; logged: string | undefined }>([
+    { name: "a tool call id", toolUseId: "toolu_01", logged: "toolu_01" },
+    { name: "an empty id", toolUseId: "", logged: undefined },
+  ])("logs $name so a run finds its transcript tool call", async ({ toolUseId, logged }) => {
+    const { log } = await dispatch(
+      await edited("traced.md", "Plain.\n", { tool_use_id: toolUseId }),
+    );
+    expect(log.tool_use_id).toBe(logged);
   });
 
   describe("scoped to the edit", () => {

@@ -59,7 +59,7 @@ Each `watch` event is one saved note, `[review: comment] <path:lines> (id <id>) 
 - a pushback, with the reason
 - one clarifying question
 
-Send the reply with `rex do review_reply id=<id> text="<reply>"` and end the turn. When the event says `reply here`, the reviewer takes no replies, so answer in the turn's text instead. `[review: comment edited]` replaces an earlier note with the same id, so act on the new body. `[review: retracted]` withdraws a note: revert any change made only for it.
+Send the reply with `rex do review_reply id=<id> text="<reply>"` and end the turn. `[review: comment edited]` replaces an earlier note with the same id, so act on the new body. `[review: retracted]` withdraws a note: revert any change made only for it.
 
 To walk Ben through the diff in Hunk or leave notes of your own there, load `hunk:review`.
 

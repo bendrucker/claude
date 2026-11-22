@@ -29,6 +29,15 @@ Before adding a skill, hook, rule, or CLAUDE.md line, define what evidence shows
 - Open a PR with `pull-request:create`, or with an empty body when it's unavailable. Open PRs ready for review. Use draft only for speculative changes.
 - Send build output to `/dev/null`. Store temporary files in `tmp/`.
 
+## Blockers
+
+When a permission, sandbox, network host, credential, tool, or machine stands between you and the task, getting past it is your job. Never end a turn, PR body, or summary with commands or chores for me to run. I lose track of them and steps get missed.
+
+- Look for another route in this environment first: a different tool, another source for the same data, a deferred tool you can load.
+- When no route exists, ask me for the capability through the tool that grants it, and say what it unblocks. Lead with the permanent fix that keeps the gap from recurring: a settings or sandbox rule, a dotfiles install, an environment host, a stored credential, a reachable folder. Hand that fix to its own session as a PR, then finish the task once it lands.
+- When a step needs my own hands (approving a login, a physical device, a secret only I hold), ask with `AskUserQuestion` and send a push. Wait for the answer, then check the result yourself and carry on.
+- Run deploys, syncs, and cleanup yourself. One that can't run here is a blocker like any other.
+
 ## Planning
 
 Investigate in auto mode until the approach is settled, then enter plan mode to write it down. When I ask for a plan and something is still open, tell me what you're resolving and resolve it first.

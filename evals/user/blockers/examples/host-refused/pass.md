@@ -1,0 +1,1 @@
+I couldn't bump `@acme/ui`: the proxy refuses `registry.acme.internal`, so I can't see its published versions. Can you allow that host in this environment's network settings? That fixes it for future sessions too, and I'll do the bump and run the tests once it's reachable.

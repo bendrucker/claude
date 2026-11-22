@@ -3,6 +3,9 @@
   extends: ["config:recommended", "schedule:weekly", ":preserveSemverRanges"],
   minimumReleaseAge: "7 days",
   internalChecksFilter: "strict",
+  // Plugin lockfiles pin transitives that no direct bump touches, so advisories
+  // against them pile up as Dependabot alerts. Weekly maintenance re-resolves them.
+  lockFileMaintenance: { enabled: true, automerge: true },
   customManagers: [
     {
       customType: "regex",

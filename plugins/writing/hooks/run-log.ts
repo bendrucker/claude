@@ -58,13 +58,6 @@ export function emittedOf(entry: RunLogEntry): string[] {
   return INJECTION_OUTCOMES.has(entry.outcome) ? [entry.check] : [];
 }
 
-export function suppressedOf(entry: RunLogEntry): string[] {
-  if (entry.suppressed_checks) return entry.suppressed_checks;
-  return entry.suppressed === true && entry.check != null && entry.check !== ""
-    ? [entry.check]
-    : [];
-}
-
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
 const OFF_VALUES = new Set(["0", "false", "off"]);
 const ON_VALUES = new Set(["1", "true", "on"]);

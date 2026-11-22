@@ -18,7 +18,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@jxa/global-type": "^1.4.0",
     "@jxa/sdef-to-dts": "^1.4.0",
     "@types/node": "^25.1.0",
     "typescript": "^7.0.0"

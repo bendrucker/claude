@@ -16,7 +16,6 @@ macOS-specific automation and system integration.
 ### Scripts
 
 - `scripts/jxa.ts` is an app-scoped JXA runner with AST-based `Application()` validation.
-- `scripts/open-url.ts` is a scheme-scoped URL opener with scheme validation.
 
 ## Sandbox
 

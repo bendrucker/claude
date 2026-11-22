@@ -115,7 +115,7 @@ function dialGlyph(index: number): string {
 
 // `tokens` is what the last response was answered over. The 200k test resets
 // with the percent when a compaction shrinks the context.
-export function dialOf(context: Pick<SessionContextUsage, "tokens" | "percent">): Tokens {
+function dialOf(context: Pick<SessionContextUsage, "tokens" | "percent">): Tokens {
   const dial = noDial();
   if (context.percent === undefined) return dial;
   const pct = Math.round(context.percent);
@@ -159,7 +159,7 @@ function recordTitle(line: string): string | undefined {
 
 // A tail starts mid-line, but a truncated record never parses as an object, so
 // the partial first line drops out without being singled out.
-export function latestTitle(chunk: string): string | undefined {
+function latestTitle(chunk: string): string | undefined {
   let title: string | undefined;
   for (const line of chunk.split("\n")) {
     // herdr strips control bytes, which would glue the words of a multi-line

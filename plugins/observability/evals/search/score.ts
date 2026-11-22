@@ -36,7 +36,7 @@ interface Run extends Scored {
   error: string | undefined;
 }
 
-export async function loadLabels(path: string, tag?: string): Promise<Labeled[]> {
+async function loadLabels(path: string, tag?: string): Promise<Labeled[]> {
   const lines = (await Bun.file(path).text()).split("\n").filter((l) => l.trim() !== "");
   return lines
     .map((l) => Label.parse(JSON.parse(l)))

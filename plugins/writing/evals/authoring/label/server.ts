@@ -21,7 +21,7 @@ const align = join(import.meta.dir, "align.ts");
 /** Deterministic left/right screen assignment from the pair id, stable across reloads. */
 export function computeLeft(id: string): "a" | "b" {
   let sum = 0;
-  for (let i = 0; i < id.length; i++) sum += id.charCodeAt(i);
+  for (let i = 0; i < id.length; i++) sum += id.codePointAt(i) ?? 0;
   return sum % 2 === 0 ? "a" : "b";
 }
 

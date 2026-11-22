@@ -687,12 +687,12 @@ describe("messageOf", () => {
   test("cuts a long comment and stops quoting at the message's quota", () => {
     const long = "y".repeat(QUOTE_MAX.comment + 50);
     const count = Math.ceil(QUOTE_MAX.message / QUOTE_MAX.comment);
-    const promoted = [fb("bot", null, [...Array(count).fill(long), "late"])];
+    const promoted = [fb("bot", null, [...Array.from({ length: count }, () => long), "late"])];
     const lines = messageOf(snapshot, promoted, new Set(["bot"]))
       .split("\n\n")[0]!
       .split("\n");
     expect(lines.filter((line) => line.startsWith("> "))).toEqual(
-      Array(count).fill(`> ${"y".repeat(QUOTE_MAX.comment)}…`),
+      Array.from({ length: count }, () => `> ${"y".repeat(QUOTE_MAX.comment)}…`),
     );
     expect(lines).toContain("(1 more not quoted)");
   });

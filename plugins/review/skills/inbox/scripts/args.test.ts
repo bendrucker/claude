@@ -7,7 +7,7 @@ import {
   parsePermissionMode,
 } from "./args";
 
-const ESC = String.fromCharCode(27);
+const ESC = String.fromCodePoint(27);
 const modeRows: [PermissionMode][] = PERMISSION_MODES.map((mode) => [mode]);
 
 describe("buildDispatchArgs", () => {

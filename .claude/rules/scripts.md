@@ -11,7 +11,7 @@ Distributed plugin code does not get that guarantee. Auto-install needs the regi
 
 #### Workspace Dependencies
 
-Auto-install skips `workspace:*` specifiers. A script importing a workspace package (`@bendrucker/*`) needs `bun install` first, or it fails with `Cannot find module`. The project Worktrunk `post-start` hook runs it for new worktrees, including `Agent(isolation='worktree')` worktrees, which Worktrunk's `WorktreeCreate` hook makes with `wt switch --create`. A script run before that hook finishes still fails.
+Auto-install skips `workspace:*` specifiers. A script importing a workspace package (`@bendrucker/*`) needs `bun install` first, or it fails with `Cannot find module`. The project Worktrunk `post-start` hook runs it for new worktrees, including `Agent(isolation='worktree')` worktrees, which Worktrunk's `WorktreeCreate` hook makes with `wt switch --create`. A script run before that hook finishes still fails. A worktree `wt` did not create, such as Claude Desktop's `.claude/worktrees/<name>`, gets the install from the project `SessionStart` hook (`.claude/hooks/mod-types/`), which runs `bun install --frozen-lockfile` when the session's checkout has no `node_modules` and records the outcome as the `stage` in `~/.claude/hook-metrics/mod-types.jsonl`.
 
 Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` code via relative paths (`../packages/marketplace/index`), so it runs in fresh worktrees without install. Reserve workspace specifiers for distributed plugin code, which cannot use relative imports across the plugin boundary.
 

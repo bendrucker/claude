@@ -5,7 +5,7 @@ argument-hint: "[<path>...]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/audit.ts:*)
   - Bash(prompt-scan-edit:*)
-  - Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh:*)
+  - 'Bash(sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh":*)'
   - Read
   - Edit
 ---
@@ -24,7 +24,7 @@ Where the `observability:session` index is available, rank the units by its `mem
 
 Judge one unit inline. Judge more than one through a Workflow with one judge per batch of units, kept within the session's workflow size, since this skill's instruction to run one is the opt-in. [references/judge.md](references/judge.md) holds the judge prompt and output schema, and [references/classes.md](references/classes.md) the classes it tags. Write the returned proposals to `tmp/prompting-audit/<run>/proposals.jsonl` in the audited repo, one per line with a unique `id`, where `<run>` names the round.
 
-!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh prompt-scan-edit`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" prompt-scan-edit`
 
 Then drive the ledger through `audit.ts` and `prompt-scan-edit`:
 

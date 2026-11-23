@@ -20,6 +20,7 @@ allowed-tools:
   - "Bash(gh stack:*)"
   - "Bash(glab mr:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*)"
+  - 'Bash(bun "${CLAUDE_PLUGIN_ROOT}/scripts/*)'
 ---
 
 # Create Pull Request
@@ -31,14 +32,14 @@ The commit log, PR template, CONTRIBUTING notes, and review-bot config in the co
 ## Context
 
 - Remote URL: !`git remote get-url origin`
-- Review bot: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts`
-- PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts`
+- Review bot: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts"`
+- PR Template: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts"`
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`
+!`bun "${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts"`
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts --stack-file "${user_config.stack_file}"`
+!`bun "${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts" --stack-file "${user_config.stack_file}"`
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
+!`bun "${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts"`
 
 ## Arguments
 

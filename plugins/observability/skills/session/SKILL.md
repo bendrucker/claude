@@ -105,7 +105,7 @@ duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql \
 
 ## Cross-Machine History
 
-!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh session-index-pull`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" session-index-pull`
 
 Each machine is a `host`: this one is `local`, and each imported machine has a chosen label. `${CLAUDE_SKILL_DIR}/scripts/hosts.ts` lists them. To list, import, re-sync, or remove a machine, follow [`references/cross-machine.md`](references/cross-machine.md).
 
@@ -121,7 +121,7 @@ Every table and view carries `host`. The `sessions` view adds `project_id` (`hos
 
 Columns of the surfaces ad-hoc SQL reads most (`DESCRIBE <name>` for anything else):
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/schema.ts`
+!`bun "${CLAUDE_SKILL_DIR}/scripts/schema.ts"`
 
 For a field not pinned to a column, reach into `data` with JSON path operators, wrapped in parens before any comparison: `(data->>'$.x') = 'y'`. [`references/schema-discovery.md`](references/schema-discovery.md) has examples.
 

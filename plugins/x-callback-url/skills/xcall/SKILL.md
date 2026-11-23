@@ -31,7 +31,7 @@ An entry matches the command text from its start. Anything ahead of the path (`V
 
 ## Usage
 
-!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh xcall-run`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" xcall-run`
 
 ```bash
 xcall-run "<url>"

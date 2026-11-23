@@ -11,6 +11,7 @@ allowed-tools:
   - "Bash(gh pr:*)"
   - "Bash(glab mr:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*)"
+  - 'Bash(bun "${CLAUDE_PLUGIN_ROOT}/scripts/*)'
 ---
 
 # Update Pull Request
@@ -22,13 +23,13 @@ Rewrite the PR/MR body so it describes what merging the current diff does. Descr
 ## Context
 
 - Remote URL: !`git remote get-url origin`
-- PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts`
+- PR Template: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts"`
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`
+!`bun "${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts"`
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts --stack-file "${user_config.stack_file}"`
+!`bun "${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts" --stack-file "${user_config.stack_file}"`
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
+!`bun "${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts"`
 
 ## Fetch
 

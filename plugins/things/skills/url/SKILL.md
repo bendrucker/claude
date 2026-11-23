@@ -7,7 +7,7 @@ allowed-tools:
   - "Bash(things-url:*)"
   - "Bash(things-inbox:*)"
   - "Bash(things-reorder:*)"
-  - "Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh:*)"
+  - 'Bash(sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh":*)'
   - Read
 ---
 
@@ -21,7 +21,7 @@ Write to Things 3 through the `things:///` URL scheme. A write is done when the 
 
 ## Usage
 
-!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh things-url things-inbox things-reorder`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" things-url things-inbox things-reorder`
 
 `url.ts` handles the auth token ([1password.md](1password.md)) and URL encoding. Multiple `id=` params batch into one JSON command, which keeps 3+ items under the rate limit of 250 operations per 10 seconds.
 

@@ -20,11 +20,15 @@ const HookInput = z.looseObject({
 
 export const STOP_INTERVAL_MS = 15 * 60 * 1000;
 
-// When the last upload ran, and the size each file had then, so an upload
-// skips the files that did not grow.
+// When the last upload ran, the size each file had then, so an upload skips
+// the files that did not grow, and the failure kinds already reported.
 const State = z
-  .object({ uploadedAt: z.number(), sizes: z.record(z.string(), z.number()) })
-  .catch({ uploadedAt: 0, sizes: {} });
+  .object({
+    uploadedAt: z.number(),
+    sizes: z.record(z.string(), z.number()),
+    reported: z.array(z.string()).default([]),
+  })
+  .catch({ uploadedAt: 0, sizes: {}, reported: [] });
 
 export function due(event: string, uploadedAt: number, now: number): boolean {
   return event !== "Stop" || now - uploadedAt >= STOP_INTERVAL_MS;
@@ -141,6 +145,37 @@ function errorCode(error: unknown): string {
   return typeof error;
 }
 
+/**
+ * Why a run failed. `unsigned` is a 403 on every file, which is what an
+ * environment without the proxy's SigV4 secret gets.
+ */
+export type FailureKind = "unsigned" | "http" | "network";
+
+export function failureKind(attempted: number, failures: Failure[]): FailureKind {
+  if (failures.length === attempted && failures.every((f) => f.status === 403)) return "unsigned";
+  return failures.some((f) => f.status !== undefined) ? "http" : "network";
+}
+
+// The kind to report for this run, or undefined when it succeeded or the
+// session already reported that kind, so a session that can never upload logs
+// once rather than on every Stop.
+export function unreported(
+  attempted: number,
+  failures: Failure[],
+  reported: string[],
+): FailureKind | undefined {
+  if (failures.length === 0) return undefined;
+  const kind = failureKind(attempted, failures);
+  return reported.includes(kind) ? undefined : kind;
+}
+
+const MESSAGES: Record<FailureKind, string> = {
+  unsigned:
+    "every PUT returned 403: this environment has no SigV4 network secret for the upload bucket",
+  http: "some PUTs returned an HTTP error",
+  network: "some PUTs could not reach the bucket",
+};
+
 // The mod-events record for a run with failures, so the session index's `mods`
 // query counts it as a failed `session-upload.upload`.
 export function failureRecord(
@@ -150,6 +185,7 @@ export function failureRecord(
   sessionId: string,
   at: Date,
 ): Record<string, unknown> {
+  const kind = failureKind(attempted, failures);
   const statuses = [
     ...new Set(failures.flatMap((f) => (f.status === undefined ? [] : [f.status]))),
   ];
@@ -159,6 +195,8 @@ export function failureRecord(
     severity_number: 13,
     event_name: `${UPLOAD_MOD}.upload`,
     attributes: {
+      kind,
+      message: MESSAGES[kind],
       hook,
       attempted,
       failed: failures.length,
@@ -218,15 +256,20 @@ async function main(): Promise<void> {
     (rel) => `${target.base}/${objectKey(target, session, rel)}`,
     state.sizes,
   );
+  if (failures.length > 0) {
+    console.error(
+      `session upload failed: ${failures.map((f) => `${f.file}: ${f.status ?? f.error}`).join(", ")}`,
+    );
+  }
+  const kind = unreported(attempted, failures, state.reported);
+  if (kind !== undefined) {
+    state.reported.push(kind);
+    await recordFailure(
+      modEvents,
+      failureRecord(input.hook_event_name, attempted, failures, input.session_id, new Date(now)),
+    );
+  }
   await Bun.write(statePath, JSON.stringify(state));
-  if (failures.length === 0) return;
-  console.error(
-    `session upload failed: ${failures.map((f) => `${f.file}: ${f.status ?? f.error}`).join(", ")}`,
-  );
-  await recordFailure(
-    modEvents,
-    failureRecord(input.hook_event_name, attempted, failures, input.session_id, new Date(now)),
-  );
 }
 
 if (import.meta.main) await main();

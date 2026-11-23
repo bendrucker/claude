@@ -3,13 +3,17 @@ import { mkdtempSync, mkdirSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  type Failure,
+  type FailureKind,
   due,
+  failureKind,
   failureRecord,
   objectKey,
   parseTarget,
   recordFailure,
   STOP_INTERVAL_MS,
   sessionFiles,
+  unreported,
   uploadFiles,
 } from "./upload";
 
@@ -142,13 +146,15 @@ describe("failure events", () => {
   ];
   const at = new Date("2026-11-21T08:00:00.123Z");
 
-  test("records a WARN session-upload.upload with the statuses and failed count", () => {
+  test("records a WARN session-upload.upload with the kind, statuses, and failed count", () => {
     expect(failureRecord("Stop", 4, failures, "abc", at)).toEqual({
       timestamp: "2026-11-21T08:00:00.123Z",
       severity_text: "WARN",
       severity_number: 13,
       event_name: "session-upload.upload",
       attributes: {
+        kind: "http",
+        message: "some PUTs returned an HTTP error",
         hook: "Stop",
         attempted: 4,
         failed: 3,
@@ -173,5 +179,83 @@ describe("failure events", () => {
     expect(sessionFiles(join(dir, "..", "..", "abc.jsonl"), dir).map(([, rel]) => rel)).toContain(
       "mod-events/session-upload.2026-11-21.jsonl",
     );
+  });
+});
+
+describe("failureKind", () => {
+  test.each<{ name: string; attempted: number; failures: Failure[]; kind: FailureKind }>([
+    {
+      name: "403 on every file is unsigned",
+      attempted: 2,
+      failures: [
+        { file: "a.jsonl", status: 403 },
+        { file: "b.jsonl", status: 403 },
+      ],
+      kind: "unsigned",
+    },
+    {
+      name: "403 on some files is http",
+      attempted: 3,
+      failures: [
+        { file: "a.jsonl", status: 403 },
+        { file: "b.jsonl", status: 403 },
+      ],
+      kind: "http",
+    },
+    {
+      name: "another status on every file is http",
+      attempted: 1,
+      failures: [{ file: "a.jsonl", status: 500 }],
+      kind: "http",
+    },
+    {
+      name: "thrown fetches alone are network",
+      attempted: 2,
+      failures: [{ file: "a.jsonl", error: "ConnectionRefused" }],
+      kind: "network",
+    },
+  ])("$name", ({ attempted, failures, kind }) => {
+    expect(failureKind(attempted, failures)).toBe(kind);
+  });
+
+  test("names the missing signature for unsigned", () => {
+    const record = failureRecord("Stop", 1, [{ file: "a.jsonl", status: 403 }], "abc", new Date(0));
+    expect(record).toHaveProperty(
+      ["attributes", "message"],
+      "every PUT returned 403: this environment has no SigV4 network secret for the upload bucket",
+    );
+  });
+});
+
+describe("unreported", () => {
+  const unsigned = [{ file: "a.jsonl", status: 403 }];
+
+  test.each<{
+    name: string;
+    failures: Failure[];
+    reported: string[];
+    kind: FailureKind | undefined;
+  }>([
+    {
+      name: "a first failure reports its kind",
+      failures: unsigned,
+      reported: [],
+      kind: "unsigned",
+    },
+    {
+      name: "a repeat of a reported kind stays quiet",
+      failures: unsigned,
+      reported: ["unsigned"],
+      kind: undefined,
+    },
+    {
+      name: "a new kind reports after another",
+      failures: [{ file: "a.jsonl", error: "ConnectionRefused" }],
+      reported: ["unsigned"],
+      kind: "network",
+    },
+    { name: "a clean run reports nothing", failures: [], reported: [], kind: undefined },
+  ])("$name", ({ failures, reported, kind }) => {
+    expect(unreported(1, failures, reported)).toBe(kind);
   });
 });

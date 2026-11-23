@@ -7,6 +7,7 @@ import {
   type FailureKind,
   due,
   failureKind,
+  failureMessage,
   failureRecord,
   objectKey,
   parseTarget,
@@ -257,5 +258,17 @@ describe("unreported", () => {
     { name: "a clean run reports nothing", failures: [], reported: [], kind: undefined },
   ])("$name", ({ failures, reported, kind }) => {
     expect(unreported(1, failures, reported)).toBe(kind);
+  });
+});
+
+describe("failureMessage", () => {
+  test("names the kind and each failed file with its status or error", () => {
+    const failures: Failure[] = [
+      { file: "a.jsonl", status: 403 },
+      { file: "mod-events/b.jsonl", error: "ECONNRESET" },
+    ];
+    expect(failureMessage("http", failures)).toBe(
+      "session upload failed (http): some PUTs returned an HTTP error. a.jsonl: 403, mod-events/b.jsonl: ECONNRESET",
+    );
   });
 });

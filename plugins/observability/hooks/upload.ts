@@ -176,6 +176,13 @@ const MESSAGES: Record<FailureKind, string> = {
   network: "some PUTs could not reach the bucket",
 };
 
+// stderr from a hook that exits 0 reaches no one, so a newly seen failure kind
+// also goes to the user.
+export function failureMessage(kind: FailureKind, failures: Failure[]): string {
+  const files = failures.map((f) => `${f.file}: ${f.status ?? f.error}`).join(", ");
+  return `session upload failed (${kind}): ${MESSAGES[kind]}. ${files}`;
+}
+
 // The mod-events record for a run with failures, so the session index's `mods`
 // query counts it as a failed `session-upload.upload`.
 export function failureRecord(
@@ -268,6 +275,7 @@ async function main(): Promise<void> {
       modEvents,
       failureRecord(input.hook_event_name, attempted, failures, input.session_id, new Date(now)),
     );
+    console.log(JSON.stringify({ systemMessage: failureMessage(kind, failures) }));
   }
   await Bun.write(statePath, JSON.stringify(state));
 }

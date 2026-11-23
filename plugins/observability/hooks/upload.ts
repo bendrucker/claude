@@ -6,6 +6,8 @@
 // a session abandoned mid-interval loses at most that much of its tail.
 
 import { readdirSync } from "node:fs";
+// oxlint-disable-next-line no-restricted-imports -- Bun has no append, and a read-then-write could drop a concurrent hook's line.
+import { appendFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 import { z } from "zod";
@@ -86,6 +88,101 @@ export function objectKey(t: Target, session: string, key: string): string {
   return [t.prefix, session, key].filter((p) => p !== "").join("/");
 }
 
+// The mod name the hook's failure events carry, as `scope.name`.
+export const UPLOAD_MOD = "session-upload";
+
+export interface Failure {
+  /** The file's key relative to the session, never the full object key. */
+  file: string;
+  /** The HTTP status of a response that was not ok. */
+  status?: number;
+  /** The error code or class of a fetch that threw. Its message may carry the URL. */
+  error?: string;
+}
+
+type Put = (url: string, init: { method: "PUT"; body: Blob }) => Promise<Response>;
+
+// PUTs each file that grew since the last upload and records the new sizes in
+// `sizes`. A failed file keeps its old size, so the next upload retries it.
+export async function uploadFiles(
+  files: [string, string][],
+  urlOf: (rel: string) => string,
+  sizes: Record<string, number>,
+  put: Put = fetch,
+): Promise<{ attempted: number; failures: Failure[] }> {
+  let attempted = 0;
+  const failures: Failure[] = [];
+  await Promise.all(
+    files.map(async ([file, rel]) => {
+      const body = Bun.file(file);
+      if (!(await body.exists()) || sizes[file] === body.size) return;
+      attempted += 1;
+      try {
+        const res = await put(urlOf(rel), { method: "PUT", body });
+        if (!res.ok) {
+          failures.push({ file: rel, status: res.status });
+          return;
+        }
+      } catch (error) {
+        failures.push({ file: rel, error: errorCode(error) });
+        return;
+      }
+      sizes[file] = body.size;
+    }),
+  );
+  failures.sort((a, b) => a.file.localeCompare(b.file));
+  return { attempted, failures };
+}
+
+function errorCode(error: unknown): string {
+  if (error instanceof Error) {
+    return "code" in error && typeof error.code === "string" ? error.code : error.name;
+  }
+  return typeof error;
+}
+
+// The mod-events record for a run with failures, so the session index's `mods`
+// query counts it as a failed `session-upload.upload`.
+export function failureRecord(
+  hook: string,
+  attempted: number,
+  failures: Failure[],
+  sessionId: string,
+  at: Date,
+): Record<string, unknown> {
+  const statuses = [
+    ...new Set(failures.flatMap((f) => (f.status === undefined ? [] : [f.status]))),
+  ];
+  return {
+    timestamp: at.toISOString(),
+    severity_text: "WARN",
+    severity_number: 13,
+    event_name: `${UPLOAD_MOD}.upload`,
+    attributes: {
+      hook,
+      attempted,
+      failed: failures.length,
+      statuses: statuses.toSorted((a, b) => a - b),
+      failures,
+      "session.id": sessionId,
+    },
+    resource: { "service.name": "claude-code", "claude_code.surface": "cloud" },
+    scope: { name: UPLOAD_MOD },
+  };
+}
+
+// Appends to the session's own mod-events directory, which this hook uploads,
+// so the record reaches the bucket on the first upload that succeeds.
+export async function recordFailure(dir: string, record: Record<string, unknown>): Promise<void> {
+  try {
+    await mkdir(dir, { recursive: true });
+    const day = String(record.timestamp).slice(0, 10);
+    await appendFile(join(dir, `${UPLOAD_MOD}.${day}.jsonl`), `${JSON.stringify(record)}\n`);
+  } catch (error) {
+    console.error(`session upload: failure event not recorded: ${String(error)}`);
+  }
+}
+
 async function main(): Promise<void> {
   const env = process.env;
   const url = env.CLAUDE_SESSION_UPLOAD_URL ?? "";
@@ -116,24 +213,20 @@ async function main(): Promise<void> {
   if (!due(input.hook_event_name, state.uploadedAt, now)) return;
   state.uploadedAt = now;
 
-  const failures: string[] = [];
-  await Promise.all(
-    sessionFiles(input.transcript_path, modEvents).map(async ([file, rel]) => {
-      const body = Bun.file(file);
-      if (!(await body.exists()) || state.sizes[file] === body.size) return;
-      const key = `${target.base}/${objectKey(target, session, rel)}`;
-      const res = await fetch(key, { method: "PUT", body }).catch((error: unknown) =>
-        error instanceof Error ? error : new Error(String(error)),
-      );
-      if (res instanceof Error || !res.ok) {
-        failures.push(`${rel}: ${res instanceof Error ? res.message : res.status}`);
-        return;
-      }
-      state.sizes[file] = body.size;
-    }),
+  const { attempted, failures } = await uploadFiles(
+    sessionFiles(input.transcript_path, modEvents),
+    (rel) => `${target.base}/${objectKey(target, session, rel)}`,
+    state.sizes,
   );
   await Bun.write(statePath, JSON.stringify(state));
-  if (failures.length > 0) console.error(`session upload failed: ${failures.join(", ")}`);
+  if (failures.length === 0) return;
+  console.error(
+    `session upload failed: ${failures.map((f) => `${f.file}: ${f.status ?? f.error}`).join(", ")}`,
+  );
+  await recordFailure(
+    modEvents,
+    failureRecord(input.hook_event_name, attempted, failures, input.session_id, new Date(now)),
+  );
 }
 
 if (import.meta.main) await main();

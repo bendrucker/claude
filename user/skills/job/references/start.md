@@ -12,8 +12,6 @@ Dispatch parallel read-only sub-agents, under the reporting contract and deadlin
 - Messaging (when configured): direct messages and mentions to the configured user since the last working day that imply an action, with sender, link, and the ask.
 - Email (when configured): unhandled mail that needs a reply, an action, or filing, with sender, subject, and link.
 
-In-flight agents are the exception to the fan-out. Run `claude agents --json --all` inline in the orchestrator and join its records to brief items per the Agents rules in `SKILL.md`.
-
 Each sub-agent uses the delegated skill, MCP, or CLI for its source and returns structured state: identifiers, links, and statuses the brief can consume directly, plus every cross-reference an item carries, such as an issue key in an MR title or branch, or an MR named in a comment or message. These cross-references drive the merge in `SKILL.md`, joining one piece of work reported from several sources. Sub-agents report state, not dispositions: who spoke last, when, and what is open. Deciding an item needs nothing is a triage call, and triage happens in the brief.
 
 ## Inbound Review Queue
@@ -46,7 +44,7 @@ Triage each inbound item, whether a message, a tracker notification, or an email
 
 Read is not handled. Notification state records only what the user has seen, so judge each thread by who spoke last and what remains open, never by unread flags. Who spoke last is also what the next-actor rule in `SKILL.md` reads: a thread where the user's own most recent comment is unanswered is waiting on whoever it was addressed to. It leaves the brief as a counted drop rather than as an item. Active discussion on work that also has an open MR in the user's review queue never collapses into background noise: it is review context and merges into that review's entry, since the thread may be converging on a different fix than the diff shows.
 
-A blocked agent is an inbound item like any message or notification, and it gets the same terminal disposition: resumed by you, focused into its herdr pane when one matched, or deferred with a note recording what it is waiting on. Read is not handled applies here too. An agent you saw in `claude agents` and walked away from is still open work.
+A blocked agent is an inbound item like any message or notification, and it gets the same terminal disposition: resumed by you, focused into its pane when one matched, or deferred with a note recording what it is waiting on. Read is not handled applies here too. An agent you saw in `claude agents` and walked away from is still open work.
 
 Route deferrals per the contract in `SKILL.md`: team work to the tracker, personal next-steps and reminders to the personal inbox. Drafting a reply the user has read is safe, as is archiving something already handled. Sending a reply without review is ask-first.
 
@@ -64,4 +62,4 @@ End with a one-line stated goal for the day.
 
 ## Brief and Act
 
-Assemble the brief grouped by project per the contract in `SKILL.md`, drawing each item's role from the analysis above. Execute per that shared contract.
+Assemble the brief and execute per `SKILL.md`, drawing each item's role from the phases above.

@@ -6,8 +6,8 @@ argument-hint: "--branch <branch | pr:<n> | mr:<n>> --prompt <file>"
 effort: low
 allowed-tools:
   - Bash(claude-dispatch:*)
-  - Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh:*)
-  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help)"
+  - 'Bash(sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh":*)'
+  - 'Bash(bun "${CLAUDE_SKILL_DIR}/scripts/dispatch.ts" --help)'
 ---
 
 # Dispatch
@@ -22,7 +22,7 @@ Write the prompt to a file under `tmp/` from what this conversation already know
 
 `--help`, run for this session:
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help`
+!`bun "${CLAUDE_SKILL_DIR}/scripts/dispatch.ts" --help`
 
 Pass `--title` with two to four Title Case words naming the task. The script ends a pane or tab session's prompt with an instruction to run `dispatch:close` once its PR is open. Pass `--keep-open` to leave that instruction out when the user wants to keep the session open.
 
@@ -44,7 +44,7 @@ The user finds a background session in `claude agents` and picks it up with `cla
 
 ## Run It
 
-!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh claude-dispatch`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" claude-dispatch`
 
 ```bash
 claude-dispatch --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...

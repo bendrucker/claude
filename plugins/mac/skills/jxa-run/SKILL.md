@@ -5,12 +5,12 @@ argument-hint: <app> <expression-or-script-file>
 effort: low
 allowed-tools:
   - "Bash(jxa-run:*)"
-  - "Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh:*)"
+  - 'Bash(sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh":*)'
 ---
 
 # Run JXA
 
-!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh jxa-run`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" jxa-run`
 
 Run the JXA expression or script file from the arguments. `$0` is the app name. Runner flags (`-e`) go before the script path. Every argument after the script path passes to the script unchanged, its own flags included.
 

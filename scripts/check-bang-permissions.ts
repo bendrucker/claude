@@ -159,21 +159,61 @@ export function unapproved(file: string, text: string): string[] {
   return violations;
 }
 
+// Claude Code substitutes these as text before the shell runs, so a path with a
+// space (Claude Desktop installs under `~/Library/Application Support`) splits
+// into two words unless the injection quotes it.
+const PATH_VARIABLE = /^\$\{?CLAUDE_(?:SKILL_DIR|PLUGIN_ROOT)\b\}?/;
+
+/** Path variables in a shell line that are outside any quotes. */
+export function unquotedPathVariables(command: string): string[] {
+  const found: string[] = [];
+  let quote: "'" | '"' | null = null;
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i] ?? "";
+    if (quote !== null) {
+      if (char === "\\" && quote === '"') i++;
+      else if (char === quote) quote = null;
+    } else if (char === "'" || char === '"') {
+      quote = char;
+    } else if (char === "\\") {
+      i++;
+    } else {
+      const match = PATH_VARIABLE.exec(command.slice(i));
+      if (match) found.push(match[0]);
+    }
+  }
+  return found;
+}
+
+/** Injections in one markdown asset that leave a plugin path variable unquoted. */
+export function unquoted(file: string, text: string): string[] {
+  return bangCommands(matter(text).content).flatMap((command) =>
+    unquotedPathVariables(command).map(
+      (variable) => `${file}: quote \`${variable}\` in \`${command}\``,
+    ),
+  );
+}
+
 if (import.meta.main) {
   await runCheck(
     async () => {
       const violations: string[] = [];
       for await (const file of assetPaths([...SKILL_GLOBS, ...COMMAND_GLOBS])) {
-        violations.push(...unapproved(file, await Bun.file(join(root, file)).text()));
+        const text = await Bun.file(join(root, file)).text();
+        violations.push(...unquoted(file, text), ...unapproved(file, text));
       }
       return {
         header: [
-          "`!` injections the file's allowed-tools does not pre-approve. A Read or Edit rule",
+          "`!` injections that can fail the skill load. Quote each plugin path variable, since",
+          "the substituted path can contain a space. A Read or Edit rule in allowed-tools",
           "must name the path after symlink resolution, since Claude Code checks the real path:",
         ],
         violations,
       };
     },
-    { success: "Every `!` injection is pre-approved by its allowed-tools" },
+    {
+      success:
+        "Every `!` injection quotes its plugin paths and is pre-approved by its allowed-tools",
+    },
   );
 }

@@ -160,6 +160,18 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop them** when `Artifact` loads deferred behind ToolSearch, or when relaunching to publish becomes routine.
 
+`PLANNOTATOR_PLAN_REVIEW=false` turns off plan review in the upstream `plannotator@plannotator` plugin, which [`plannotator`](../plugins/plannotator) depends on. Its `ExitPlanMode` and `EnterPlanMode` hooks then pass through, so plan approval stays in Claude Code's own dialog, and its inbox and review commands stay on. The hooks run the `plannotator` binary on `PATH`, which honors the variable from 0.29.1. It is in managed settings because the plugin dependency installs on every platform.
+
+**Drop it** to route plan approval through Plannotator, or when the `plannotator` plugin drops its upstream dependency.
+
+## Compaction
+
+`autoCompactWindow: 280000` fires auto-compaction at 280K of context instead of the model's full window. On a 1M-context model it trades an earlier summary, plus the skill re-injection that follows every compaction, for turns that stop re-reading a large, stale prefix. 280K sits above the 200K standard window, so a session that fits a non-1M model never compacts early.
+
+Idle compaction compacts a 200K+ session shortly before its 1h prompt cache expires, so the 200K–280K band this window never compacted can now compact while idle. The session index's `idle-compactions` query reports each one with its band and the minutes to the next prompt. `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` raises its floor and `"idleCompaction": false` turns it off.
+
+**Drop it** when the main-loop models' default auto-compact threshold is at or below 280K.
+
 ## Hooks
 
 Why a hook entry in `user/settings.json` or `managed/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).

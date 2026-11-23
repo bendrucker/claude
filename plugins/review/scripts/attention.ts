@@ -368,7 +368,7 @@ export function rexReviewArgs(block: string, review: RexReview = {}): string[] {
     if (review.base != null && review.base !== "") args.push(`revisions=${review.base}..HEAD`);
     if (review.reviewer != null) args.push(`reviewer=${review.reviewer}`);
   }
-  if (review.batch === true) args.push("mode=batch");
+  args.push(`mode=${review.batch === true ? "batch" : "live"}`);
   return args;
 }
 

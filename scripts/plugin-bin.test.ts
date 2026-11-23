@@ -63,7 +63,7 @@ describe.each(skillDirs.map(({ plugin, dir }) => [`${plugin}:${basename(dir)}`, 
         .filter((shim) => new RegExp(`(^|[\\s\`(])${shim}([\\s\`:)]|$)`, "m").test(text));
       const preflights = [
         ...skill.matchAll(
-          /^!`(sh \$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/bin-path-check\.sh) ([^`]+)`$/gm,
+          /^!`(sh "\$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/bin-path-check\.sh") ([^`]+)`$/gm,
         ),
       ];
       const checked = new Set(preflights.flatMap((match) => match[2]?.split(" ") ?? []));

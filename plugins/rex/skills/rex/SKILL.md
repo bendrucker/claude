@@ -4,7 +4,7 @@ description: >-
   Drive the Rex terminal multiplexer: tabs, panes, splits, and hosts. Load this when opening a file alongside the user, starting a dev server or log tail the user should watch, reading another terminal's output, running a command on a saved host, or asking what else is running. Tab, pane, split, and host are Rex's terms. In a session Rex hosts, a request that uses one is a Rex request even when it never says Rex. New PR-bound work goes to `dispatch:dispatch`.
 argument-hint: "[orient | view <file> | read <block>]"
 allowed-tools:
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts)
+  - 'Bash(bun "${CLAUDE_SKILL_DIR}/scripts/orient.ts")'
   - Bash(rex session inspect:*)
   - Bash(rex window ls:*)
   - Bash(rex block ls:*)
@@ -24,7 +24,7 @@ Rex hosts this session's tabs and panes. A tab is a window and a pane is a block
 
 ## Current Session
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts`
+!`bun "${CLAUDE_SKILL_DIR}/scripts/orient.ts"`
 
 One line per tab, then one per block: ID, label, foreground cwd, and program. `*this*` marks the block running this session. If it prints a failure instead of a listing, stop here and use ordinary tools.
 

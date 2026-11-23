@@ -23,6 +23,7 @@ allowed-tools:
   - Bash(git fetch:*)
   - Bash(git push:*)
   - Bash(bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/*)
+  - 'Bash(bun "${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/*)'
 hooks:
   PreToolUse:
     - matcher: "Bash(git commit:*)|Bash(git rebase --continue:*)|Bash(git merge --continue:*)|Bash(git cherry-pick --continue:*)"
@@ -35,15 +36,15 @@ hooks:
 
 ## Status
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/status.ts`
+!`bun "${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/status.ts"`
 
 ## Context
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/context.ts`
+!`bun "${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/context.ts"`
 
 ## Upstream
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/upstream.ts`
+!`bun "${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/upstream.ts"`
 
 ## Resolving
 

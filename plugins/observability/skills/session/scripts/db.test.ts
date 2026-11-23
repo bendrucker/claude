@@ -972,6 +972,19 @@ describe("hook_events", () => {
 });
 
 describe("skill_loads view", () => {
+  it("sizes each body in bytes", async () => {
+    const rows = await db.query(
+      `SELECT body_bytes FROM skill_loads WHERE session_id = 'skill-loads-session' AND skill = 'ship'`,
+      z.object({ body_bytes: z.coerce.number() }),
+    );
+    expect(rows).toEqual([
+      {
+        body_bytes: "Base directory for this skill: /Users/test/.claude/skills/ship\n\n# Ship"
+          .length,
+      },
+    ]);
+  });
+
   it("records each body load with its trigger and plugin version", async () => {
     const rows = await db.query(
       `SELECT skill, plugin, plugin_version, trigger, tool_use_id FROM skill_loads
@@ -1001,6 +1014,55 @@ describe("skill_loads view", () => {
         tool_use_id: null,
       },
     ]);
+  });
+});
+
+describe("idle-compactions query", () => {
+  it("reports size, band, time to the next prompt, and re-injected skills per idle compaction", async () => {
+    const rows = await runQuery(
+      db,
+      "idle-compactions",
+      z.object({
+        session_id: z.string(),
+        compact_pre_tokens: z.bigint(),
+        in_window_band: z.boolean(),
+        minutes_to_next_prompt: z.number().nullable(),
+        next_prompt_source: z.string().nullable(),
+        reinjected_skills: z.bigint(),
+        reinjected_bytes: z.coerce.number().transform((bytes) => bytes > 0),
+      }),
+      filterParams({ window: null }),
+    );
+    expect(rows).toEqual([
+      {
+        session_id: "idle-resumed-session",
+        compact_pre_tokens: 241000n,
+        in_window_band: true,
+        minutes_to_next_prompt: 90,
+        next_prompt_source: "typed",
+        reinjected_skills: 2n,
+        reinjected_bytes: true,
+      },
+      {
+        session_id: "idle-abandoned-session",
+        compact_pre_tokens: 305000n,
+        in_window_band: false,
+        minutes_to_next_prompt: null,
+        next_prompt_source: null,
+        reinjected_skills: 0n,
+        reinjected_bytes: false,
+      },
+    ]);
+  });
+
+  it("moves the band's upper edge with the window param", async () => {
+    const rows = await runQuery(
+      db,
+      "idle-compactions",
+      z.object({ session_id: z.string(), in_window_band: z.boolean() }),
+      filterParams({ window: "400000" }),
+    );
+    expect(rows.every((r) => r.in_window_band)).toBe(true);
   });
 });
 
@@ -1259,13 +1321,21 @@ describe("activity query", () => {
       filterParams(),
     );
     const bySignal = new Map(rows.map((r) => [r.signal, Number(r.count)]));
-    expect(bySignal.get("prompt: typed")).toBe(2);
+    // compactions-session fixtures add four typed prompts to the two elsewhere.
+    expect(bySignal.get("prompt: typed")).toBe(6);
     expect(bySignal.get("prompt: queued")).toBe(1);
     expect(bySignal.get("prompt: system")).toBe(1);
     // `promptSource` calls this turn `queued`; the attachment says who queued it.
     expect(bySignal.get("queued command: auto-continuation")).toBe(1);
     expect(bySignal.get("interruptions")).toBe(1);
-    expect(bySignal.get("compactions")).toBe(1);
+    expect(bySignal.get("compactions")).toBe(6);
+    // The boundary's trigger says only manual or auto; the notice after it names idle
+    // and away compactions, and `precomputed` names a background summary.
+    expect(bySignal.get("compaction: manual")).toBe(1);
+    expect(bySignal.get("compaction: auto")).toBe(1);
+    expect(bySignal.get("compaction: idle")).toBe(2);
+    expect(bySignal.get("compaction: away")).toBe(1);
+    expect(bySignal.get("compaction: precomputed")).toBe(1);
     expect(bySignal.get("mode: auto")).toBe(1);
     // hooks-session contributes one, plan-iterations-session (added for the
     // plan-iterations query) contributes a second.
@@ -1352,7 +1422,7 @@ describe("outcomes query", () => {
       "sessions: ongoing": 1,
       "sessions: handed-off": 2,
       "sessions: abandoned-with-edits": 4,
-      "sessions: no-artifact": 20,
+      "sessions: no-artifact": 23,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1369,7 +1439,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 27,
+      "sessions: ongoing": 30,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });

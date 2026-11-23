@@ -256,12 +256,12 @@ describe("sessionHost", () => {
 
 describe("rexReviewArgs", () => {
   test.each<{ name: string; review: RexReview; expected: string[] }>([
-    { name: "working diff", review: {}, expected: [] },
-    { name: "empty base", review: { base: "" }, expected: [] },
+    { name: "working diff", review: {}, expected: ["mode=live"] },
+    { name: "empty base", review: { base: "" }, expected: ["mode=live"] },
     {
       name: "against a base",
       review: { base: "origin/main" },
-      expected: ["revisions=origin/main..HEAD"],
+      expected: ["revisions=origin/main..HEAD", "mode=live"],
     },
     {
       name: "plannotator diff in batch",
@@ -271,7 +271,7 @@ describe("rexReviewArgs", () => {
     {
       name: "a document passes its absolute path and drops diff options",
       review: { doc: "/repo/tmp/pr-body.md", base: "origin/main", reviewer: "hunk" },
-      expected: ["doc=/repo/tmp/pr-body.md"],
+      expected: ["doc=/repo/tmp/pr-body.md", "mode=live"],
     },
   ])("$name", ({ review, expected }) => {
     expect(rexReviewArgs("block:01a1", review)).toEqual([
@@ -283,7 +283,7 @@ describe("rexReviewArgs", () => {
   });
 
   test("a relative document resolves against the working directory", () => {
-    expect(rexReviewArgs("block:01a1", { doc: "design.md" }).at(-1)).toBe(
+    expect(rexReviewArgs("block:01a1", { doc: "design.md" })).toContain(
       `doc=${join(process.cwd(), "design.md")}`,
     );
   });

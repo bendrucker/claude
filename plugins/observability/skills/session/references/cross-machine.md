@@ -8,7 +8,7 @@ Procedures for listing, importing, re-syncing, and forgetting another machine's 
 bun <skill-dir>/scripts/hosts.ts
 ```
 
-Shows each host with its import time, egress policy, last index, rsync source, and a ready-to-run re-sync command.
+Shows each host with its import time, egress policy, last index, newest upload, rsync source, and a ready-to-run re-sync command. For an `s3://` host it lists the bucket through the `aws` CLI, and when the newest object is older than `--stale-days` (default 3) or the listing fails, it prints a `stale: <host> ...` line to stderr and exits 1, so a scheduled check can key on either. This catches an uploader that stopped, which `index-health`'s `host-staleness` cannot tell apart from a host nobody pulled.
 
 ## Importing a Machine
 
@@ -53,3 +53,5 @@ session-index-pull --host cloud
 ```
 
 `--egress` fits because these rows came from the cloud in the first place. The bucket keeps every session. `pull.ts` keeps the local copy to the sessions uploaded within `--days` (default 90, matching `cleanupPeriodDays`), fetching any whose objects grew and deleting the rest, so the next refresh imports the new ones and reaps the rows of the old, the way `cleanupPeriodDays` works for `local`. It shells out to the `aws` CLI with whatever credentials the environment provides.
+
+A run whose PUTs fail, on an HTTP error status or a thrown fetch, appends a `session-upload.upload` event at WARN to the session's `mod-events/`, once per session for each `kind`: `unsigned` (a 403 on every file, meaning the environment has no SigV4 network secret for the bucket), `http`, or `network`. The event carries the kind, a `message` stating it, the hook, the `attempted` and `failed` counts, the distinct `statuses`, and each failed file's session-relative name with its status or error code. The hook still exits 0. The event reaches the bucket with the first upload that succeeds, so the `mods` query shows it as a `failed` row for mod `session-upload`, and the cloud session's own index shows it immediately.

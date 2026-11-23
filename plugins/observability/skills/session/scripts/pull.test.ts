@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { localFiles, plan } from "./pull";
+import { localFiles, plan, s3Location, uploadStaleness } from "./pull";
 
 const DAY = 86_400_000;
 
@@ -44,4 +44,31 @@ test("keys local mod events as the bucket does", async () => {
 test("reads a host with no mod events", () => {
   const host = mkdtempSync(join(tmpdir(), "pull-"));
   expect(localFiles(join(host, "projects"), join(host, "mod-events"))).toEqual(new Map());
+});
+
+test("s3Location splits the bucket from a slash-terminated prefix", () => {
+  expect(s3Location("s3://bucket/sessions/raw/cloud/")).toEqual({
+    bucket: "bucket",
+    prefix: "sessions/raw/cloud/",
+  });
+  expect(s3Location("s3://bucket/")).toEqual({ bucket: "bucket", prefix: "" });
+  expect(s3Location("/Users/me/.claude/projects")).toBeUndefined();
+});
+
+test("uploadStaleness keys on the newest object, not the oldest", () => {
+  const objects = [
+    { key: "cse_old/a.jsonl", size: 1, lastModified: DAY },
+    { key: "cse_new/a.jsonl", size: 1, lastModified: 8 * DAY },
+  ];
+  expect(uploadStaleness(objects, 10 * DAY, 3)).toEqual({ newest: 8 * DAY, stale: false });
+  expect(uploadStaleness(objects, 11 * DAY + 1, 3)).toEqual({ newest: 8 * DAY, stale: true });
+});
+
+test("uploadStaleness holds a host at exactly the threshold fresh", () => {
+  const objects = [{ key: "cse/a.jsonl", size: 1, lastModified: DAY }];
+  expect(uploadStaleness(objects, 4 * DAY, 3).stale).toBe(false);
+});
+
+test("uploadStaleness flags a prefix that never received an upload", () => {
+  expect(uploadStaleness([], 10 * DAY, 3)).toEqual({ newest: undefined, stale: true });
 });

@@ -13,6 +13,7 @@ allowed-tools:
   - Bash(coderabbit:*)
   - Bash(jq:*)
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*)"
+  - 'Bash(bun "${CLAUDE_PLUGIN_ROOT}/scripts/*)'
   - Skill(github:pr-comments)
   - Skill(gitlab:merge-request)
   - Skill(pull-request:babysit)
@@ -74,7 +75,7 @@ With `--local`, run the same reviewer against the branch's unmerged commits befo
 
 Run this mode unprompted when you are about to push or open a PR in a repo with an available bot and the diff warrants a metered review ([local.md](local.md) sets that gate). Skip it when `/ship` or `pull-request:create` already ran it on this branch.
 
-- Local detection: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts`
+- Local detection: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts"`
 
 Resolve that line to a provider per [local.md](local.md), which also covers the CLI mechanics and the hosted signals for repos with no config file. A provider reported as paused is out: report the pause and stop.
 

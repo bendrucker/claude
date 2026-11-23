@@ -57,7 +57,7 @@ const Listing = z.object({
     .default([]),
 });
 
-async function list(bucket: string, prefix: string): Promise<S3Object[]> {
+export async function list(bucket: string, prefix: string): Promise<S3Object[]> {
   const out =
     await $`aws s3api list-objects-v2 --bucket ${bucket} --prefix ${prefix} --output json`.text();
   return Listing.parse(out.trim() === "" ? {} : JSON.parse(out)).Contents.map((o) => ({
@@ -65,6 +65,28 @@ async function list(bucket: string, prefix: string): Promise<S3Object[]> {
     size: o.Size,
     lastModified: Date.parse(o.LastModified),
   }));
+}
+
+// `s3://bucket/prefix` → the bucket and the listing prefix, with its trailing slash.
+export function s3Location(source: string): { bucket: string; prefix: string } | undefined {
+  const match = /^s3:\/\/([^/]+)\/(.*?)\/?$/.exec(source);
+  if (match === null) return undefined;
+  const [, bucket = "", base = ""] = match;
+  return { bucket, prefix: base === "" ? "" : `${base}/` };
+}
+
+export interface Staleness {
+  /** When the newest object was uploaded, or undefined for an empty prefix. */
+  newest: number | undefined;
+  stale: boolean;
+}
+
+// The uploader overwrites each object as its session grows, so the newest
+// LastModified is the last upload that landed. An empty prefix has never
+// received one.
+export function uploadStaleness(objects: S3Object[], now: number, days: number): Staleness {
+  const newest = objects.length === 0 ? undefined : Math.max(...objects.map((o) => o.lastModified));
+  return { newest, stale: newest === undefined || now - newest > days * 86_400_000 };
 }
 
 const MOD_EVENTS = "mod-events";
@@ -116,8 +138,8 @@ if (import.meta.main) {
 
   const hosts = await listImportedHosts();
   const host = hosts.find((h) => h.label === argv.flags.host);
-  const match = /^s3:\/\/([^/]+)\/(.*?)\/?$/.exec(host?.manifest.source ?? "");
-  if (host === undefined || match === null) {
+  const location = s3Location(host?.manifest.source ?? "");
+  if (host === undefined || location === undefined) {
     const found =
       hosts.length === 0
         ? "none"
@@ -127,8 +149,7 @@ if (import.meta.main) {
     );
     process.exit(1);
   }
-  const [, bucket = "", base = ""] = match;
-  const prefix = base === "" ? "" : `${base}/`;
+  const { bucket, prefix } = location;
   const root = join(host.root, "projects");
   const events = join(host.root, MOD_EVENTS);
 

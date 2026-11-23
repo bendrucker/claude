@@ -5,7 +5,7 @@ description: >-
 argument-hint: "[--target <name>]"
 allowed-tools:
   - Bash(claude-dispatch-close:*)
-  - Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh:*)
+  - 'Bash(sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh":*)'
 ---
 
 # Close
@@ -22,7 +22,7 @@ Get a finished session out of the user's way without losing work. The pane close
 
 ## Close This Pane
 
-!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh claude-dispatch-close`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" claude-dispatch-close`
 
 1. Leave the worktree, branch, and any `tmp/` output in place, and make no extra commits.
 2. Write a summary of one to three lines: what is done, and what is left on disk.

@@ -137,24 +137,23 @@ describe.skipIf(!ready)("attention under Rex", () => {
     await rm(repo, { recursive: true, force: true });
   });
 
-  test("a saved plannotator diff note reaches watch, and closing the split ends it", async () => {
-    expect(open(agent, repo, "--diff")).toBe(`opened plannotator-tui beside ${agent}`);
+  test("a saved Hunk note reaches watch, and closing the split ends it", async () => {
+    expect(open(agent, repo, "--diff", "--app", "hunk")).toBe(`opened Hunk beside ${agent}`);
     const watch = new Watch(agent, repo);
-    const tui = await until("the plannotator split", () => reviewBlock(agent));
-    await until("plannotator's diff", () =>
-      screen(tui).includes("export function sub") ? true : undefined,
+    const hunk = await until("the Hunk split", () => reviewBlock(agent));
+    await until("Hunk's live status line", () =>
+      screen(hunk).includes("live ·") ? true : undefined,
     );
 
-    sh("rex", "send-key", "-b", tui, "j", "j", "j", "j", "v", "v", "c");
-    await until("the comment box", () => (screen(tui).includes("enter saves") ? true : undefined));
-    sh("rex", "send", "-b", tui, "rename sub to subtract");
-    sh("rex", "send-key", "-b", tui, "enter");
+    sh("rex", "send-key", "-b", hunk, "j", "j", "j", "j", "j", "j", "c");
+    sh("rex", "send", "-b", hunk, "rename sub to subtract");
+    sh("rex", "send-key", "-b", hunk, "ctrl+s");
 
     expect(await watch.next("[review: comment]")).toMatch(
       /^\[review: comment\] math\.js:\d+ \(id [^)]+\) \| .* \| rename sub to subtract$/,
     );
 
-    sh("rex", "block", "close", tui);
+    sh("rex", "block", "close", hunk);
     expect(await watch.next("[review: closed]")).toMatch(/^\[review: closed\] \w+$/);
     expect(await watch.exited).toBe(0);
   }, 30_000);

@@ -264,13 +264,13 @@ describe("rexReviewArgs", () => {
       expected: ["revisions=origin/main..HEAD", "mode=live"],
     },
     {
-      name: "batch",
-      review: { batch: true },
-      expected: ["mode=batch"],
+      name: "Hunk diff in batch",
+      review: { app: "hunk", batch: true },
+      expected: ["app=hunk", "mode=batch"],
     },
     {
       name: "a document passes its absolute path and drops diff options",
-      review: { doc: "/repo/tmp/pr-body.md", base: "origin/main" },
+      review: { doc: "/repo/tmp/pr-body.md", base: "origin/main", app: "hunk" },
       expected: ["doc=/repo/tmp/pr-body.md", "mode=live"],
     },
   ])("$name", ({ review, expected }) => {

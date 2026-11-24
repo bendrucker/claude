@@ -25,10 +25,11 @@ export const SIZE_THRESHOLD = 10_000;
 // loop impossible: past it, the presentation goes to the user's own approval.
 const SIZE_MAX_FIRES = 2;
 
-// A re-present that keeps nearly every line of a plan this gate just denied, and
-// drops almost none, patched the denied text to get past the gate instead of
-// reworking it. A plan the gate passed went to the user, so the next one answers
-// their feedback and may grow by what it asked for.
+// A re-present that keeps nearly every line of a plan this gate just denied as a
+// repeat of a user rejection, and drops almost none, patched the denied text to get
+// past the gate instead of reworking it. A plan the gate passed went to the user, so
+// the next one answers their feedback and may grow by what it asked for. A size
+// denial came from the gate alone, so its fix may keep most lines.
 const APPEND_ONLY_MIN_CARRYOVER = 0.9;
 // Count lines the re-present introduced, not net size. A swap that trades a few
 // lines for a few new ones nets zero while carrying the whole prior document.
@@ -157,7 +158,7 @@ export async function processInput(
 
   const hashPath = join(dir, "exit-plan-hash");
   const linesPath = join(dir, "exit-plan-lines");
-  const deniedPath = join(dir, "exit-plan-denied");
+  const lastRulePath = join(dir, "exit-plan-last-rule");
 
   const hash = createHash("sha256").update(plan).digest("hex");
   const previous = await readState(hashPath);
@@ -167,25 +168,33 @@ export async function processInput(
   const previousLinesRaw = await readState(linesPath);
   await writeState(linesPath, JSON.stringify([...currentLines]));
 
-  const previousDenied = (await readState(deniedPath)) === "1";
-  const reason = await decide(dir, plan, {
-    unchanged: previous === hash,
+  // Only a user rejection, or a denial repeating one, arms the re-present rules.
+  const lastRule = await readState(lastRulePath);
+  const rejected = lastRule !== "size";
+  const repeatedRejection = lastRule === "unchanged" || lastRule === "append-only";
+  const decision = await decide(dir, plan, {
+    unchanged: rejected && previous === hash,
     appendOnly:
-      previousDenied &&
+      repeatedRejection &&
       previousLinesRaw !== null &&
       isAppendOnlyRevision(parseLineSet(previousLinesRaw) ?? new Set(), currentLines),
   });
-  await writeState(deniedPath, reason === null ? "0" : "1");
-  return reason === null ? null : formatDecision(reason);
+  await writeState(lastRulePath, decision?.rule ?? "allowed");
+  return decision === null ? null : formatDecision(decision.reason);
+}
+
+interface GateDecision {
+  rule: "unchanged" | "append-only" | "size";
+  reason: string;
 }
 
 async function decide(
   dir: string,
   plan: string,
   { unchanged, appendOnly }: { unchanged: boolean; appendOnly: boolean },
-): Promise<string | null> {
-  if (unchanged) return DENY_REASON;
-  if (appendOnly) return APPEND_ONLY_REASON;
+): Promise<GateDecision | null> {
+  if (unchanged) return { rule: "unchanged", reason: DENY_REASON };
+  if (appendOnly) return { rule: "append-only", reason: APPEND_ONLY_REASON };
   if (plan.length <= SIZE_THRESHOLD) return null;
 
   // A pre-count marker file holds "asked", which parses to NaN and fails the
@@ -194,7 +203,7 @@ async function decide(
   const priorFires = Number((await readState(askedPath)) ?? 0);
   if (!Number.isInteger(priorFires) || priorFires >= SIZE_MAX_FIRES) return null;
   await writeState(askedPath, String(priorFires + 1));
-  return sizeReason(priorFires);
+  return { rule: "size", reason: sizeReason(priorFires) };
 }
 
 // Fail open, but never silently: exit 1 lets the ExitPlanMode call through while

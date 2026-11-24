@@ -8,7 +8,7 @@ Your session id is `sessionId` in `~/.claude/sessions/$PPID.json`, and your shor
 
 The pane is already closed, so skip any instruction to run `dispatch:close`.
 
-1. Finish any skill the session had in progress, such as the remaining steps of `ship`.
+1. Finish any skill the session had in progress.
 2. Run `pull-request:babysit --reviews <pr>`. Leave `--merge` off, because the user decides when to merge. Babysit runs as `--merge` on its own when the user already enabled auto-merge.
 3. When the watcher reports `max-time-reached`, start babysit again.
 4. Once babysit stops at green, end your turn. Keep watching until the PR merges or closes, because conflicts and CI failures can stall a merge at any point. github and gitlab plugin messages wake you. On a conflict, a failing check, or new review comments, run babysit again.

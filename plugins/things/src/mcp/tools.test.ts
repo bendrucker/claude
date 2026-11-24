@@ -186,6 +186,7 @@ function fakeClient() {
     dispatch: [] as { command: string; params: Record<string, string> }[],
     tags: [] as { requested: string[]; createMissing: boolean }[],
     paced: [] as number[],
+    deleted: [] as string[][],
   };
   const client: ThingsClient = {
     ensureRunning: () => {
@@ -210,6 +211,10 @@ function fakeClient() {
     },
     pace: (ms) => {
       calls.paced.push(ms);
+      return Promise.resolve();
+    },
+    deleteTodos: (ids) => {
+      calls.deleted.push(ids);
       return Promise.resolve();
     },
   };
@@ -525,6 +530,20 @@ describe("write tools", () => {
     await mcp.callTool({ name: "reorder_todos", arguments: { ids: ["T1", "T2"], list: "today" } });
 
     expect(calls.dispatch.map((call) => call.command)).toEqual(["json", "json"]);
+    await mcp.close();
+  });
+
+  test("deletes todos through Apple Events rather than the URL scheme", async () => {
+    const { calls, client } = fakeClient();
+    const mcp = await connect(client);
+
+    const result = ToolResult.parse(
+      await mcp.callTool({ name: "delete_todos", arguments: { ids: ["T1", "T2"] } }),
+    );
+
+    expect(result.content?.[0]?.text).toBe("Moved 2 todos to the Trash");
+    expect(calls.deleted).toEqual([["T1", "T2"]]);
+    expect(calls.dispatch).toEqual([]);
     await mcp.close();
   });
 

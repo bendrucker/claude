@@ -47,7 +47,9 @@ This constrains more than `stdio.ts`. The tools reuse the plugin's CLI scripts (
 
 ## Tools
 
-Reads run the plugin's JXA scripts through the `mac` plugin's runner: `list_todos`, `get_todo`, `find_todos`, `search_todos`, `query_logbook`, `list_metadata`. Tag creation takes the same path, as the one write that the URL scheme cannot express.
+Reads run the plugin's JXA scripts through the `mac` plugin's runner: `list_todos`, `get_todo`, `find_todos`, `search_todos`, `query_logbook`, `list_metadata`. Tag creation and `delete_todos` take the same path, as the writes the URL scheme cannot express.
+
+`delete_todos` sends Things' scripting `delete`, which moves a todo to the Trash rather than erasing it. Erasing would take `empty trash`, which empties the whole list, so no tool sends it. Every id resolves before the first delete, so one unknown id fails the call with nothing moved.
 
 Writes go through the `things:///` URL scheme: `add_todo`, `add_project`, `update_todos`, `update_project`, `capture_inbox`, `reorder_todos`. Cultured Code exposes no write API beyond it.
 
@@ -134,7 +136,7 @@ Each message needs its own trailing newline. The transport frames on newlines, s
 
 Checklist items are write-only. The URL scheme sets, prepends, and appends them, and `update_todos` exposes all three, but Things' scripting dictionary has no accessor for them, so no tool can read one back. `get_todo` says so in its description rather than returning a field that is always absent.
 
-Deleting has no URL-scheme command, so no tool exposes it and `update_todos` with `canceled` is as close as a caller gets. Things' scripting dictionary does offer `delete`, which moves an item to the Trash list rather than erasing it. A trashed todo keeps its id and still reports status `open`, so `get_todo` cannot tell one from a live todo.
+A trashed todo keeps its id and still reports status `open`, so `get_todo` cannot tell one from a live todo.
 
 ## Constraints
 

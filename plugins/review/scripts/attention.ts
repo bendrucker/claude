@@ -590,8 +590,7 @@ function rexOpen(block: string, review: RexReview): void {
     stdio: ["ignore", "inherit", "inherit"],
   });
   if (result.exitCode !== 0) process.exit(1);
-  const surface =
-    review.doc == null && review.app === "hunk" ? "Hunk" : "plannotator-tui";
+  const surface = review.doc == null && review.app === "hunk" ? "Hunk" : "plannotator-tui";
   console.log(`opened ${surface} beside ${block}`);
 }
 

@@ -15,20 +15,27 @@ export interface EditScope {
   added: Set<number>;
 }
 
-/** What an Edit, MultiEdit, or overwriting Write replaced. Null when the whole file counts as written. */
-export function editScopeOf(toolResponse: unknown): EditScope | null {
-  const response = ToolResponse.safeParse(toolResponse).data;
-  if (response === undefined || response.type === "create") return null;
-  if (typeof response.originalFile !== "string") return null;
+export type Hunk = z.infer<typeof Hunk>;
+
+/** The 1-based numbers, in the new file, of the lines the hunks add. */
+export function addedLines(hunks: Hunk[]): Set<number> {
   const added = new Set<number>();
-  for (const hunk of response.structuredPatch ?? []) {
+  for (const hunk of hunks) {
     let line = hunk.newStart;
     for (const text of hunk.lines) {
       if (text.startsWith("+")) added.add(line);
       if (text.startsWith("+") || text.startsWith(" ")) line += 1;
     }
   }
-  return { original: response.originalFile, added };
+  return added;
+}
+
+/** What an Edit, MultiEdit, or overwriting Write replaced. Null when the whole file counts as written. */
+export function editScopeOf(toolResponse: unknown): EditScope | null {
+  const response = ToolResponse.safeParse(toolResponse).data;
+  if (response === undefined || response.type === "create") return null;
+  if (typeof response.originalFile !== "string") return null;
+  return { original: response.originalFile, added: addedLines(response.structuredPatch ?? []) };
 }
 
 function keyOf(alert: ValeAlert): string {

@@ -1,0 +1,56 @@
+# evidence: user example 2026-11-23, "fits no slot", which `ai-tells.NegatedObject` leaves out of its verb list. The construction reads archaic next to "doesn't fit any slot".
+# retire when: judged hits stop reading worse than their rewrites.
+extends: existence
+message: "Stilted negation: '%s'. Negate the verb instead: \"doesn't fit any ...\"."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/NegatedFit.yml
+level: warning
+nonword: true
+ignorecase: true
+# Same exemptions as ai-tells.NegatedObject: comparatives and quantifier idioms negate a degree, not an object, and a quote or backtick may open the object. "There's no slot" has no verb before "no" and never matches.
+tokens:
+  - "\\b(?:fit|fits|fitted|fitting) no (?!(?:one|longer|more|less|fewer|matter|sooner|later|earlier|better|worse|faster|slower|higher|lower|further|deeper|closer|harder|easier|doubt|way|idea|choice|effect|need)\\b)(?:['\"‘“`]?[a-z][-a-z]*\\b|\\*+)"
+tests:
+  - name: "flags fit before no"
+    input: |
+      These files fit no category.
+    contains: [Writing.NegatedFit]
+  - name: "flags fits before no"
+    input: |
+      The result fits no slot.
+    contains: [Writing.NegatedFit]
+  - name: "flags fitted before no"
+    input: |
+      The part fitted no socket.
+    contains: [Writing.NegatedFit]
+  - name: "flags fitting before no"
+    input: |
+      A value fitting no schema is rejected.
+    contains: [Writing.NegatedFit]
+  - name: "flags a quoted object"
+    input: |
+      The label fits no "bucket".
+    contains: [Writing.NegatedFit]
+  - name: "allows fit in memory"
+    input: |
+      The table fits in memory.
+    absent: Writing.NegatedFit
+  - name: "allows fit into an object"
+    input: |
+      The key can fit into the slot.
+    absent: Writing.NegatedFit
+  - name: "allows no one as a pronoun"
+    input: |
+      The case fits no one in particular.
+    absent: Writing.NegatedFit
+  - name: "allows a comparative"
+    input: |
+      The new rule fits no better than the old one.
+    absent: Writing.NegatedFit
+  - name: "allows an exempt noun"
+    input: |
+      The change fits no way of working here.
+    absent: Writing.NegatedFit
+  - name: "allows no with no verb before it"
+    input: |
+      There's no slot for it.
+    absent: Writing.NegatedFit

@@ -1,0 +1,56 @@
+# evidence: per 10k words in the voice corpus, Ben's PRs 1.72, issues 0.94, mail 1.13, dictation 0.18, against 3.1 to 3.3 in repo markdown. Ben flagged "has no milk" and "has no owner" as old-timey, dramatic register on 2026-11-23. `ai-tells.NegatedObject` skips has/have by design, since the docs corpora use it as ordinary English.
+# retire when: judged hits stop reading worse than their rewrites.
+extends: existence
+message: "Stilted negation: '%s'. Negate the verb instead: \"doesn't have an ...\"."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/NegatedPossession.yml
+level: suggestion
+nonword: true
+ignorecase: true
+# Same exemptions as ai-tells.NegatedObject plus idioms that read as everyday English ("has no effect," "have no idea," "has no choice," "has no need"). A quote or backtick may open the object. "There's no" and "there is no" have no verb before "no" and never match.
+tokens:
+  - "\\b(?:has|have|had|having) no (?!(?:one|longer|more|less|fewer|matter|sooner|later|earlier|better|worse|faster|slower|higher|lower|further|deeper|closer|harder|easier|doubt|way|idea|choice|effect|need)\\b)(?:['\"‘“`]?[a-z][-a-z]*\\b|\\*+)"
+tests:
+  - name: "flags has before no"
+    input: |
+      The directory has no owner.
+    contains: [Writing.NegatedPossession]
+  - name: "flags have before no"
+    input: |
+      The workers have no access.
+    contains: [Writing.NegatedPossession]
+  - name: "flags had before no"
+    input: |
+      The branch had no commits.
+    contains: [Writing.NegatedPossession]
+  - name: "flags having before no"
+    input: |
+      A cache having no entries is fine.
+    contains: [Writing.NegatedPossession]
+  - name: "flags a quoted object"
+    input: |
+      The field has no "owner".
+    contains: [Writing.NegatedPossession]
+  - name: "allows no one as a pronoun"
+    input: |
+      No one has the key.
+    absent: Writing.NegatedPossession
+  - name: "allows the exempt noun effect"
+    input: |
+      The flag has no effect on the build.
+    absent: Writing.NegatedPossession
+  - name: "allows the exempt noun idea"
+    input: |
+      I have no idea.
+    absent: Writing.NegatedPossession
+  - name: "allows a comparative"
+    input: |
+      The cache has no more room.
+    absent: Writing.NegatedPossession
+  - name: "allows has with an article"
+    input: |
+      The directory has an owner.
+    absent: Writing.NegatedPossession
+  - name: "allows there is no"
+    input: |
+      There's no owner. There is no owner.
+    absent: Writing.NegatedPossession

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "extends": ["./lint/base.json", "./lint/bun.json", "./lint/typescript.json"],
+  "extends": ["./lint/repo.json"],
   "ignorePatterns": [
     "**/fixtures/**",
     "**/evals/**/examples/**",

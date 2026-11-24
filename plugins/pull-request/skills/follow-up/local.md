@@ -6,7 +6,7 @@ Mechanics for running a hosted reviewer's CLI in [Local Mode](SKILL.md#local-mod
 
 Reviews are metered, and a diff earns one review through one channel, local or hosted. Spend it when the diff touches risk areas (auth, permissions, sandbox config, secret handling, network egress), adds a new runtime entry point (a hook, script, server, or CLI command), or runs past roughly 100 changed lines or 4 files excluding tests, docs, and lockfiles. Prose, dependency bumps, and reverts never qualify. A config diff qualifies only through the risk areas above.
 
-A `ship` skill with its own Bot Review Gate overrides these defaults. An explicit `--local` request overrides everything.
+An explicit `--local` request overrides these defaults.
 
 #### Recalibration
 
@@ -23,7 +23,7 @@ SKILL.md injects `scripts/detect-bot.ts` output at load: each provider's repo co
   - `gh api 'repos/{owner}/{repo}/rules/branches/{default-branch}' --jq '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]'`
 - A CLI on PATH with no config and no hosted signals is a global install. Run a bot only against a repo it reviews.
 - Provider identified but CLI missing: offer to install it (per the provider section below).
-- No signals anywhere: in the proactive paths (ship's pass, create's pre-push step) skip silently. On an explicit `--local` request, ask which bot reviews this repo's PRs.
+- No signals anywhere: in the proactive paths (create's pre-push step) skip silently. On an explicit `--local` request, ask which bot reviews this repo's PRs.
 
 ## Running a Review
 

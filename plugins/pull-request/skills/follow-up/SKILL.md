@@ -73,7 +73,7 @@ On stop, report fixes, replies and resolves, and escalations. Once the bar is cl
 
 With `--local`, run the same reviewer against the branch's unmerged commits before anything is pushed. Triage and the acceptance bar are the same, with findings from CLI output instead of PR threads and the score in its local form ([local.md](local.md)). A declined finding goes in the report with its reason.
 
-Run this mode unprompted when you are about to push or open a PR in a repo with an available bot and the diff warrants a metered review ([local.md](local.md) sets that gate). Skip it when `/ship` or `pull-request:create` already ran it on this branch.
+Run this mode unprompted when you are about to push or open a PR in a repo with an available bot and the diff warrants a metered review ([local.md](local.md) sets that gate). Skip it when `pull-request:create` already ran it on this branch.
 
 - Local detection: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts"`
 

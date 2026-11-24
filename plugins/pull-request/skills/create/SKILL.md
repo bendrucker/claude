@@ -84,7 +84,7 @@ When the context above shows a detected PR template, load [`references/template.
 1. When the current branch is a default branch (main or master), stop and ask the user to switch to a feature branch.
 1. Stage any unstaged changes: `git add .`
 1. When the branch carries no commits yet, commit in the same format as the PR title.
-1. Local bot review: the Review bot line above reports repo config, CLI presence, and any cooldown. On a config hit with no cooldown, apply the gate in follow-up's SKILL.md to decide whether the diff needs a metered review, and run `pull-request:follow-up --local` before pushing when it does. With no config, decide from the hosted signals in follow-up's `local.md`. Skip it when a local bot pass already ran on this branch this session (`/ship` runs one), the gate says skip, the provider is paused, detection finds nothing, or the user declines.
+1. Local bot review: the Review bot line above reports repo config, CLI presence, and any cooldown. On a config hit with no cooldown, apply the gate in follow-up's SKILL.md to decide whether the diff needs a metered review, and run `pull-request:follow-up --local` before pushing when it does. With no config, decide from the hosted signals in follow-up's `local.md`. Skip it when a local bot pass already ran on this branch this session, the gate says skip, the provider is paused, detection finds nothing, or the user declines.
 1. Push the branch: `git push -u origin HEAD`
 1. Resolve every label against the repo before creating: each `--label` value, plus the review label when the gate warranted a metered review that no local pass already spent. Load [`references/labels.md`](references/labels.md) for the lookup and for a label that doesn't resolve.
 1. Draft the title and body.

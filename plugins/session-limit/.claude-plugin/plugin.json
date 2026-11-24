@@ -12,6 +12,12 @@
       "title": "Extra usage enabled",
       "description": "Tell the model that requests past an exhausted 5-hour block spend overage credits. Leave off for accounts without extra usage.",
       "default": false
+    },
+    "muted": {
+      "type": "boolean",
+      "title": "Mute usage notices",
+      "description": "Skip usage limit notices on this machine. /limits on turns them back on for one session.",
+      "default": false
     }
   }
 }

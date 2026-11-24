@@ -6,6 +6,14 @@ Steer the model to wind down before a usage block runs out.
 
 `overage` (default `false`): set it on accounts with extra usage so the exhausted-block message warns that further requests spend overage credits.
 
+`muted` (default `false`): skip the notices on this machine. Set it in an untracked settings file to keep it to one machine:
+
+```json
+{ "pluginConfigs": { "session-limit@bendrucker": { "options": { "muted": true } } } }
+```
+
+`/limits off` mutes one session, and `/limits on` unmutes it over the machine default. Bare `/limits` shows which applies. A muted crossing still counts as announced and is logged as a `muted` event.
+
 ## Contents
 
 - **Mod**: [`register.ts`](mod/register.ts) reads the rate-limit windows on each `session.measure` and appends guidance mid-turn when a window crosses a band. Each append is logged through [`mod-events`](../mod-events/README.md) as an `inject` event, and a landed append prints a one-line summary to the transcript. Bands re-arm after `/clear` and `/resume`.

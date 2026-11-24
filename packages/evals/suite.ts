@@ -67,11 +67,24 @@ export async function withDependencies(repo: string, plugins: string[]): Promise
   return [...seen].toSorted();
 }
 
-/** Repo-relative directories of the plugins one plugin declares as dependencies. */
+const Marketplace = z.object({ name: z.string() });
+
+/** The name of the marketplace the repo publishes, when it has one. */
+async function ownMarketplace(repo: string): Promise<string | undefined> {
+  const file = Bun.file(join(repo, ".claude-plugin/marketplace.json"));
+  return (await file.exists()) ? Marketplace.parse(await file.json()).name : undefined;
+}
+
+/** Repo-relative directories of the plugin's dependencies, leaving out ones from another marketplace. */
 async function dependencies(repo: string, plugin: string): Promise<string[]> {
   const manifest = Bun.file(join(repo, plugin, ".claude-plugin/plugin.json"));
   if (!(await manifest.exists())) return [];
-  const { dependencies: names } = PluginManifest.parse(await manifest.json());
+  const { dependencies: declared } = PluginManifest.parse(await manifest.json());
+  const own = await ownMarketplace(repo);
+  const names = declared.flatMap((dep) => {
+    const [name = dep, marketplace] = dep.split("@");
+    return marketplace === undefined || marketplace === own ? [name] : [];
+  });
   return Promise.all(
     names.map(async (name) => {
       const dep = join(dirname(plugin), name);

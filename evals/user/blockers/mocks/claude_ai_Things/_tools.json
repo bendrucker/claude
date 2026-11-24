@@ -8,8 +8,15 @@
         "properties": {
           "title": { "type": "string", "minLength": 1 },
           "notes": { "type": "string", "description": "Markdown supported, max 10,000 chars" },
-          "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag names; each must already exist in Things unless create_tags is set" },
-          "when": { "type": "string", "description": "Schedule: today, tomorrow, evening, anytime, someday, yyyy-mm-dd, or natural language like 'next week'" },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Tag names; each must already exist in Things unless create_tags is set"
+          },
+          "when": {
+            "type": "string",
+            "description": "Schedule: today, tomorrow, evening, anytime, someday, yyyy-mm-dd, or natural language like 'next week'"
+          },
           "deadline": { "type": "string", "description": "yyyy-mm-dd" },
           "list": { "type": "string", "description": "Project name to file under (projects only)" }
         },

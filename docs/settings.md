@@ -164,9 +164,9 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop it** to route plan approval through Plannotator, or when the `plannotator` plugin drops its upstream dependency.
 
-`CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1` turns on [Code Mode](https://code.claude.com/docs/en/code-mode), where Claude writes JavaScript that makes several tool calls in one `REPL` step. It lives in `user/settings.json` because Claude Code ignores it in project settings, managed settings can only turn it off, and cloud sessions don't support it. Each call inside the code still passes `deny` and `ask` rules and `PreToolUse` hooks under its own tool name, but the auto-mode classifier reviews the code as a whole and not the run-time values it computes. Code Mode refuses to start beside a mod that checks tool calls (the `tool.call` handlers in `load`, `plan`, `sandbox`, and `zsh`) and names the blocker on the startup line and in `/status`. A session started in Code Mode resumes only with it on. It is working while the session index records `REPL` tool calls on the Mac.
+`CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1` turns on [Code Mode](https://code.claude.com/docs/en/code-mode), where Claude writes JavaScript that makes several tool calls in one `REPL` step. It lives in `user/settings.json` because Claude Code ignores it in project settings, managed settings can only turn it off, and cloud sessions don't support it. Each call inside the code still passes `deny` and `ask` rules and `PreToolUse` hooks under its own tool name, but the auto-mode classifier reviews the code as a whole and not the run-time values it computes. It needs Claude Code 2.1.329 or later, where a mod that hooks tool calls no longer keeps it off. Earlier versions start without it and name the blocking mod on the startup line and in `/status`. A session started in Code Mode resumes only with it on. It is working while the session index records `REPL` tool calls on the Mac.
 
-**Drop it** if no session records a `REPL` call within two weeks of the mods becoming compatible, if it regresses latency or tokens per task, or when Code Mode leaves experimental status.
+**Drop it** if no session records a `REPL` call within two weeks, if it regresses latency or tokens per task, or when Code Mode leaves experimental status.
 
 ## Compaction
 

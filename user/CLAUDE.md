@@ -27,6 +27,7 @@ Before adding a skill, hook, rule, or CLAUDE.md line, define what evidence shows
 - Prefer `analyst` over `general-purpose` for read-only spawns. Pass `model: haiku` for pure lookup.
 - When debugging Claude Code itself (harness, classifier, hooks, plugins, startup), launch the observed session with `DEBUG_SDK=1 claude`, which writes `~/.claude/debug/<session-id>.txt`. Set it in the launch environment, since Claude Code ignores it in `settings.json` `env`.
 - Open a PR with `pull-request:create`, or with an empty body when it's unavailable. Open PRs ready for review. Use draft only for speculative changes.
+- Watch every PR you open without asking: `subscribe_pr_activity` in a cloud session, `pull-request:babysit` locally. Drive CI and bot review to green, then tell me it's ready to merge.
 - Send build output to `/dev/null`. Store temporary files in `tmp/`.
 
 ## Blockers

@@ -10,7 +10,7 @@ Code review workflows for Claude Code.
 - The `follow-up` skill follows up on a PR/MR you reviewed: it checks if your comments were addressed, finds silent resolves, and decides whether to re-approve.
 - The `meat-proxy` skill drafts a short reply that hands an AI-relayed PR, MR, or doc back to its author with motivation and scope questions, holding line-level findings in private notes. It posts only when told to, as an unpublished draft.
 - The `inbox` skill dispatches inbound PR/MR reviews as background sessions that collect in `claude agents` (GitHub and GitLab).
-- The `human` skill requests Ben's own review of the working diff or a document, in the terminal (reviewr under herdr, Hunk under Rex, plannotator-tui) or the browser (plannotator). It raises a herdr pane label and toast that the plugin's `UserPromptSubmit` hook clears when he replies. It routes to the [`hunk`](../hunk) and [`plannotator`](../plannotator) plugins for instructions specific to each tool.
+- The `human` skill requests Ben's own review of the working diff or a document, in the terminal (reviewr under herdr, plannotator-tui under Rex and for documents) or the browser (plannotator). It raises a herdr pane label and toast that the plugin's `UserPromptSubmit` hook clears when he replies. It routes to the [`plannotator`](../plannotator) plugin for instructions specific to that tool.
 
 ### Hooks
 
@@ -26,7 +26,7 @@ Code review workflows for Claude Code.
 bun test plugins/review
 ```
 
-`scripts/attention.integration.ts` drives a real Hunk and plannotator-tui review in Rex. It needs Rex with the dotfiles `review_changes` action:
+`scripts/attention.integration.ts` drives a real plannotator-tui diff and document review in Rex. It needs Rex with the dotfiles `review_changes` action:
 
 ```sh
 bun test ./plugins/review/scripts/attention.integration.ts

@@ -264,13 +264,13 @@ describe("rexReviewArgs", () => {
       expected: ["revisions=origin/main..HEAD", "mode=live"],
     },
     {
-      name: "plannotator diff in batch",
-      review: { reviewer: "plannotator", batch: true },
-      expected: ["reviewer=plannotator", "mode=batch"],
+      name: "batch",
+      review: { batch: true },
+      expected: ["mode=batch"],
     },
     {
       name: "a document passes its absolute path and drops diff options",
-      review: { doc: "/repo/tmp/pr-body.md", base: "origin/main", reviewer: "hunk" },
+      review: { doc: "/repo/tmp/pr-body.md", base: "origin/main" },
       expected: ["doc=/repo/tmp/pr-body.md", "mode=live"],
     },
   ])("$name", ({ review, expected }) => {

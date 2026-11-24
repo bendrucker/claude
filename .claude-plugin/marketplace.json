@@ -50,11 +50,6 @@
       "source": "./plugins/review"
     },
     {
-      "name": "hunk",
-      "description": "Drive Hunk diff review sessions, on top of the instructions the installed Hunk binary ships",
-      "source": "./plugins/hunk"
-    },
-    {
       "name": "plannotator",
       "description": "Ben's Plannotator review gate, on top of the upstream Plannotator plugin",
       "source": "./plugins/plannotator"

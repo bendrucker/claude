@@ -346,28 +346,16 @@ export function sessionHost(env: Record<string, string | undefined> = process.en
   return { kind: "none" };
 }
 
-export const reviewers = ["hunk", "plannotator"] as const;
-export type Reviewer = (typeof reviewers)[number];
-
-export function isReviewer(value: string): value is Reviewer {
-  return (reviewers as readonly string[]).includes(value);
-}
-
 export interface RexReview {
   base?: string | undefined;
   batch?: boolean;
-  reviewer?: Reviewer | undefined;
   doc?: string | undefined;
 }
 
-// A document always opens in plannotator-tui, which the review CLI picks from `doc`.
 export function rexReviewArgs(block: string, review: RexReview = {}): string[] {
   const args = ["do", "review_changes", `block=${block}`];
   if (review.doc != null) args.push(`doc=${resolve(review.doc)}`);
-  else {
-    if (review.base != null && review.base !== "") args.push(`revisions=${review.base}..HEAD`);
-    if (review.reviewer != null) args.push(`reviewer=${review.reviewer}`);
-  }
+  else if (review.base != null && review.base !== "") args.push(`revisions=${review.base}..HEAD`);
   args.push(`mode=${review.batch === true ? "batch" : "live"}`);
   return args;
 }
@@ -590,9 +578,7 @@ function rexOpen(block: string, review: RexReview): void {
     stdio: ["ignore", "inherit", "inherit"],
   });
   if (result.exitCode !== 0) process.exit(1);
-  const surface =
-    review.doc != null || review.reviewer === "plannotator" ? "plannotator-tui" : "Hunk";
-  console.log(`opened ${surface} beside ${block}`);
+  console.log(`opened plannotator-tui beside ${block}`);
 }
 
 function fail(message: string): never {
@@ -680,10 +666,6 @@ const openCmd = command(
         type: Boolean,
         description: "Under Rex, hold notes for Send instead of delivering each to `watch`",
       },
-      reviewer: {
-        type: String,
-        description: `Under Rex, the diff reviewer: ${reviewers.join(" or ")}`,
-      },
     },
   },
   async (parsed) => {
@@ -695,15 +677,11 @@ const openCmd = command(
     if (host.kind === "none") fail("no herdr pane or Rex block: run the browser gate");
     const doc = parsed.flags.doc;
     if (doc != null && !(await Bun.file(doc).exists())) fail(`no such file: ${doc}`);
-    const { reviewer } = parsed.flags;
-    if (reviewer != null && !isReviewer(reviewer))
-      fail(`--reviewer must be ${reviewers.join(" or ")}`);
     if (host.kind === "rex") {
       rexOpen(host.block, {
         doc: doc ?? undefined,
         base: parsed.flags.base,
         batch: parsed.flags.batch === true,
-        reviewer: reviewer ?? undefined,
       });
       process.exit(0);
     }
@@ -766,7 +744,7 @@ const watchCmd = command(
   {
     name: "watch",
     help: {
-      description: "Under Rex, print each Hunk note as Ben saves it until the review closes",
+      description: "Under Rex, print each note as Ben saves it until the review closes",
     },
   },
   async () => {

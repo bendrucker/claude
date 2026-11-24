@@ -14,7 +14,7 @@ const PROSE_PARAGRAPH =
   "The cache stores frequently accessed records in memory. It evicts the oldest entry when full. A configurable TTL bounds staleness. Reads fall back to the database on a miss.";
 
 // 174 words, past the visible-word limit.
-const VISIBLE_PROSE = Array(6).fill(PROSE_PARAGRAPH).join("\n\n");
+const VISIBLE_PROSE = Array.from({ length: 6 }, () => PROSE_PARAGRAPH).join("\n\n");
 
 // The same words collapsed: clears the small-body word limit without being visible.
 const LONG_PROSE = `<details>\n<summary>Notes</summary>\n\n${VISIBLE_PROSE}\n\n</details>`;
@@ -23,7 +23,7 @@ const LONG_PROSE = `<details>\n<summary>Notes</summary>\n\n${VISIBLE_PROSE}\n\n<
 const BLOCK_PARAGRAPH =
   "The cache stores frequently accessed records in memory and evicts the oldest entry once it fills up completely. A configurable expiry bounds how stale any record may become before reads fall back to the database again. Every miss is logged with the key and the time spent waiting on the backing store.";
 
-const TABLE = `| Key | Value |\n| --- | --- |\n${Array(30).fill("| alpha beta gamma | delta epsilon zeta |").join("\n")}`;
+const TABLE = `| Key | Value |\n| --- | --- |\n${Array.from({ length: 30 }, () => "| alpha beta gamma | delta epsilon zeta |").join("\n")}`;
 
 const SHA40 = "2554da150000000000000000000000000000abcd";
 const KNOWN_COMMITS = new Set(["2554da15", "dc8acf12", SHA40]);
@@ -340,7 +340,7 @@ describe("warn rules", () => {
     { name: "long collapsed block", body: `Adds the lookup.\n\n${LONG_PROSE}`, fires: [] },
     {
       name: "long fenced output",
-      body: `Adds the lookup.\n\n\`\`\`\n${Array(100).fill("alpha beta gamma delta").join("\n")}\n\`\`\``,
+      body: `Adds the lookup.\n\n\`\`\`\n${Array.from({ length: 100 }, () => "alpha beta gamma delta").join("\n")}\n\`\`\``,
       fires: [],
     },
     { name: "one block past the limit", body: BLOCK_PARAGRAPH, fires: ["structure-limits"] },

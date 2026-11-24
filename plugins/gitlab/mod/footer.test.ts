@@ -116,7 +116,9 @@ describe("five chips", () => {
 
   test("wide terminals draw every chip in full", () => {
     const all = ["3:full", "1:full", "2:full", "4:full", "5:full"];
-    expect([200, 100, 60, 40].map(shape)).toEqual(Array(4).fill({ tiers: all, rest: undefined }));
+    expect([200, 100, 60, 40].map(shape)).toEqual(
+      Array.from({ length: 4 }, () => ({ tiers: all, rest: undefined })),
+    );
   });
 
   test("a squeeze demotes the later chips first", () => {

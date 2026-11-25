@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
 import {
+  applyOrder,
   HostUnreachableError,
+  type LiveSession,
+  sortSessions,
   listLiveSessions,
   loadDescriptions,
   parseDescriptions,
@@ -55,7 +58,7 @@ test("a schema violation warns", () => {
 });
 
 test("a valid file maps names to descriptions and skips entries without one", () => {
-  const { descriptions, warning } = parseDescriptions(
+  const { descriptions, orders, warning } = parseDescriptions(
     [
       "[[session]]",
       'name = "Area A"',
@@ -64,10 +67,36 @@ test("a valid file maps names to descriptions and skips entries without one", ()
       "",
       "[[session]]",
       'name = "Area B"',
+      "order = 0",
     ].join("\n"),
   );
   expect(warning).toBeUndefined();
   expect([...descriptions]).toEqual([["Area A", "First area"]]);
+  expect([...orders]).toEqual([["Area B", 0]]);
+});
+
+test("ordered sessions sort first and move to the top of Rex's list", async () => {
+  const live = (label: string): LiveSession => ({ id: `id-${label}`, label, tabs: [], cwds: [] });
+  const orders = new Map([
+    ["Inbox", 0],
+    ["Area B", 1],
+  ]);
+  const sorted = sortSessions(
+    [live("Area A"), live("Area B"), live("Area C"), live("Inbox")],
+    orders,
+  );
+  expect(sorted.map((s) => s.label)).toEqual(["Inbox", "Area B", "Area A", "Area C"]);
+
+  const calls: string[][] = [];
+  const run: RexRunner = (argv) => {
+    calls.push([...argv]);
+    return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+  };
+  await applyOrder(run, "host-b", sorted, orders);
+  expect(calls).toEqual([
+    ["rex", "-S", "host-b", "session", "move", "id-Inbox", "--index", "1"],
+    ["rex", "-S", "host-b", "session", "move", "id-Area B", "--index", "2"],
+  ]);
 });
 
 test("recent areas keep non-live labels from the last 14 days", () => {
@@ -123,7 +152,12 @@ function fakeRex(options: { failServer?: string } = {}): { run: RexRunner; calls
 test("live sessions gather tabs and distinct foreground cwds, falling back to pwd", async () => {
   const { run } = fakeRex();
   expect(await listLiveSessions(run)).toEqual([
-    { label: "Area A", tabs: ["Tab One", "Tab Two"], cwds: ["/work/a", "/work/home"] },
+    {
+      id: "session:1",
+      label: "Area A",
+      tabs: ["Tab One", "Tab Two"],
+      cwds: ["/work/a", "/work/home"],
+    },
   ]);
 });
 
@@ -138,7 +172,14 @@ test("an unreachable host raises HostUnreachableError and routes through -S", as
 
 test("the table lists each session with its description and the recent areas", () => {
   const output = renderSessions(
-    [{ label: "Area A", tabs: ["Tab One", "Tab Two"], cwds: ["/work/a", "/work/b"] }],
+    [
+      {
+        id: "session:1",
+        label: "Area A",
+        tabs: ["Tab One", "Tab Two"],
+        cwds: ["/work/a", "/work/b"],
+      },
+    ],
     new Map([
       ["Area A", "First area"],
       ["Area B", "Second area"],

@@ -42,16 +42,16 @@ A tab is a workstream with this session as its lead, and a pane is one task with
 
 ### Session
 
-Under Rex, a tab can't move between sessions after it opens, so pick its session first. The user keeps one Rex session per area of work, plus the inbox `I/O` for scratch work and light follow-ups. The candidates, with each session's tabs, working directories, and description, and recently closed areas:
+Under Rex, a tab can't move between sessions after it opens, so pick its session first. The user keeps one Rex session per area of work, plus the inbox `I/O` for scratch work and light follow-ups. The candidates, with each session's tabs, working directories, and description, and recently closed areas. Listing them also moves the sessions that `~/.config/rex/sessions.toml` gives an `order` to the top of Rex's session list:
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions`
+!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions --apply-order`
 
 Take the first rule that fits:
 
 - A light follow-up to existing work, such as a small CI fix: stay in this session, or pass `--session I/O`.
 - One area session clearly matches the repo, a working directory, a tab label, or the description: pass `--session <label>` without asking.
-- Several sessions match, or none does: ask with `AskUserQuestion`. Offer the closest areas, a new session named for the area, and any recent area that fits. On a new-session answer, run `rex new <label> --json`, then dispatch with `--session <label>`.
-- The repo has no checkout on this machine, or the user named another host: list that host's sessions with `bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions --host <label>`, then dispatch with `--host <label> --session <label> --repo <path>`.
+- Several sessions match, or none does: ask with `AskUserQuestion`. Offer the closest areas, a new session named for the area, and any recent area that fits. On a new-session answer, run `rex new <label> --json` and then `bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions --apply-order`, then dispatch with `--session <label>`.
+- The repo has no checkout on this machine, or the user named another host: list that host's sessions with `claude-dispatch sessions --host <label>`, then dispatch with `--host <label> --session <label> --repo <path>`.
 
 `--help` above names the tab multiplexer `--mux` defaults to. When the task calls for a pane or tab and `--help` says to pass `--mux` instead, ask the user with `AskUserQuestion` whether to use `rex` or `herdr`.
 

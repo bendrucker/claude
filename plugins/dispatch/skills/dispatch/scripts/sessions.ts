@@ -18,6 +18,7 @@ interface Result {
 export type RexRunner = (argv: readonly string[]) => Promise<Result>;
 
 export interface LiveSession {
+  id: string;
   label: string;
   tabs: string[];
   cwds: string[];
@@ -30,6 +31,7 @@ const SessionsFileSchema = z.object({
         name: z.string(),
         path: z.string().optional(),
         description: z.string().optional(),
+        order: z.number().int().optional(),
       }),
     )
     .default([]),
@@ -41,6 +43,7 @@ export function defaultSessionsFile(): string {
 
 export interface Descriptions {
   descriptions: Map<string, string>;
+  orders: Map<string, number>;
   warning?: string;
 }
 
@@ -48,20 +51,51 @@ export function parseDescriptions(text: string): Descriptions {
   try {
     const parsed = SessionsFileSchema.parse(parseToml(text));
     const descriptions = new Map<string, string>();
+    const orders = new Map<string, number>();
     for (const entry of parsed.session) {
       if (entry.description != null) descriptions.set(entry.name, entry.description);
+      if (entry.order != null) orders.set(entry.name, entry.order);
     }
-    return { descriptions };
+    return { descriptions, orders };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    return { descriptions: new Map(), warning: `ignoring malformed sessions file: ${reason}` };
+    return {
+      descriptions: new Map(),
+      orders: new Map(),
+      warning: `ignoring malformed sessions file: ${reason}`,
+    };
   }
 }
 
 export async function loadDescriptions(file: string): Promise<Descriptions> {
   const handle = Bun.file(file);
-  if (!(await handle.exists())) return { descriptions: new Map() };
+  if (!(await handle.exists())) return { descriptions: new Map(), orders: new Map() };
   return parseDescriptions(await handle.text());
+}
+
+/** Sessions with an `order` first, ascending, then the rest in Rex's order. */
+export function sortSessions(
+  sessions: readonly LiveSession[],
+  orders: ReadonlyMap<string, number>,
+): LiveSession[] {
+  const rank = (s: LiveSession) => orders.get(s.label) ?? Number.MAX_SAFE_INTEGER;
+  return sessions.toSorted((a, b) => rank(a) - rank(b));
+}
+
+export async function applyOrder(
+  run: RexRunner,
+  server: string | undefined,
+  sorted: readonly LiveSession[],
+  orders: ReadonlyMap<string, number>,
+): Promise<void> {
+  const ordered = sorted.filter((s) => orders.has(s.label));
+  for (const [index, session] of ordered.entries()) {
+    const argv = ["session", "move", session.id, "--index", String(index + 1)];
+    // oxlint-disable-next-line no-await-in-loop -- each index assumes the earlier moves finished.
+    const result = await run(["rex", ...(server == null ? [] : ["-S", server]), ...argv]);
+    if (result.code !== 0)
+      throw new Error(`rex session move ${session.label} failed: ${result.stderr.trim()}`);
+  }
 }
 
 export function recentAreas(
@@ -150,6 +184,7 @@ export async function listLiveSessions(run: RexRunner, server?: string): Promise
       );
       const cwds = await Promise.all(ids.map((id) => blockCwd(run, server, id)));
       return {
+        id: session.session_id,
         label: session.label,
         tabs: view.windows.flatMap((w) => w.label ?? []),
         cwds: [...new Set(cwds.flatMap((c) => c ?? []))],
@@ -199,10 +234,11 @@ export function createSessionsCommand(run: RexRunner): Command {
     .option("--host <label>", "list this saved host's sessions instead (`rex hosts list`)")
     .option("--data-dir <dir>", "dispatch ledger directory; defaults to the plugin data dir")
     .option("--sessions-file <file>", "descriptions file", defaultSessionsFile())
+    .option("--apply-order", "move sessions with an `order` to the top of Rex's session list")
     .action(async (options) => {
-      let sessions: LiveSession[];
+      let live: LiveSession[];
       try {
-        sessions = await listLiveSessions(run, options.host);
+        live = await listLiveSessions(run, options.host);
       } catch (error) {
         if (error instanceof HostUnreachableError) {
           process.stderr.write(`host \`${error.message}\` is unreachable\n`);
@@ -211,8 +247,10 @@ export function createSessionsCommand(run: RexRunner): Command {
         }
         process.exit(1);
       }
-      const { descriptions, warning } = await loadDescriptions(options.sessionsFile);
+      const { descriptions, orders, warning } = await loadDescriptions(options.sessionsFile);
       if (warning != null) process.stderr.write(`warning: ${warning}\n`);
+      const sessions = sortSessions(live, orders);
+      if (options.applyOrder) await applyOrder(run, options.host, sessions, orders);
       const areas =
         options.host == null
           ? recentAreas(

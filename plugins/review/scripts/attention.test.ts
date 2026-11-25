@@ -256,13 +256,15 @@ describe("sessionHost", () => {
 
 describe("rexReviewArgs", () => {
   test.each<{ name: string; review: RexReview; expected: string[] }>([
-    { name: "working diff", review: {}, expected: ["mode=live"] },
-    { name: "empty base", review: { base: "" }, expected: ["mode=live"] },
+    { name: "working diff", review: {}, expected: [] },
+    { name: "empty base", review: { base: "" }, expected: [] },
     {
       name: "against a base",
       review: { base: "origin/main" },
-      expected: ["base=origin/main", "mode=live"],
+      expected: ["base=origin/main"],
     },
+    { name: "plannotator ignores batch", review: { batch: true }, expected: [] },
+    { name: "Hunk diff live", review: { app: "hunk" }, expected: ["app=hunk", "mode=live"] },
     {
       name: "Hunk diff in batch",
       review: { app: "hunk", batch: true },
@@ -271,7 +273,7 @@ describe("rexReviewArgs", () => {
     {
       name: "a document passes its absolute path and drops diff options",
       review: { doc: "/repo/tmp/pr-body.md", base: "origin/main", app: "hunk" },
-      expected: ["doc=/repo/tmp/pr-body.md", "mode=live"],
+      expected: ["doc=/repo/tmp/pr-body.md"],
     },
   ])("$name", ({ review, expected }) => {
     expect(rexReviewArgs("block:01a1", review)).toEqual([

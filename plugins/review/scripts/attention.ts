@@ -360,16 +360,13 @@ export interface RexReview {
   doc?: string | undefined;
 }
 
-// A document always opens in plannotator-tui, which the review CLI picks from `doc`.
+// A document always opens in plannotator-tui. Only Hunk has a live mode.
 export function rexReviewArgs(block: string, review: RexReview = {}): string[] {
   const args = ["do", "review_changes", `block=${block}`];
-  if (review.doc != null) args.push(`doc=${resolve(review.doc)}`);
-  else {
-    if (review.base != null && review.base !== "") args.push(`base=${review.base}`);
-    if (review.app != null) args.push(`app=${review.app}`);
-  }
-  args.push(`mode=${review.batch === true ? "batch" : "live"}`);
-  return args;
+  if (review.doc != null) return [...args, `doc=${resolve(review.doc)}`];
+  if (review.base != null && review.base !== "") args.push(`base=${review.base}`);
+  if (review.app !== "hunk") return args;
+  return [...args, "app=hunk", `mode=${review.batch === true ? "batch" : "live"}`];
 }
 
 export const CLOSED = "[review: closed]";

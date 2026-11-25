@@ -3,6 +3,9 @@ name: memory-review
 description: Review Claude Code auto-memory for staleness against the session index and the repos each memory names, then propose per-file fixes, retirements, or verified-on dates for Ben to accept one at a time.
 argument-hint: "[<memory-dir> | --all]"
 disable-model-invocation: true
+allowed-tools:
+  - 'Bash(sh "${CLAUDE_SKILL_DIR}/scripts/memory-dir.sh")'
+  - Bash(date +%F)
 ---
 
 # Memory Review
@@ -15,7 +18,7 @@ Auto-memory drifts. A memory records what was true when it was written. Later wo
 - `--all`: review every `~/.claude/projects/*/memory/` directory, one directory at a time, each run to completion before the next.
 - Default: the current project's memory directory.
 
-Current project's memory directory: !`d=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && root=$(dirname "$d") || root=$PWD; dir="$HOME/.claude/projects/$(printf %s "$root" | sed 's|[/.]|-|g')/memory"; if [ -d "$dir" ]; then echo "$dir ($(ls "$dir" | wc -l | tr -d ' ') files)"; else echo "none at $dir"; fi`
+Current project's memory directory: !`sh "${CLAUDE_SKILL_DIR}/scripts/memory-dir.sh"`
 
 Today: !`date +%F`
 

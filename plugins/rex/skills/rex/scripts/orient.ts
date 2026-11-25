@@ -133,8 +133,10 @@ async function processOf(session: string, block: string): Promise<Process | null
 }
 
 // Rex no longer sets REX_SESSION in new terminals. The block names its session.
+// A block ID works as `-s`, which keeps an inherited REX_BLOCK from scoping the lookup.
 async function currentSession(block: string): Promise<string> {
-  const inspected = block === "" ? null : await rex(["block", "inspect", block, "--json"]);
+  const inspected =
+    block === "" ? null : await rex(["block", "inspect", "-s", block, block, "--json"]);
   const owner = inspected === null ? null : decode(BlockSession, inspected);
   return owner?.session_id ?? process.env.REX_SESSION ?? "";
 }

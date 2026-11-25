@@ -594,6 +594,10 @@ describe("dispatch stand-ins", () => {
     [["whoami", "--json"], '{"tailscale":null}\n'],
     [["window", "new", "-s", "session:eval", "eval-x"], '{"block_ids":["block:eval-1"]}\n'],
     [["split", "-b", "block:sender", "--split=right"], '{"block_ids":["block:eval-2"]}\n'],
+    [
+      ["block", "inspect", "block:sender", "--json"],
+      '{"session_id":"session:eval","block":{"block_id":"block:sender","window_id":"window:eval"}}\n',
+    ],
     [["block", "call", "-b", "block:sender", "size"], '{"columns":200,"rows":50}\n'],
     [
       ["block", "call", "-b", "block:eval-1", "program_status", "{}"],
@@ -826,7 +830,6 @@ describe("dispatch stand-ins", () => {
           HOME: r.home,
           PATH: `${join(r.home, ".eval-stubs/bin")}:${process.env.PATH ?? ""}`,
           REX_BLOCK: "block:sender",
-          REX_SESSION: "session:eval",
           CLAUDE_PLUGIN_DATA: mkdtempSync(join(tmpdir(), "eval-stubs-data-")),
         },
       },

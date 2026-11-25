@@ -15,7 +15,12 @@ export interface ResumeDeps {
   now: () => Date;
   wait: (ms: number) => Promise<void>;
   out: (line: string) => void;
-  spawnDetached: (argv: readonly string[], cwd: string, logPath: string) => Promise<number>;
+  spawnDetached: (
+    argv: readonly string[],
+    cwd: string,
+    logPath: string,
+    env: Readonly<Record<string, string>>,
+  ) => Promise<number>;
   alive: (pid: number) => boolean;
 }
 
@@ -29,10 +34,18 @@ export async function spawnDetached(
   argv: readonly string[],
   cwd: string,
   logPath: string,
+  env: Readonly<Record<string, string>>,
 ): Promise<number> {
   const launcher = Bun.spawn(
     ["sh", "-c", '"$@" >>"$0" 2>&1 </dev/null & echo $!', logPath, ...argv],
-    { cwd, detached: true, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+    {
+      cwd,
+      env: { ...process.env, ...env },
+      detached: true,
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    },
   );
   const [stdout, stderr, code] = await Promise.all([
     new Response(launcher.stdout).text(),
@@ -85,6 +98,7 @@ export function startResumer(
   session: string,
   pr: string,
   cwd: string,
+  env: Readonly<Record<string, string>> = {},
 ): Promise<number> {
   const pid = processId(deps.env.CLAUDE_PID ?? "");
   if (pid == null)
@@ -108,6 +122,7 @@ export function startResumer(
     ],
     cwd,
     resumerLog(deps.dataDir, session),
+    env,
   );
 }
 

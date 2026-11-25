@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "bun:test";
 import {
   applyOrder,
+  currentSession,
   HostUnreachableError,
   type LiveSession,
   sortSessions,
@@ -199,4 +200,50 @@ test("the table lists each session with its description and the recent areas", (
 
 test("the table omits the recent areas section when there are none", () => {
   expect(renderSessions([], new Map(), [])).not.toContain("Recent areas");
+});
+
+test.each<{
+  name: string;
+  env: Record<string, string>;
+  inspect: { code: number; stdout: string } | null;
+  expected: string | undefined;
+}>([
+  {
+    name: "the block's session over an inherited REX_SESSION",
+    env: { REX_BLOCK: "block:7", REX_SESSION: "session:old" },
+    inspect: { code: 0, stdout: '{"session_id":"session:live","block":{}}' },
+    expected: "session:live",
+  },
+  {
+    name: "the block's session with no REX_SESSION",
+    env: { REX_BLOCK: "block:7" },
+    inspect: { code: 0, stdout: '{"session_id":"session:live"}' },
+    expected: "session:live",
+  },
+  {
+    name: "REX_SESSION once the block is gone",
+    env: { REX_BLOCK: "block:7", REX_SESSION: "session:old" },
+    inspect: { code: 1, stdout: "" },
+    expected: "session:old",
+  },
+  {
+    name: "nothing for a closed block and no REX_SESSION",
+    env: { REX_BLOCK: "block:7" },
+    inspect: { code: 1, stdout: "" },
+    expected: undefined,
+  },
+  {
+    name: "REX_SESSION without asking Rex when no block is set",
+    env: { REX_SESSION: "session:old" },
+    inspect: null,
+    expected: "session:old",
+  },
+])("currentSession returns $name", async ({ env, inspect, expected }) => {
+  const calls: string[] = [];
+  const run: RexRunner = (argv) => {
+    calls.push(argv.join(" "));
+    return Promise.resolve({ code: inspect?.code ?? 1, stdout: inspect?.stdout ?? "", stderr: "" });
+  };
+  expect(await currentSession(env, run)).toBe(expected);
+  expect(calls).toEqual(inspect == null ? [] : ["rex block inspect block:7 --json"]);
 });

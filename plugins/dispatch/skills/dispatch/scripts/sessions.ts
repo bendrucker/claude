@@ -228,6 +228,30 @@ export async function resolveSessionLabel(run: RexRunner, session: string): Prom
   }
 }
 
+const BlockSessionSchema = z.object({ session_id: z.string().min(1) });
+
+// Rex no longer sets REX_SESSION in new terminals. A closed pane's block is
+// gone, and REX_SESSION is then the only record of its session.
+export async function currentSession(
+  env: Readonly<Record<string, string | undefined>>,
+  run: RexRunner,
+): Promise<string | undefined> {
+  const fallback = env.REX_SESSION === "" ? undefined : env.REX_SESSION;
+  const block = env.REX_BLOCK ?? "";
+  if (block === "") return fallback;
+  try {
+    const inspected = await rexJson(
+      run,
+      undefined,
+      ["block", "inspect", block, "--json"],
+      BlockSessionSchema,
+    );
+    return inspected.session_id;
+  } catch {
+    return fallback;
+  }
+}
+
 export function createSessionsCommand(run: RexRunner): Command {
   return new Command("sessions")
     .description("List live Rex sessions with their tabs, directories, and descriptions.")

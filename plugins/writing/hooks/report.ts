@@ -70,13 +70,17 @@ function rank(alert: HookAlert): number {
 /** Every alert in one hook output, denying when any alert denies. */
 export function report(
   alerts: HookAlert[],
-  { event, filePath }: { event: HookEvent; filePath?: string | undefined },
-): { output: SyncHookJSONOutput; decision: Decision; shown: HookAlert[] } | null {
+  {
+    event,
+    filePath,
+    limit = MAX_REPORTED,
+  }: { event: HookEvent; filePath?: string | undefined; limit?: number },
+): { output: SyncHookJSONOutput; decision: Decision; shown: HookAlert[]; text: string } | null {
   if (alerts.length === 0) return null;
   const ordered = alerts.toSorted((a, b) => rank(a) - rank(b));
-  const shown = ordered.slice(0, MAX_REPORTED);
+  const shown = ordered.slice(0, limit);
   const text = render(shown, ordered.length - shown.length, filePath);
   const decision = ordered[0]?.decision ?? "context";
   const output = decision === "deny" ? formatDecision(text) : formatContext(event, text);
-  return { output, decision, shown };
+  return { output, decision, shown, text };
 }

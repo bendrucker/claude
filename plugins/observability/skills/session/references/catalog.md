@@ -54,6 +54,7 @@ These read files rather than the index, each through a self-defaulting glob that
 - `hook-self-timing` [`metrics_glob`, `hook`]: Hook latency from the hooks' own clocks, read off `~/.claude/hook-metrics/*.jsonl` rather than the index.
 - `plan-sections` [`plans_glob`, `markdown` extension]: One row per markdown section across plan files on disk, joined to the session that produced each plan.
 - `skill-config-vs-observed` [`skill`, `plugin_skill_glob`, `user_skill_glob`, `project_skill_glob`, `yaml` extension]: Installed skills that never fire, the curation instrument: SKILL.md frontmatter on disk left-joined against observed `skill_calls` and typed slash commands, zero-fire first.
+- `writing-bash-coverage` [`log_path`]: Per week, Bash calls that look like they write prose to a markdown file, against how many have a writing-hook run-log row: the miss rate of the Bash lint path's detection.
 <!-- /generated:on-disk-queries -->
 
 ## Tables and Views

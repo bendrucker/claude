@@ -231,7 +231,8 @@ export async function resolveSessionLabel(run: RexRunner, session: string): Prom
 const BlockSessionSchema = z.object({ session_id: z.string().min(1) });
 
 // Rex no longer sets REX_SESSION in new terminals. A closed pane's block is
-// gone, and REX_SESSION is then the only record of its session.
+// gone, and REX_SESSION is then the only record of its session. A block ID
+// works as `-s`, which keeps an inherited REX_BLOCK from scoping the lookup.
 export async function currentSession(
   env: Readonly<Record<string, string | undefined>>,
   run: RexRunner,
@@ -243,7 +244,7 @@ export async function currentSession(
     const inspected = await rexJson(
       run,
       undefined,
-      ["block", "inspect", block, "--json"],
+      ["block", "inspect", "-s", block, block, "--json"],
       BlockSessionSchema,
     );
     return inspected.session_id;

@@ -67,7 +67,7 @@ const REX_ENV = { REX_BLOCK: "block:7" };
 // A background continuation inherits the closed pane's block and the session close resolved for it.
 const BACKGROUND_REX_ENV = { REX_BLOCK: "block:7", REX_SESSION: "main" };
 const OWN_SESSION = {
-  "rex block inspect block:7 --json": ok(JSON.stringify({ session_id: "main" })),
+  "rex block inspect -s block:7 block:7 --json": ok(JSON.stringify({ session_id: "main" })),
 };
 const HERDR_ENV = { HERDR_ENV: "1", HERDR_PANE_ID: "pane-9" };
 
@@ -530,7 +530,7 @@ describe("parkSession", () => {
     );
     const report = await parkSession(PARK, deps);
     expect(argvs(calls).filter((line) => line.startsWith("rex"))).toEqual([
-      "rex block inspect block:7 --json",
+      "rex block inspect -s block:7 block:7 --json",
       "rex block inspect -s main block:7 --json",
       "rex window inspect -s main window:1 --json",
       'rex api call -s main session.float_block {"block_id":"block:7","bounds":[0.2,0.15,0.6,0.7]}',
@@ -658,7 +658,7 @@ describe("attachSession", () => {
   test("rex opens the tab in the handed-off session once the stale block is gone", async () => {
     const { deps, calls } = makeDeps(
       {
-        "rex block inspect block:7 --json": fail("block not found"),
+        "rex block inspect -s block:7 block:7 --json": fail("block not found"),
         "rex window new": ok(JSON.stringify({ block_ids: ["block:a"], window_id: "w" })),
       },
       BACKGROUND_REX_ENV,
@@ -671,7 +671,7 @@ describe("attachSession", () => {
 
   test("rex refuses when neither the block nor REX_SESSION names a session", async () => {
     const { deps, calls } = makeDeps(
-      { "rex block inspect block:7 --json": fail("block not found") },
+      { "rex block inspect -s block:7 block:7 --json": fail("block not found") },
       REX_ENV,
     );
     expect((await failureOf(attachSession(FORK, deps))).exitCode).toBe(2);

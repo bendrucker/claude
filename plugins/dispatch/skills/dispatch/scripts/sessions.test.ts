@@ -245,5 +245,5 @@ test.each<{
     return Promise.resolve({ code: inspect?.code ?? 1, stdout: inspect?.stdout ?? "", stderr: "" });
   };
   expect(await currentSession(env, run)).toBe(expected);
-  expect(calls).toEqual(inspect == null ? [] : ["rex block inspect block:7 --json"]);
+  expect(calls).toEqual(inspect == null ? [] : ["rex block inspect -s block:7 block:7 --json"]);
 });

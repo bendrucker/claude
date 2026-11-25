@@ -28,7 +28,18 @@ Before adding a skill, hook, rule, or CLAUDE.md line, define what evidence shows
 - When debugging Claude Code itself (harness, classifier, hooks, plugins, startup), launch the observed session with `DEBUG_SDK=1 claude`, which writes `~/.claude/debug/<session-id>.txt`. Set it in the launch environment, since Claude Code ignores it in `settings.json` `env`.
 - Open a PR with `pull-request:create`, or with an empty body when it's unavailable. Open it ready when it already qualifies under the next line, and as a draft otherwise.
 - Mark a draft ready once I could merge it as is: its evidence is in (tests for code, an eval or bench table in the body for a prompt, skill, or performance change), required checks pass on the head, and follow-ups such as threshold tuning are filed as todos. Flip it yourself. After ready, push only conflict, CI, and review fixes.
+- Watch every PR you open without asking: `subscribe_pr_activity` in a cloud session, `pull-request:babysit` locally. Drive CI and bot review to green, then tell me it's ready to merge.
 - Send build output to `/dev/null`. Store temporary files in `tmp/`.
+
+## Blockers
+
+When a permission, sandbox, network host, credential, tool, or machine stands between you and the task, getting past it is your job. Never end a turn, PR body, or summary with commands or chores for me to run, including a "quick answer now" alongside the real ask. I lose track of them and steps get missed.
+
+- Look for another route in this environment first: a different tool, another source for the same data, a deferred tool you can load.
+- When no route exists, ask me for the capability through the tool that grants it, and say what it unblocks. Lead with the permanent fix that keeps the gap from recurring: a settings or sandbox rule, a dotfiles install, an environment host, a stored credential, a reachable folder. Hand that fix to its own session as a PR, then finish the task once it lands.
+- When a step needs my own hands (approving a login, a physical device, a secret only I hold), ask with `AskUserQuestion` and send a push. Wait for the answer, then check the result yourself and carry on.
+- A step of the task left for me once your part is done, with none of your work waiting on it, goes to Things as a to-do tagged `claude-code`, not into the reply. Search for an open one first and update it rather than filing a second. The notes carry what to do, how you'll know it's done, the permanent fix that would remove the step, and a link to the session. When a later session can confirm it's done, complete it. When Things can't be reached, say so in the reply and name the step.
+- Run deploys, syncs, and cleanup yourself. One that can't run here is a blocker like any other.
 
 ## Planning
 

@@ -36,7 +36,7 @@ export type DispatchLedgerRow = z.infer<typeof DispatchRowSchema>;
 // One line per pane close or per finished background watch, so cleanup can
 // find the work a closed session left on disk. `outcome` is set on `ended` rows.
 const ClosedRowSchema = z.object({
-  event: z.enum(["closed", "parked", "ended"]),
+  event: z.enum(["closed", "parked", "ended", "relocated"]),
   ts: z.string(),
   session: z.string(),
   fork: z.string().nullable(),
@@ -50,6 +50,8 @@ const ClosedRowSchema = z.object({
   target: z.string().nullable(),
   summary: z.string().nullable(),
   outcome: z.enum(["merged", "closed", "stopped"]).optional(),
+  // The Rex session a `relocated` row moved the conversation to.
+  to: z.string().optional(),
 });
 
 export type ClosedRow = z.infer<typeof ClosedRowSchema>;

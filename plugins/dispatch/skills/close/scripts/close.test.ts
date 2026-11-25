@@ -17,11 +17,12 @@ import {
   type Deps,
   defaultDeps,
   parkSession,
+  relocateSession,
   restoreSession,
 } from "./close";
 import { CloseError } from "./errors";
 import { hostMuxer } from "./muxers";
-import { recordEnded, resumerLog, resumeSession } from "./resume";
+import { recordEnded, reopenSession, resumerLog, resumeSession } from "./resume";
 import { closedRows, leftBehind } from "./rows";
 
 const ok = (stdout = ""): CommandResult => ({ code: 0, stdout, stderr: "" });
@@ -481,6 +482,113 @@ const REX_LAYERS = (window: CommandResult) => ({
 
 const PARK = { session: "sess-1", pr: "https://github.com/o/r/pull/1", summary: "done" };
 
+describe("relocateSession", () => {
+  const options = { session: "sess-1", to: "other" };
+  const env = { ...REX_ENV, CLAUDE_PID: "9" };
+  const REX = {
+    "rex api call target.resolve": ok(
+      JSON.stringify({
+        results: [
+          {
+            status: "resolved",
+            target: { kind: "session", session_id: "session:b", label: "other" },
+          },
+        ],
+      }),
+    ),
+    "rex block inspect": ok(JSON.stringify({ block: { window_id: "window:1" } })),
+    "rex window inspect": ok(JSON.stringify({ label: "My Task", layers: [] })),
+  };
+
+  test("starts a reopener for the target session, records the move, and closes the pane", async () => {
+    const { deps, calls, dataDir, spawned } = makeDeps(REX, env);
+    const report = await relocateSession(options, deps);
+    expect(spawned[0]?.argv.slice(2)).toEqual([
+      "reopen",
+      "--session",
+      "sess-1",
+      "--pid",
+      "9",
+      "--to",
+      "session:b",
+      "--label",
+      "My Task",
+      "--cwd",
+      "/work/tree",
+    ]);
+    expect(spawned[0]?.logPath).toBe(resumerLog(dataDir, "sess-1"));
+    expect(argvs(calls).at(-1)).toBe("rex block close -s main block:7");
+    expect(report).toMatchObject({ resumer: RESUMER, label: "My Task" });
+    expect(readLedger(dataDir)).toMatchObject([
+      { event: "relocated", session: "sess-1", to: "other", mux: "rex", target: "block:7" },
+    ]);
+  });
+
+  test("an unknown target fails before starting anything", async () => {
+    const { deps, calls, dataDir, spawned } = makeDeps(
+      {
+        ...REX,
+        "rex api call target.resolve": ok(
+          JSON.stringify({ results: [{ query: "other", status: "not_found" }] }),
+        ),
+      },
+      env,
+    );
+    const error = await failureOf(relocateSession(options, deps));
+    expect(error).toMatchObject({ exitCode: 2, message: "Rex session other was not found" });
+    expect(spawned).toEqual([]);
+    expect(readLedger(dataDir)).toEqual([]);
+    expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
+  });
+
+  test.each([
+    ["herdr", { ...HERDR_ENV, CLAUDE_PID: "9" }],
+    ["bg", { CLAUDE_PID: "9" }],
+  ])("refuses under %s", async (_, muxEnv) => {
+    const { deps, spawned } = makeDeps(REX, muxEnv);
+    const error = await failureOf(relocateSession(options, deps));
+    expect(error.message).toContain("not running in Rex");
+    expect(spawned).toEqual([]);
+  });
+
+  test("a failed close kills the reopener and records it ended", async () => {
+    const { deps, dataDir, killed } = makeDeps({ ...REX, "rex block close": fail("gone") }, env);
+    await failureOf(relocateSession(options, deps));
+    expect(killed).toEqual([RESUMER]);
+    expect(readLedger(dataDir)).toMatchObject([
+      { event: "relocated" },
+      { event: "ended", outcome: "stopped" },
+    ]);
+  });
+});
+
+describe("reopenSession", () => {
+  const options = { session: "sess-1", pid: 9, to: "session:b", label: "My Task", cwd: "/w" };
+
+  test("opens a tab resuming the session once its process exits", async () => {
+    const { deps, calls } = makeDeps(
+      { "rex window new": ok(JSON.stringify({ block_ids: ["block:new"] })) },
+      REX_ENV,
+    );
+    expect(await reopenSession(options, deps)).toBe("block:new");
+    expect(argvs(calls)).toEqual([
+      "rex window new -s session:b My Task -c /w --focus=false --json -- claude --resume sess-1",
+    ]);
+  });
+
+  test("gives up while the process still runs", async () => {
+    const { deps, calls } = makeDeps({}, REX_ENV);
+    deps.alive = () => true;
+    expect((await failureOf(reopenSession(options, deps))).message).toContain("still running");
+    expect(calls).toEqual([]);
+  });
+
+  test("reports a failed rex window new", async () => {
+    const { deps } = makeDeps({ "rex window new": fail("no such session") }, REX_ENV);
+    expect((await failureOf(reopenSession(options, deps))).message).toContain("no such session");
+  });
+});
+
 describe("parkSession", () => {
   test("rex floats a tiled block, minimizes its layer, and records a parked row", async () => {
     const { deps, calls, dataDir } = makeDeps(
@@ -674,14 +782,22 @@ describe("report", () => {
     expect(leftBehind([...rows, parked]).map((row) => row.ts)).toEqual(["4"]);
   });
 
-  test("--count counts parked beside closed and ended", async () => {
+  test("--left-behind skips a relocated row, whose session moved on", () => {
+    const moved = closedRow({ event: "relocated", branch: "f", path: "/f", dirty: 2, ts: "8" });
+    expect(leftBehind([...rows, moved]).map((row) => row.ts)).toEqual(["4"]);
+  });
+
+  test("--count counts parked and relocated beside closed and ended", async () => {
     const { deps, out, dataDir } = makeDeps({}, REX_ENV);
     appendDispatch(dispatchRow(), dataDir);
     for (const row of rows) appendDispatch(row, dataDir);
     appendDispatch(closedRow({ event: "parked" }), dataDir);
     appendDispatch(closedRow({ event: "ended", outcome: "merged" }), dataDir);
+    appendDispatch(closedRow({ event: "relocated", to: "other" }), dataDir);
     await createProgram(deps).parseAsync(["report", "--count"], { from: "user" });
-    expect(out).toEqual([JSON.stringify({ closed: rows.length, parked: 1, ended: 1 })]);
+    expect(out).toEqual([
+      JSON.stringify({ closed: rows.length, parked: 1, ended: 1, relocated: 1 }),
+    ]);
   });
 
   test("the command prints JSON rows", async () => {

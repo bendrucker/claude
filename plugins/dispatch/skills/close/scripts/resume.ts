@@ -4,6 +4,7 @@ import { backgroundId, detachedEnv, type Runner } from "../../dispatch/scripts/d
 import { appendDispatch, type ClosedRow } from "../../dispatch/scripts/ledger";
 import { CloseError } from "./errors";
 import { gitFacts } from "./git";
+import { openResumeWindow } from "./rex";
 import { endedRow, type Outcome } from "./rows";
 import { trimmed } from "./text";
 
@@ -133,7 +134,7 @@ export async function recordEnded(
   return row;
 }
 
-async function awaitExit(
+export async function awaitExit(
   deps: ResumeDeps,
   pid: number,
   attempts = EXIT_ATTEMPTS,
@@ -170,4 +171,54 @@ export async function resumeSession(options: ResumeOptions, deps: ResumeDeps): P
     return failed(`claude --bg printed no background session id: ${started.stdout.trim()}`);
   deps.out(started.stdout.trim());
   return fork;
+}
+
+export interface ReopenOptions {
+  session: string;
+  pid: number;
+  to: string;
+  label: string;
+  cwd: string;
+}
+
+export function startReopener(
+  deps: ResumeDeps,
+  options: Omit<ReopenOptions, "pid">,
+): Promise<number> {
+  const pid = processId(deps.env.CLAUDE_PID ?? "");
+  if (pid == null)
+    throw new CloseError(
+      "CLAUDE_PID is not a process id, so relocate cannot wait for this session to exit",
+      2,
+    );
+  mkdirSync(deps.dataDir, { recursive: true });
+  const { session, to, label, cwd } = options;
+  return deps.spawnDetached(
+    [
+      process.execPath,
+      RESUME_SCRIPT,
+      "reopen",
+      "--session",
+      session,
+      "--pid",
+      `${pid}`,
+      "--to",
+      to,
+      "--label",
+      label,
+      "--cwd",
+      cwd,
+    ],
+    cwd,
+    resumerLog(deps.dataDir, session),
+  );
+}
+
+export async function reopenSession(options: ReopenOptions, deps: ResumeDeps): Promise<string> {
+  const { pid, ...window } = options;
+  if (!(await awaitExit(deps, pid)))
+    throw new CloseError(`session process ${pid} was still running, so it was not reopened`);
+  const block = await openResumeWindow(deps.run, window);
+  deps.out(JSON.stringify({ to: window.to, block }));
+  return block;
 }

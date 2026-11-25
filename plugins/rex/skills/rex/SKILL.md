@@ -1,7 +1,7 @@
 ---
 name: rex
 description: >-
-  Drive the Rex terminal multiplexer: tabs, panes, splits, and hosts. Load this when opening a file alongside the user, starting a dev server or log tail the user should watch, reading another terminal's output, running a command on a saved host, or asking what else is running. Tab, pane, split, and host are Rex's terms. In a session Rex hosts, a request that uses one is a Rex request even when it never says Rex. New PR-bound work goes to `dispatch:dispatch`.
+  Drive the Rex terminal multiplexer: tabs, panes, splits, and hosts. Load this when opening a file or web page alongside the user, starting a dev server or log tail the user should watch, reading another terminal's output, running a command on a saved host, or asking what else is running. Tab, pane, split, and host are Rex's terms. In a session Rex hosts, a request that uses one is a Rex request even when it never says Rex. New PR-bound work goes to `dispatch:dispatch`.
 argument-hint: "[orient | view <file> | read <block>]"
 allowed-tools:
   - 'Bash(bun "${CLAUDE_SKILL_DIR}/scripts/orient.ts")'
@@ -57,6 +57,16 @@ Confirm the viewer started before telling the user to look at it:
 ```bash
 rex capture -b <block> --trim --unwrap
 ```
+
+## Web Pages
+
+Show a web page, a local dev server, or rendered HTML beside this pane with `terminal-browser`:
+
+```bash
+terminal-browser open <url|port|file.html> --split right
+```
+
+It splits this pane from `REX_BLOCK`, or opens a new tab when a browser pane already sits beside it. To drive the page, load the `terminal-browser` skill.
 
 ## Long-Running Processes
 

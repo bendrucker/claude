@@ -139,7 +139,13 @@ export async function closeSession(options: CloseOptions, deps: Deps): Promise<C
   const resumer =
     handoff == null
       ? null
-      : await startResumer(deps, handoff.session, handoff.pr, facts.toplevel ?? deps.cwd);
+      : await startResumer(
+          deps,
+          handoff.session,
+          handoff.pr,
+          facts.toplevel ?? deps.cwd,
+          (await host.handoffEnv?.()) ?? {},
+        );
 
   const row = closedRow(
     facts,
@@ -279,7 +285,9 @@ export function createProgram(deps: Deps): Command {
     );
 
   const restore = new Command("restore")
-    .description("Show this session's parked pane again, without focusing it.")
+    .description(
+      "Show this session's parked pane again without focusing it, and mark its tab unread.",
+    )
     .requiredOption("--session <id>", "this session's id")
     .action(() =>
       guarded(async () => {

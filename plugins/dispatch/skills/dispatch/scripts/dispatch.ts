@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
 import { appendDispatch, type DispatchLedgerRow, resolveDataDir } from "./ledger";
-import { createSessionsCommand, resolveSessionLabel } from "./sessions";
+import { createSessionsCommand, currentSession, resolveSessionLabel } from "./sessions";
 
 const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 // wt's pr:<n> and mr:<n> shortcuts, or a PR or MR URL.
@@ -1491,7 +1491,7 @@ if (import.meta.main && process.argv[2] === "sessions") {
       },
       session: {
         type: String,
-        description: "Rex session ID or label for the new tab; defaults to REX_SESSION",
+        description: "Rex session ID or label for the new tab; defaults to this pane's session",
       },
       split: {
         type: Boolean,
@@ -1612,9 +1612,12 @@ if (import.meta.main && process.argv[2] === "sessions") {
     process.exit(2);
   }
   const sender = await readSender(process.env);
-  // REX_SESSION names a session on this machine, never the host's.
+  // This pane's session is on this machine, never the host's.
   const rexSessionValue =
-    argv.flags.session ?? (argv.flags.host == null ? process.env.REX_SESSION : undefined);
+    argv.flags.session ??
+    (argv.flags.host == null && mux === "rex"
+      ? await currentSession(process.env, spawnRunner)
+      : undefined);
   const rexSession =
     mux === "rex" && rexSessionValue != null && rexSessionValue !== "" && argv.flags.host == null
       ? await resolveSessionLabel(spawnRunner, rexSessionValue)

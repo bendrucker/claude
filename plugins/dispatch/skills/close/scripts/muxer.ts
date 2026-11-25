@@ -25,6 +25,8 @@ export interface Muxer {
   closePane(target: string): Promise<void>;
   // Opens an unfocused pane running `claude attach <fork>` and returns its id.
   openAttachPane(fork: string): Promise<string>;
+  // Variables the background continuation needs to reach this pane's session once the pane is gone.
+  handoffEnv?: () => Promise<Readonly<Record<string, string>>>;
   // Hides the pane with its process running, and shows it again.
   parkPane?: (target: string) => Promise<void>;
   restorePane?: (target: string) => Promise<void>;

@@ -33,6 +33,8 @@ if ((first === "window" && second === "new") || first === "split") {
   if (cwd !== undefined) await recordLaunch(cwd, first === "split" ? "pane" : "tab", label ?? "");
   print({ block_ids: [await nextBlock()] });
 }
+if (first === "block" && second === "inspect" && words.includes("--json"))
+  print({ session_id: "session:eval", block: { block_id: words[2], window_id: "window:eval" } });
 if (first === "block" && second === "call" && words.includes("size"))
   print({ columns: 200, rows: 50 });
 if (first === "block" && second === "call" && words.includes("program_status")) {

@@ -38,6 +38,8 @@ const Process = z.object({
 });
 type Process = z.infer<typeof Process>;
 
+const BlockSession = z.object({ session_id: z.string().min(1) });
+
 // Only `label` is read. Endpoints can contain an SSH hostname and stay out of
 // the projection.
 const Hosts = z.object({
@@ -130,17 +132,32 @@ async function processOf(session: string, block: string): Promise<Process | null
   return text === null ? null : decode(Process, text);
 }
 
+// Rex no longer sets REX_SESSION in new terminals. The block names its session.
+async function currentSession(block: string): Promise<string> {
+  const inspected = block === "" ? null : await rex(["block", "inspect", block, "--json"]);
+  const owner = inspected === null ? null : decode(BlockSession, inspected);
+  return owner?.session_id ?? process.env.REX_SESSION ?? "";
+}
+
 async function orient(): Promise<void> {
-  const session = process.env.REX_SESSION ?? "";
-  if (session === "") {
+  const thisBlock = process.env.REX_BLOCK ?? "";
+  if (thisBlock === "" && (process.env.REX_SESSION ?? "") === "") {
     console.log(
-      "Not running under Rex (REX_SESSION unset). The commands below will not reach a server.",
+      "Not running under Rex (REX_BLOCK unset). The commands below will not reach a server.",
     );
     return;
   }
 
   if (Bun.which("rex") === null) {
     console.log("rex is not on PATH.");
+    return;
+  }
+
+  const session = await currentSession(thisBlock);
+  if (session === "") {
+    console.log(
+      `rex block inspect ${thisBlock} failed. Run rex whoami --json to see where this is.`,
+    );
     return;
   }
 
@@ -172,7 +189,7 @@ async function orient(): Promise<void> {
     if (result != null) processes.set(id, result);
   }
 
-  console.log(orientation(inspect, processes, process.env.REX_BLOCK ?? ""));
+  console.log(orientation(inspect, processes, thisBlock));
   const hosts = hostsLine(listing);
   if (hosts !== null) console.log(hosts);
 }

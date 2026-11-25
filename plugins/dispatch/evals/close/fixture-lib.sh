@@ -12,7 +12,7 @@ printf '#!/usr/bin/env bash\nexec "%s" "%s" "$@"\n' "$bun" "$HOME/.eval-stubs/cl
 chmod +x "$HOME/.eval-stubs/bin/claude-dispatch-close"
 
 for rc in .zshenv .bashrc; do
-  printf '%s\n' 'export REX_BLOCK=block:sender REX_SESSION=session:eval' 'unset HERDR_ENV HERDR_PANE_ID' >> "$HOME/$rc"
+  printf '%s\n' 'export REX_BLOCK=block:sender' 'unset REX_SESSION' 'unset HERDR_ENV HERDR_PANE_ID' >> "$HOME/$rc"
   printf 'export CLAUDE_PLUGIN_DATA=%q\n' "$HOME/cwd/.dispatch-data" >> "$HOME/$rc"
 done
 

@@ -38,7 +38,7 @@ Default to a sibling split of this pane that leaves focus where it is:
 rex split --split=right --focus=false -c <cwd> --json
 ```
 
-Rex scopes every command to this session and anchors splits on this pane from `REX_SESSION` and `REX_BLOCK`. Write each argument literally: `<cwd>` is the absolute working directory, and `<block>` is a block ID. A worktree session refuses a `rex` command that contains a shell variable. Add `-s <session>` only to target another session.
+Rex scopes every command to this session and anchors splits on this pane from `REX_BLOCK`, which names this pane's block. Rex no longer sets `REX_SESSION` in new terminals, so take this session's ID from the listing above or `rex whoami --json`. Write each argument literally: `<cwd>` is the absolute working directory, and `<block>` is a block ID. A worktree session refuses a `rex` command that contains a shell variable. Add `-s <session>` only to target another session.
 
 Split `right` on a wide pane and `below` on a tall one, alternating direction across successive splits. A new tab, session, or host needs the user to ask for it. Take the new block from `.block_ids[0]`.
 
@@ -90,6 +90,15 @@ Take `<layer_id>` from the first call's `layer_id`.
 ## Machines
 
 Put `-S <label>` on every command that touches a saved host. Commands run on that machine, so paths and programs must exist there. When a command fails to connect, report "host `<label>` is unreachable".
+
+Run a one-off command on a saved host through Rex rather than `ssh`, then read its output and close the block:
+
+```bash
+rex -S <label> run --wait --keep-open --focus=false -c <cwd> --json -- <command>
+rex -S <label> capture -b <block> --trim --unwrap
+```
+
+After starting a server on another host, open it on this machine with `rex -S <label> forward open <block>`. Rex forwards a local port to the port the server's terminal listens on and opens the URL.
 
 When more than one Rex app is connected, client actions such as `rex do` need `-C <client>`, a label from `rex client ls`.
 

@@ -3,6 +3,8 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
+import { isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
+import { isLinted } from "../detection/vale";
 import { addedLines, type EditScope, type Hunk } from "./edit-scope";
 
 /** Files above this size are never snapshotted or linted. */
@@ -18,6 +20,12 @@ const Manifest = z.object({
 type Manifest = z.infer<typeof Manifest>;
 
 export type Lints = (absolutePath: string) => Promise<boolean>;
+
+/** The files the hook lints for a session in `cwd`: what Vale lints, less scratch, plan, and memory files. */
+export function lintTargets(cwd: string): Lints {
+  return async (path) =>
+    !isScratchPath(path, cwd) && !isPlanPath(path) && !isMemoryPath(path) && (await isLinted(path));
+}
 
 export interface ChangedFile extends EditScope {
   path: string;

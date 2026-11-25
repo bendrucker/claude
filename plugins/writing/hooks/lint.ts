@@ -5,11 +5,12 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
 import { lintFile, valeAlerts } from "../detection/vale";
-import { editScopeOf, newAlerts } from "./edit-scope";
-import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
-import { decisionOf, hookAlertOf, type HookAlert, report } from "./report";
+import { type EditScope, editScopeOf, newAlerts } from "./edit-scope";
+import { formatContext, isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
+import { decisionOf, hookAlertOf, type HookAlert, MAX_REPORTED, report } from "./report";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
 import { recentlyFired, recordFired } from "./session-state";
+import { detectChanges, type Lints, lintTargets } from "./worktree-changes";
 
 export type HookInput = PreToolUseHookInput | PostToolUseHookInput;
 
@@ -27,9 +28,8 @@ export function targetOf(filePath: string): string {
 // since the model did not write them.
 async function lintEdited(
   filePath: string,
-  toolResponse: unknown,
+  scope: EditScope | null,
 ): Promise<{ alerts: HookAlert[]; checks: string[]; unedited: number }> {
-  const scope = editScopeOf(toolResponse);
   // The pre-edit lint runs beside the saved one, since most edited files already raise an alert.
   const [all, before] = await Promise.all([
     lintFile(filePath),
@@ -91,7 +91,7 @@ export async function dispatch(
       alerts = await lintMessages(input);
       checks = unique(alerts.map((alert) => alert.check));
     } else if (hasPath) {
-      ({ alerts, checks, unedited } = await lintEdited(filePath, input.tool_response));
+      ({ alerts, checks, unedited } = await lintEdited(filePath, editScopeOf(input.tool_response)));
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -102,22 +102,7 @@ export async function dispatch(
     unedited > 0 ? { checks, unedited_alerts: unedited } : { checks };
   if (alerts.length === 0) return finish(null, "silent", scoped);
 
-  // Repeats are muted per file, so an alert left in one file does not hide the same check in another.
-  const key = (check: string): string =>
-    base.target === undefined ? check : `${base.target}:${check}`;
-  const muted = new Set<string>();
-  const kept: HookAlert[] = [];
-  for (const alert of alerts) {
-    if (alert.decision === "context") {
-      if (muted.has(alert.check)) continue;
-      // oxlint-disable-next-line no-await-in-loop -- reads one small state file per check, and the loop is bounded by the checks found.
-      if (await recentlyFired(input.session_id, key(alert.check), now)) {
-        muted.add(alert.check);
-        continue;
-      }
-    }
-    kept.push(alert);
-  }
+  const { kept, muted } = await unmuted(alerts, input.session_id, base.target, now);
 
   const extra = scoped;
   if (muted.size > 0) extra.suppressed_checks = [...muted];
@@ -129,9 +114,111 @@ export async function dispatch(
   }
 
   const emitted = unique(result.shown.map((alert) => alert.check));
-  // oxlint-disable-next-line no-await-in-loop -- sequential writes to one state file; concurrent read-modify-write would drop checks.
-  for (const check of emitted) await recordFired(input.session_id, key(check), now);
+  await recordAll(emitted, input.session_id, base.target, now);
   return finish(result.output, result.decision, { ...extra, check: emitted[0], emitted });
+}
+
+// Repeats are muted per file, so an alert left in one file does not hide the same check in another.
+function keyOf(check: string, target: string | undefined): string {
+  return target === undefined ? check : `${target}:${check}`;
+}
+
+async function unmuted(
+  alerts: HookAlert[],
+  sessionId: string,
+  target: string | undefined,
+  now: number,
+): Promise<{ kept: HookAlert[]; muted: Set<string> }> {
+  const muted = new Set<string>();
+  const kept: HookAlert[] = [];
+  for (const alert of alerts) {
+    if (alert.decision === "context") {
+      if (muted.has(alert.check)) continue;
+      // oxlint-disable-next-line no-await-in-loop -- reads one small state file per check, and the loop is bounded by the checks found.
+      if (await recentlyFired(sessionId, keyOf(alert.check, target), now)) {
+        muted.add(alert.check);
+        continue;
+      }
+    }
+    kept.push(alert);
+  }
+  return { kept, muted };
+}
+
+async function recordAll(
+  checks: string[],
+  sessionId: string,
+  target: string | undefined,
+  now: number,
+): Promise<void> {
+  // oxlint-disable-next-line no-await-in-loop -- sequential writes to one state file; concurrent read-modify-write would drop checks.
+  for (const check of checks) await recordFired(sessionId, keyOf(check, target), now);
+}
+
+export interface BashDispatchResult {
+  output: SyncHookJSONOutput | null;
+  logs: RunLogEntry[];
+}
+
+// A Bash call can write several files, so it logs a row per changed file and reports them in one output.
+/** Lint the lines a Bash call added to files in the cwd's repo, against the snapshot taken before the call. */
+export async function dispatchBash(
+  input: PostToolUseHookInput,
+  now: number = Date.now(),
+  lints: Lints = lintTargets(input.cwd),
+): Promise<BashDispatchResult> {
+  if (isPlanMode(input)) return { output: null, logs: [] };
+  const start = performance.now();
+  const detection = await detectChanges(input.session_id, input.cwd, lints);
+  if (detection.status !== "changed") return { output: null, logs: [] };
+
+  const sections: string[] = [];
+  const logs: RunLogEntry[] = [];
+  let budget = MAX_REPORTED;
+  for (const file of detection.files) {
+    const target = targetOf(file.path);
+    const row: RunLogEntry = {
+      ts: new Date(now).toISOString(),
+      session_id: input.session_id,
+      event: "PostToolUse",
+      tool: input.tool_name,
+      ext: getExtension(file.path),
+      target,
+      duration_ms: 0,
+      outcome: "silent",
+    };
+    if (input.tool_use_id !== "") row.tool_use_id = input.tool_use_id;
+    logs.push(row);
+    let linted: Awaited<ReturnType<typeof lintEdited>>;
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- files share one repeat-suppression state file, so they lint in turn.
+      linted = await lintEdited(file.path, file);
+    } catch (error) {
+      row.outcome = "error";
+      row.vale_error = error instanceof Error ? error.message : String(error);
+      continue;
+    }
+    row.checks = linted.checks;
+    if (linted.unedited > 0) row.unedited_alerts = linted.unedited;
+    // oxlint-disable-next-line no-await-in-loop -- see above.
+    const { kept, muted } = await unmuted(linted.alerts, input.session_id, target, now);
+    if (muted.size > 0) row.suppressed_checks = [...muted];
+    const result =
+      budget > 0
+        ? report(kept, { event: "PostToolUse", filePath: file.path, limit: budget })
+        : null;
+    if (result === null) continue;
+    const emitted = unique(result.shown.map((alert) => alert.check));
+    // oxlint-disable-next-line no-await-in-loop -- see above.
+    await recordAll(emitted, input.session_id, target, now);
+    budget -= result.shown.length;
+    sections.push(result.text);
+    Object.assign(row, { outcome: "context", check: emitted[0], emitted });
+  }
+  const duration = Math.round(performance.now() - start);
+  for (const row of logs) row.duration_ms = duration;
+  const output = sections.length === 0 ? null : formatContext("PostToolUse", sections.join("\n\n"));
+  return { output, logs };
 }
 
 function unique(values: string[]): string[] {
@@ -168,8 +255,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  const { output, log } = await dispatch(input);
-  appendRunLog(log);
+  const { output, logs } =
+    input.hook_event_name === "PostToolUse" && input.tool_name === "Bash"
+      ? await dispatchBash(input)
+      : await dispatch(input).then((result) => ({ output: result.output, logs: [result.log] }));
+  for (const log of logs) appendRunLog(log);
   if (output) {
     process.stdout.write(`${JSON.stringify(output)}\n`);
   }

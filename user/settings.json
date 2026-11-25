@@ -156,7 +156,7 @@
       "options": {
         "auto_merge": true,
         "stack_file": "wt/stack",
-        "body_review_skill": "review:human"
+        "review_skill": "review:human"
       }
     },
     "things@bendrucker": {

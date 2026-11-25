@@ -29,6 +29,7 @@ import {
   reviewrOpenArgs,
   rexReviewArgs,
   type RexReview,
+  rexSurface,
   sessionHost,
   type Host,
   surfaceState,
@@ -286,6 +287,21 @@ describe("rexReviewArgs", () => {
     expect(rexReviewArgs("block:01a1", { doc: "design.md" })).toContain(
       `doc=${join(process.cwd(), "design.md")}`,
     );
+  });
+});
+
+describe("rexSurface", () => {
+  test.each<{ name: string; review: RexReview; expected: string }>([
+    {
+      name: "a document",
+      review: { doc: "pr-body.md", reviewer: "hunk" },
+      expected: "plannotator-tui",
+    },
+    { name: "plannotator diff", review: { reviewer: "plannotator" }, expected: "plannotator-tui" },
+    { name: "Hunk diff", review: { reviewer: "hunk" }, expected: "Hunk" },
+    { name: "diff with no reviewer passed", review: {}, expected: "the diff reviewer" },
+  ])("$name", ({ review, expected }) => {
+    expect(rexSurface(review)).toBe(expected);
   });
 });
 

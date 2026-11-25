@@ -1,6 +1,7 @@
 ---
 name: steward
-description: Conventions for watching a pull request in this repository until it merges.
+description: House rules for PR Steward and the /steward watch in this repository
+user-invocable: false
 disable-model-invocation: true
 ---
 

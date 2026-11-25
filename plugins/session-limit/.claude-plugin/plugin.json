@@ -16,7 +16,7 @@
     "muted": {
       "type": "boolean",
       "title": "Mute usage notices",
-      "description": "Skip usage limit notices on this machine. /limits on turns them back on for one session.",
+      "description": "Skip usage limit notices on this machine. /session-limit on turns them back on for one session.",
       "default": false
     }
   }

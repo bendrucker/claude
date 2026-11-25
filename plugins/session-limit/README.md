@@ -12,7 +12,7 @@ Steer the model to wind down before a usage block runs out.
 { "pluginConfigs": { "session-limit@bendrucker": { "options": { "muted": true } } } }
 ```
 
-`/limits off` mutes one session, and `/limits on` unmutes it over the machine default. Bare `/limits` shows which applies. A muted crossing still counts as announced and is logged as a `muted` event.
+`/session-limit off` mutes one session, and `/session-limit on` unmutes it over the machine default. Bare `/session-limit` shows which applies. A muted crossing still counts as announced and is logged as a `muted` event.
 
 ## Contents
 

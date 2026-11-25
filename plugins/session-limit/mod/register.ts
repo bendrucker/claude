@@ -27,7 +27,7 @@ export function register(on: On, options: PluginOptions): void {
     void $.modEvents.emit({ mod: MOD, event: "session.start" });
     $.command
       .register({
-        name: "limits",
+        name: "session-limit",
         description: "Mute or unmute usage limit notices for this session",
         argumentHint: "[on|off]",
       })
@@ -42,13 +42,13 @@ export function register(on: On, options: PluginOptions): void {
     return next(e);
   });
 
-  on("command.run", { command: "limits" }, async ($, e) => {
+  on("command.run", { command: "session-limit" }, async ($, e) => {
     const arg = e.args.trim();
     if (arg === "on" || arg === "off") {
       await $.state.set(MUTED, arg === "off");
       void $.modEvents.emit({ mod: MOD, event: "mute", detail: { muted: arg === "off" } });
     } else if (arg !== "") {
-      return { text: "Usage: /limits [on|off]" };
+      return { text: "Usage: /session-limit [on|off]" };
     }
     const { muted, source } = await mutedState($, mutedByDefault);
     const scope = source === "machine" ? "machine default" : "this session";

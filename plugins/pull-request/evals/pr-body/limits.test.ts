@@ -6,7 +6,7 @@ const spans = (n: number) => Array.from({ length: n }, (_, i) => `\`c${i}\``).jo
 
 test("passes a short body on every row", () => {
   expect(limitLines(long(10))).toEqual([
-    "PR-LIMIT prose-words=pass (10 of 120)",
+    "PR-LIMIT visible-words=pass (10 of 150)",
     "PR-LIMIT max-block=pass (10 of 40)",
     "PR-LIMIT prose-code-spans=pass (0 of 6)",
     "PR-LIMIT path-spans=pass (0 of 1)",
@@ -26,13 +26,15 @@ test("fails code spans and hidden words without counting collapsed prose as visi
 });
 
 test("fails length on a long single paragraph", () => {
-  expect(limitLines(long(130)).filter((l) => l.includes("=fail"))).toEqual([
-    "PR-LIMIT prose-words=fail (130 of 120)",
-    "PR-LIMIT max-block=fail (130 of 40)",
+  expect(limitLines(long(160)).filter((l) => l.includes("=fail"))).toEqual([
+    "PR-LIMIT visible-words=fail (160 of 150)",
+    "PR-LIMIT max-block=fail (160 of 40)",
   ]);
 });
 
-test("leaves list words out of the prose count", () => {
+test("counts list words with prose words", () => {
   const list = Array.from({ length: 5 }, () => `- ${long(38)}`).join("\n");
-  expect(limitLines(`${long(10)}\n\n${list}`).filter((l) => l.includes("=fail"))).toEqual([]);
+  expect(limitLines(`${long(10)}\n\n${list}`).filter((l) => l.includes("=fail"))).toEqual([
+    "PR-LIMIT visible-words=fail (200 of 150)",
+  ]);
 });

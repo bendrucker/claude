@@ -1,6 +1,6 @@
 // How much a PR body asks of its reader. Only what a reader sees without
 // expanding anything counts: not fenced code, not tables, not <details>.
-// Only prose words are capped, since lists carry parallel items cheaply.
+// Visible words, prose and list items together, are capped.
 
 import type { List, ListItem, Nodes, RootContent } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
@@ -9,6 +9,8 @@ import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 
 export interface Structure {
+  /** Words in visible paragraphs, headings, and list items. */
+  visibleWords: number;
   /** Words in visible paragraphs and headings. */
   proseWords: number;
   /** Words in visible list items. */
@@ -25,12 +27,17 @@ export interface Structure {
   contrastPhrases: number;
 }
 
-type LimitKey = "proseWords" | "maxBlockWords" | "proseCodeSpans" | "pathSpans" | "contrastPhrases";
+type LimitKey =
+  | "visibleWords"
+  | "maxBlockWords"
+  | "proseCodeSpans"
+  | "pathSpans"
+  | "contrastPhrases";
 
 // One-sided limits fitted against hand-written PRs: a body fails only by
 // exceeding them, so terseness is never penalized.
 export const LIMITS = {
-  proseWords: 120,
+  visibleWords: 150,
   maxBlockWords: 40,
   proseCodeSpans: 6,
   pathSpans: 1,
@@ -38,7 +45,7 @@ export const LIMITS = {
 } as const satisfies Pick<Structure, LimitKey>;
 
 const LIMIT_LABELS = {
-  proseWords: "prose words",
+  visibleWords: "visible words",
   maxBlockWords: "longest paragraph or bullet words",
   proseCodeSpans: "inline code spans",
   pathSpans: "file paths in inline code",
@@ -46,7 +53,7 @@ const LIMIT_LABELS = {
 } as const satisfies Record<LimitKey, string>;
 
 const LIMIT_KEYS = [
-  "proseWords",
+  "visibleWords",
   "maxBlockWords",
   "proseCodeSpans",
   "pathSpans",
@@ -164,6 +171,7 @@ export function measureStructure(body: string): Structure {
   };
   tallyBlocks(root.children, tally);
   return {
+    visibleWords: tally.proseWords + tally.listWords,
     proseWords: tally.proseWords,
     listWords: tally.listWords,
     maxBlockWords: Math.max(0, ...tally.blockWords),
@@ -192,5 +200,5 @@ export function limitsReason(exceeded: ExceededLimit[]): string {
   const detail = exceeded
     .map(({ label, measured, limit }) => `${label} ${measured} > ${limit}, cut ${measured - limit}`)
     .join("; ");
-  return `The body is over its structure limits (${detail}). List words count apart from prose words. Tables, fenced output, and \`<details>\` don't count. Make every cut in one rewrite.`;
+  return `The body is over its structure limits (${detail}). Tables, fenced output, and \`<details>\` don't count. Make every cut in one rewrite.`;
 }

@@ -261,7 +261,7 @@ describe("rexReviewArgs", () => {
     {
       name: "against a base",
       review: { base: "origin/main" },
-      expected: ["revisions=origin/main..HEAD", "mode=live"],
+      expected: ["base=origin/main", "mode=live"],
     },
     {
       name: "Hunk diff in batch",

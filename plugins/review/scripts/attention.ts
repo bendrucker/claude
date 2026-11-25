@@ -365,7 +365,7 @@ export function rexReviewArgs(block: string, review: RexReview = {}): string[] {
   const args = ["do", "review_changes", `block=${block}`];
   if (review.doc != null) args.push(`doc=${resolve(review.doc)}`);
   else {
-    if (review.base != null && review.base !== "") args.push(`revisions=${review.base}..HEAD`);
+    if (review.base != null && review.base !== "") args.push(`base=${review.base}`);
     if (review.app != null) args.push(`app=${review.app}`);
   }
   args.push(`mode=${review.batch === true ? "batch" : "live"}`);
@@ -764,7 +764,7 @@ const watchCmd = command(
   {
     name: "watch",
     help: {
-      description: "Under Rex, print each Hunk note as Ben saves it until the review closes",
+      description: "Under Rex, print each review note as Ben saves it until the review closes",
     },
   },
   async () => {

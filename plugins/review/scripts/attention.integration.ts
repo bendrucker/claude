@@ -158,6 +158,17 @@ describe.skipIf(!ready)("attention under Rex", () => {
     expect(await watch.exited).toBe(0);
   }, 30_000);
 
+  test("closing a plannotator diff split with no notes approves", async () => {
+    expect(open(agent, repo, "--diff")).toBe(`opened plannotator-tui beside ${agent}`);
+    const watch = new Watch(agent, repo);
+    const tui = await until("the plannotator split", () => reviewBlock(agent));
+    await until("plannotator's diff", () => (screen(tui).includes("math.js") ? true : undefined));
+
+    sh("rex", "block", "close", tui);
+    expect(await watch.next("[review: closed]")).toBe("[review: closed] approved");
+    expect(await watch.exited).toBe(0);
+  }, 30_000);
+
   test("a plannotator document comment reaches watch, and Approve ends it", async () => {
     expect(open(agent, repo, "--doc", "design.md")).toBe(`opened plannotator-tui beside ${agent}`);
     const watch = new Watch(agent, repo);

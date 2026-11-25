@@ -26,7 +26,7 @@ Code review workflows for Claude Code.
 bun test plugins/review
 ```
 
-`scripts/attention.integration.ts` drives a real Hunk and plannotator-tui review in Rex. It needs Rex with the dotfiles `review_changes` action:
+`scripts/attention.integration.ts` drives a real Hunk and plannotator-tui review in Rex. It needs Rex with the dotfiles `review_changes` action, and `REX_SESSION` set to a full session id when the server has more than one session:
 
 ```sh
 bun test ./plugins/review/scripts/attention.integration.ts

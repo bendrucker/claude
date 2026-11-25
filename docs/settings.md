@@ -168,6 +168,8 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop it** if no session records a `REPL` call within two weeks, if it regresses latency or tokens per task, or when Code Mode leaves experimental status.
 
+`PLANNOTATOR_INBOX_NOTES=0` keeps an Inbox that an agent starts from writing its note to `~/.claude/rules/plannotator-inbox.md`. That path is this repo's `user/rules`, and the note would load into every session and steer decisions away from `AskUserQuestion`, which blocks in Rex and Moshi where Ben can answer it. Agents keep the `plannotator_inbox` tool. It is in user settings because the Inbox runs only on local machines. The launchd agent in dotfiles sets the same variable for the Inbox it starts. **Drop it** to have agents send decisions to the Inbox unprompted.
+
 ## Compaction
 
 `autoCompactWindow: 280000` fires auto-compaction at 280K of context instead of the model's full window. On a 1M-context model it trades an earlier summary, plus the skill re-injection that follows every compaction, for turns that stop re-reading a large, stale prefix. 280K sits above the 200K standard window, so a session that fits a non-1M model never compacts early.

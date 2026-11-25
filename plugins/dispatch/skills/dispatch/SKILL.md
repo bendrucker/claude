@@ -51,7 +51,7 @@ Take the first rule that fits:
 - A light follow-up to existing work, such as a small CI fix: stay in this session, or pass `--session I/O`.
 - One area session clearly matches the repo, a working directory, a tab label, or the description: pass `--session <label>` without asking.
 - Several sessions match, or none does: ask with `AskUserQuestion`. Offer the closest areas, a new session named for the area, and any recent area that fits. On a new-session answer, run `rex new <label> --json` and then `bun "${CLAUDE_SKILL_DIR}/scripts/dispatch.ts" sessions --apply-order`, then dispatch with `--session <label>`.
-- The repo has no checkout on this machine, or the user named another host: list that host's sessions with `claude-dispatch sessions --host <label>`, then dispatch with `--host <label> --session <label> --repo <path>`.
+- The user named another host: list that host's sessions with `claude-dispatch sessions --host <label>`, then dispatch with `--host <label> --session <label> --repo <path or slug>`.
 
 `--help` above names the tab multiplexer `--mux` defaults to. When the task calls for a pane or tab and `--help` says to pass `--mux` instead, ask the user with `AskUserQuestion` whether to use `rex` or `herdr`.
 
@@ -66,13 +66,24 @@ claude-dispatch --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [
 ```
 
 - Make `claude-dispatch` the entire Bash command, with no `cd`, env prefix, pipe, `&&`, or loop, because only that form matches its sandbox exclusion. For several dispatches, write one prompt file each and issue the Bash calls in parallel in one message.
-- `--repo` defaults to this session's repository, shown in `--help` above. Pass it only to dispatch into another repository.
+- `--repo` defaults to this session's repository, shown in `--help` above. Pass it only to dispatch into another repository. See Other Repositories below.
 - A branch that exists locally or on a remote is reused, and a branch that already has a worktree opens there. `wt` resolves a PR or MR to its head branch. `--base` applies only to a branch being created, and is fetched first.
 - Under Rex the session opens in a new tab, or a pane with `--split`, labeled with the title. From outside Rex, pass `--session <id or label>` from `rex ls`.
 
+## Other Repositories
+
+`--repo` takes a path, an `owner/name` slug, or a GitHub URL. A slug or URL resolves to `~/src/<owner>/<name>`, where `<owner>` is the upstream owner. A fork's slug resolves to its parent's directory, so `bendrucker/plannotator` lands in `~/src/backnotprop/plannotator`. A missing path of the form `~/src/<owner>/<name>` resolves the same way.
+
+When that directory is missing, the script clones it with `gh` on the machine that runs the session:
+
+- With push access upstream, `origin` is upstream.
+- Without it, the script forks with `gh repo fork --clone`. `origin` is the fork, `upstream` is the parent and gh's default repository. The dispatched session pushes to `origin`, and `gh pr create` opens the PR against upstream. Worktrees go under the fork owner, since `wt` names them from `origin`.
+
+In a checkout with an `upstream` remote, `--base` defaults to upstream's default branch instead of `origin/main`, because the fork's own branch lags.
+
 ## Other Machines
 
-To run the session on another machine, pass `--host <label> --session <remote session> --repo <remote path>`. The label must appear in `rex hosts list`, and that machine must have the dispatch plugin deployed at `~/.claude-repo`. The worktree, settings, and fetch happen there. The session starts with `--remote-control`, which puts it in `ListAgents` here. `path` stays `null`, and `branch` stays a PR or MR reference, until the remote screen shows them.
+To run the session on another machine, pass `--host <label> --session <remote session> --repo <remote path or slug>`. The label must appear in `rex hosts list`, and that machine must have the dispatch plugin deployed at `~/.claude-repo`. The worktree, settings, and fetch happen there. The session starts with `--remote-control`, which puts it in `ListAgents` here. `path` stays `null`, and `branch` stays a PR or MR reference, until the remote screen shows them.
 
 ## Read the Result
 

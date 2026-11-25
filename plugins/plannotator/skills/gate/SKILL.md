@@ -16,6 +16,8 @@ Block on Ben's verdict in Plannotator and fold his feedback in until he approves
 - Diff: `plannotator review --git --json`, adding `--base <ref>` when the caller resolved one.
 - File: `plannotator annotate <file> --gate --json --require-approval`.
 
+Run the command in the background, since Ben's decision can outlast the foreground timeout. Once its output shows `Plannotator session ready: http://localhost:<port>`, post that full URL in chat so Ben can tap it in the Rex iPhone app, which forwards the port and opens the review.
+
 ## Decision
 
 - `approved` ends the gate.

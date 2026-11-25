@@ -2,7 +2,9 @@
 name: review:human
 description: >-
   Request Ben's own review of the working diff or a document before it leaves the machine, for architecture and slop rather than bugs. Runs after the mechanical passes (code-review or simplify, comments:audit). Use for "get my review", "let me look at this first", or as the last pre-PR pass.
-argument-hint: "[--diff] [--doc <file>] [--kind <kind>] [--base <ref>] [--reviewer hunk|plannotator] [--batch] [--browser] [--summary <text>]"
+argument-hint: >-
+  [--diff] [--doc <file>] [--kind <kind>] [--base <ref>]
+  [--reviewer hunk|plannotator] [--batch] [--browser] [--summary <text>]
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts:*)"
   - Bash(rex do review_reply:*)

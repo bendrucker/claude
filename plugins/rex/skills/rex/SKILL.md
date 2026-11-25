@@ -76,7 +76,7 @@ The `❯` line at the bottom of a Claude pane shows Claude Code's own prompt sug
 
 ## Sessions
 
-A tab or pane can't move between Rex sessions, so choose the session before opening one. A Claude tab moves through `dispatch:close` relocate, which resumes the conversation in a new tab there. Move any other tab by recreating it in the target session and closing the old one, after the user confirms.
+A tab or pane can't move between Rex sessions, so choose the session before opening one. A tab already in the wrong session stays there unless the user moves it.
 
 Keep at most 4 tiled panes visible in a tab. Float an extra pane, then minimize its layer:
 

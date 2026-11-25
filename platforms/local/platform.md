@@ -37,7 +37,7 @@ herdr, the Herdr app, and Rex host sessions here. Open panes, tabs, and splits w
 
 I organize multiplexer sessions (Rex sessions, herdr workspaces) by area of work, with several tabs on that area in each. The inbox session `I/O` takes scratch work, coordinators, and light follow-ups to existing work, such as a small CI fix. New non-trivial work goes to an area session.
 
-- Pick the session before opening a tab, because Rex can't move a tab afterwards. To move a Claude tab already in the wrong session, use `dispatch:close` relocate.
+- Pick the session before opening a tab, because Rex can't move a tab afterwards.
 - Keep at most 4 tiled panes visible in a tab. Put a watcher or any extra pane in a minimized floating pane.
 - Create a new session only when I agree to it.
 - `rex -S <host>` reaches the other machine's sessions. Consider them only when I name that host, or when the repo has no checkout on this machine.

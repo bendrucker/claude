@@ -20,6 +20,11 @@ export function corpusAt(evals: string): Corpus {
         filters: [DOTFILES],
       },
       {
+        local: join(evals, "pr-body", "data"),
+        remote: "data",
+        filters: [{ exclude: "*" }, { include: "case-finals.json" }],
+      },
+      {
         local: scenarios,
         remote: "create-scenarios",
         filters: [
@@ -28,6 +33,7 @@ export function corpusAt(evals: string): Corpus {
           { include: "examples/scenario-*" },
           { include: "work-*" },
           { include: "examples/work-*" },
+          { include: "distractor-*" },
         ],
       },
     ],

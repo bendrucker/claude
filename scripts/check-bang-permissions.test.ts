@@ -5,6 +5,8 @@ import {
   bangCommands,
   subcommands,
   unapproved,
+  unquoted,
+  unquotedPathVariables,
 } from "./check-bang-permissions";
 
 describe("bangCommands", () => {
@@ -154,6 +156,62 @@ test("unapproved reports each uncovered subcommand and path", () => {
       "probe/SKILL.md: no Bash rule matches \`echo none\`",
       "probe/SKILL.md: no Bash rule matches \`touch /tmp/other/y\`",
       "probe/SKILL.md: no Edit rule covers \`/tmp/other/y\` in \`touch /tmp/other/y\`",
+    ]
+  `);
+});
+
+describe("unquotedPathVariables", () => {
+  test.each<{ name: string; command: string; expected: string[] }>([
+    {
+      name: "bare skill dir splits on a space",
+      command: "bun ${CLAUDE_SKILL_DIR}/scripts/x.ts",
+      expected: ["${CLAUDE_SKILL_DIR}"],
+    },
+    {
+      name: "bare plugin root without braces",
+      command: "sh $CLAUDE_PLUGIN_ROOT/scripts/x.sh",
+      expected: ["$CLAUDE_PLUGIN_ROOT"],
+    },
+    {
+      name: "double-quoted path",
+      command: 'bun "${CLAUDE_SKILL_DIR}/scripts/x.ts" --help',
+      expected: [],
+    },
+    {
+      name: "single-quoted path",
+      command: "bun '${CLAUDE_PLUGIN_ROOT}/scripts/x.ts'",
+      expected: [],
+    },
+    {
+      name: "quoted in one subcommand, bare in the next",
+      command: 'echo "${CLAUDE_SKILL_DIR}"; cat ${CLAUDE_SKILL_DIR}/a',
+      expected: ["${CLAUDE_SKILL_DIR}"],
+    },
+    {
+      name: "a longer variable sharing the prefix",
+      command: "echo ${CLAUDE_SKILL_DIRS}",
+      expected: [],
+    },
+    { name: "an unrelated variable", command: "touch /tmp/${CLAUDE_SESSION_ID}", expected: [] },
+  ])("$name", ({ command, expected }) => {
+    expect(unquotedPathVariables(command)).toEqual(expected);
+  });
+});
+
+test("unquoted reports each injection with a bare path variable", () => {
+  const skill = [
+    "---",
+    "name: probe",
+    "---",
+    "",
+    "!`bun ${CLAUDE_SKILL_DIR}/scripts/schema.ts`",
+    '!`bun "${CLAUDE_SKILL_DIR}/scripts/orient.ts"`',
+    "Run `bun ${CLAUDE_SKILL_DIR}/scripts/query.ts` for a query.",
+    "",
+  ].join("\n");
+  expect(unquoted("probe/SKILL.md", skill)).toMatchInlineSnapshot(`
+    [
+      "probe/SKILL.md: quote \`\${CLAUDE_SKILL_DIR}\` in \`bun \${CLAUDE_SKILL_DIR}/scripts/schema.ts\`",
     ]
   `);
 });

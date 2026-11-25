@@ -62,7 +62,7 @@ describe("processInput", () => {
       const body = join(tempDir, "body.md");
       await Bun.write(
         body,
-        `${"Adds words. ".repeat(65)}\n\n| a | b |\n| - | - |\n| one | two |\n`,
+        `${"Adds words. ".repeat(80)}\n\n| a | b |\n| - | - |\n| one | two |\n`,
       );
       const input = createInput(`gh pr create --title "x: y" --body-file ${body}`);
       await processInput(
@@ -82,8 +82,8 @@ describe("processInput", () => {
         attributes: {
           verb: "gh pr create",
           rules: ["run-on-prose", "structure-limits"],
-          proseWords: 130,
-          visibleWords: 130,
+          proseWords: 160,
+          visibleWords: 160,
           hiddenWords: 4,
           "session.id": "s-1",
         },
@@ -93,7 +93,7 @@ describe("processInput", () => {
     it("denies an over-limit body on every create and edit", async () => {
       const events = join(tempDir, "mod-events");
       const body = join(tempDir, "body.md");
-      await Bun.write(body, "Adds words. ".repeat(65));
+      await Bun.write(body, "Adds words. ".repeat(80));
       const run = (verb: string) =>
         processInput(
           { ...createInput(`gh pr ${verb} --body-file ${body}`), session_id: "s-2" },
@@ -102,7 +102,7 @@ describe("processInput", () => {
       const verbs = ["edit 1", "create --title 'x: y'", "create --title 'x: y'", "edit 1"];
       const results = await Promise.all(verbs.map(run));
       for (const result of results) {
-        expect(getDenyReason(result)).toContain("prose words 130 > 120, cut 10");
+        expect(getDenyReason(result)).toContain("visible words 160 > 150, cut 10");
       }
     });
 

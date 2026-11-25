@@ -88,7 +88,7 @@ duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql -cmd "SET 
 The rest:
 
 <!-- generated:queries -->
-`already-allowed-still-prompting`, `bare-refs`, `catalog-reinjection-thrash-sessions`, `classifier`, `cli-health`, `field-drift`, `hook-block-then-retry-success`, `hook-config-vs-observed`, `hook-self-timing`, `idle-compactions`, `memory-loads`, `model-summary`, `mods`, `permissions`, `plan-iterations`, `plan-sections`, `plan-sizes`, `prune-acceptance`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence`, `search`, `skill-activity`, `stats`, `stop-hook-noop-detector`, `subagent-effort`, `text-export`, `tool-failure-rates`, `top-sessions`, `usage-spikes`
+`already-allowed-still-prompting`, `bare-refs`, `catalog-reinjection-thrash-sessions`, `classifier`, `cli-health`, `field-drift`, `hook-block-then-retry-success`, `hook-config-vs-observed`, `hook-self-timing`, `idle-compactions`, `memory-loads`, `model-summary`, `mods`, `permissions`, `plan-iterations`, `plan-sections`, `plan-sizes`, `prune-acceptance`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence`, `search`, `skill-activity`, `stats`, `stop-hook-noop-detector`, `subagent-effort`, `text-export`, `tool-failure-rates`, `top-sessions`, `usage-spikes`, `writing-bash-coverage`
 <!-- /generated:queries -->
 
 [`references/catalog.md`](references/catalog.md) gives each query's purpose and params. Before running a query you have not used, read the YAML header of its `resources/queries/<name>.sql` for its output, caveats, and param defaults.
@@ -105,7 +105,7 @@ duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql \
 
 ## Cross-Machine History
 
-!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh session-index-pull`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" session-index-pull`
 
 Each machine is a `host`: this one is `local`, and each imported machine has a chosen label. `${CLAUDE_SKILL_DIR}/scripts/hosts.ts` lists them. To list, import, re-sync, or remove a machine, follow [`references/cross-machine.md`](references/cross-machine.md).
 
@@ -121,7 +121,7 @@ Every table and view carries `host`. The `sessions` view adds `project_id` (`hos
 
 Columns of the surfaces ad-hoc SQL reads most (`DESCRIBE <name>` for anything else):
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/schema.ts`
+!`bun "${CLAUDE_SKILL_DIR}/scripts/schema.ts"`
 
 For a field not pinned to a column, reach into `data` with JSON path operators, wrapped in parens before any comparison: `(data->>'$.x') = 'y'`. [`references/schema-discovery.md`](references/schema-discovery.md) has examples.
 

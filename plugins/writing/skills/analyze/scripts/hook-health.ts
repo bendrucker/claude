@@ -18,8 +18,17 @@ export interface CheckHealth extends Acceptance {
   fired: number;
 }
 
+export interface SourceHealth {
+  source: string;
+  rows: number;
+  injected: number;
+  revisited: number;
+  accepted: number;
+}
+
 export interface HookHealth {
   total: number;
+  sources: SourceHealth[];
   byOutcome: Record<RunOutcome, number>;
   checks: CheckHealth[];
   latency: { p50: number; p95: number; silentP95: number };
@@ -94,6 +103,30 @@ export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
   return counts;
 }
 
+const FILE_EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit"]);
+
+const SOURCES: { source: string; matches: (entry: RunLogEntry) => boolean }[] = [
+  { source: "file edits", matches: (entry) => FILE_EDIT_TOOLS.has(entry.tool) },
+  {
+    source: "bash",
+    matches: (entry) => entry.tool === "Bash" && entry.event === "PostToolUse",
+  },
+];
+
+function bySource(entries: RunLogEntry[]): SourceHealth[] {
+  return SOURCES.map(({ source, matches }) => {
+    const rows = entries.filter(matches);
+    const counts = [...acceptance(rows).values()];
+    return {
+      source,
+      rows: rows.length,
+      injected: rows.filter((row) => row.outcome === "context" || row.outcome === "deny").length,
+      revisited: counts.reduce((sum, count) => sum + count.revisited, 0),
+      accepted: counts.reduce((sum, count) => sum + count.accepted, 0),
+    };
+  }).filter((health) => health.rows > 0);
+}
+
 export function summarize(entries: RunLogEntry[]): HookHealth {
   const byOutcome: Record<RunOutcome, number> = {
     silent: 0,
@@ -129,6 +162,7 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
 
   return {
     total: entries.length,
+    sources: bySource(entries),
     byOutcome,
     checks,
     latency: {
@@ -139,7 +173,7 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
   };
 }
 
-function actedOn(cat: CheckHealth): string {
+function actedOn(cat: Pick<Acceptance, "revisited" | "accepted">): string {
   if (cat.revisited === 0) return "n/a";
   return `${cat.accepted}/${cat.revisited} ${Math.round((cat.accepted / cat.revisited) * 100)}%`;
 }
@@ -155,7 +189,21 @@ export function renderReport(health: HookHealth): string {
     ["outcomes", outcomes],
     ["latency (ms)", `p50=${p50} p95=${p95} silent-p95=${silentP95}`],
   ]);
-  if (health.checks.length === 0) return summary;
+  const sources =
+    health.sources.length === 0
+      ? ""
+      : `\n${table([
+          ["source", "rows", "injection rate", "acted on"],
+          ...health.sources.map((src) => [
+            src.source,
+            String(src.rows),
+            src.rows === 0
+              ? "n/a"
+              : `${src.injected}/${src.rows} ${Math.round((src.injected / src.rows) * 100)}%`,
+            actedOn(src),
+          ]),
+        ])}`;
+  if (health.checks.length === 0) return `${summary}${sources}`;
   const checks = table([
     ["check", "fired", "acted on", "unconfirmed"],
     ...health.checks.map((cat) => [
@@ -165,7 +213,7 @@ export function renderReport(health: HookHealth): string {
       String(cat.unconfirmed),
     ]),
   ]);
-  return `${summary}\n${checks}`;
+  return `${summary}${sources}\n${checks}`;
 }
 
 export async function readLog(path: string, since?: string): Promise<RunLogEntry[]> {

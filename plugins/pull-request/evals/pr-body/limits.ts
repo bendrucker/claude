@@ -6,7 +6,7 @@ export const CHECKS = { ...LIMITS, ...GUARDS };
 type CheckKey = keyof typeof CHECKS;
 
 export const ROWS = {
-  proseWords: "prose-words",
+  visibleWords: "visible-words",
   maxBlockWords: "max-block",
   proseCodeSpans: "prose-code-spans",
   pathSpans: "path-spans",

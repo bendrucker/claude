@@ -1,12 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PostToolUseHookInput, PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import type { SyncHookJSONOutput } from "./io";
 import type { RunOutcome } from "./run-log";
-import { dispatch, targetOf } from "./lint";
+import { isLinted } from "../detection/vale";
+import { dispatch, dispatchBash, targetOf } from "./lint";
+import { snapshot } from "./worktree-changes";
 
 // Session-state files land in $TMPDIR. Redirect it so test runs do not litter
 // the shared OS temp dir with per-UUID state files.
@@ -305,5 +307,83 @@ describe("skips", () => {
     const { output, log } = await dispatch(input);
     expect(output).toBeNull();
     expect(log.checks).toBeUndefined();
+  });
+});
+
+describe("Bash calls", () => {
+  // Repos live under the redirected TMPDIR, which the hook treats as scratch, so tests lint by extension alone.
+  const lints = (path: string): Promise<boolean> => isLinted(path);
+
+  async function repoWith(files: Record<string, string>): Promise<string> {
+    const repo = await realpath(mkdtempSync(join(stateDir, "repo-")));
+    const git = (...args: string[]): void => {
+      Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: repo });
+    };
+    git("init", "-q", "--template=");
+    await Promise.all(
+      Object.entries(files).map(([name, text]) => Bun.write(join(repo, name), text)),
+    );
+    git("add", ".");
+    git("commit", "-qm", "init", "--no-gpg-sign");
+    return repo;
+  }
+
+  function bash(repo: string, sessionId: string): PostToolUseHookInput {
+    return {
+      hook_event_name: "PostToolUse",
+      session_id: sessionId,
+      tool_name: "Bash",
+      tool_input: { command: "python3 - <<'EOF' ... EOF" },
+      tool_response: {},
+      ...common,
+      cwd: repo,
+    };
+  }
+
+  it("reports only the lines the call added to a file already dirty", async () => {
+    const repo = await repoWith({ "doc.md": "# Notes\n\nPlain.\n" });
+    const session = crypto.randomUUID();
+    await Bun.write(join(repo, "doc.md"), "# Notes\n\nEvery row that fits no slot.\n");
+    await snapshot(session, repo, lints);
+    await Bun.write(
+      join(repo, "doc.md"),
+      "# Notes\n\nEvery row that fits no slot.\n\nThe tool names no file.\n",
+    );
+    const { output, logs } = await dispatchBash(bash(repo, session), 1_000_000, lints);
+    expect(contextOf(output)).toContain("5:");
+    expect(contextOf(output)).not.toContain("3:");
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      tool: "Bash",
+      event: "PostToolUse",
+      outcome: "context",
+      target: targetOf(join(repo, "doc.md")),
+      unedited_alerts: 1,
+    });
+  });
+
+  it("reports every changed file in one output with a row each", async () => {
+    const repo = await repoWith({ "a.md": "Plain.\n" });
+    const session = crypto.randomUUID();
+    await snapshot(session, repo, lints);
+    await Bun.write(join(repo, "a.md"), "Plain.\n\nThe tool names no file.\n");
+    await Bun.write(join(repo, "b.md"), "The step has no owner.\n");
+    const { output, logs } = await dispatchBash(bash(repo, session), 1_000_000, lints);
+    expect(contextOf(output)).toContain("a.md");
+    expect(contextOf(output)).toContain("b.md");
+    expect(logs.map((row) => row.outcome)).toEqual(["context", "context"]);
+  });
+
+  test.each<{ name: string; snapshotFirst: boolean }>([
+    { name: "a call that changed nothing", snapshotFirst: true },
+    { name: "a call with no snapshot", snapshotFirst: false },
+  ])("logs nothing for $name", async ({ snapshotFirst }) => {
+    const repo = await repoWith({ "doc.md": "Plain.\n" });
+    const session = crypto.randomUUID();
+    if (snapshotFirst) await snapshot(session, repo, lints);
+    expect(await dispatchBash(bash(repo, session), 1_000_000, lints)).toEqual({
+      output: null,
+      logs: [],
+    });
   });
 });

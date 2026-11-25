@@ -33,7 +33,7 @@ In a cloud session, where Plannotator's browser can't reach Ben, name what to re
 
 ## Precondition
 
-Request after the mechanical passes have run. `/ship` orders them. Standalone on an unreviewed diff, say so in the `--summary` text rather than running them here.
+Request after the mechanical passes have run. On an unreviewed diff, say so in the `--summary` text rather than running them here.
 
 ## Request
 

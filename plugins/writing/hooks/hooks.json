@@ -1,5 +1,5 @@
 {
-  "description": "Detects writing style violations and AI tropes",
+  "description": "Detects writing style violations and AI tropes. The Bash path (worktree-snapshot.ts, then lint.ts on PostToolUse Bash) retires if under 5% of its run-log rows inject over 4 weeks, and its detection is revisited if writing-bash-coverage misses stay above 30%",
   "hooks": {
     "SessionStart": [
       {
@@ -16,6 +16,10 @@
       {
         "matcher": "Bash",
         "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/worktree-snapshot.ts\""
+          },
           {
             "type": "command",
             "command": "IFS= read -r in; case $in in *--body*|*--message*|*--description*|*--title*|*=@*|*-F*|*--file*|*--input*|*-m*|*-?m*|*-b*|*\\<*) if printf '%s' \"$in\" | grep -qE -- '--(body|message|description|title)[-= ]|(-F|--field)[= ][^ ]*=@|git (commit|tag).* (-F|--file)[= ]|git (commit|tag).* -[a-zA-Z]*m |--input[= ]|(review|note|discussion)[^|;&]*( <|-m |-b )'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/lint.ts\"; fi ;; esac"
@@ -35,6 +39,15 @@
     "PostToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/lint.ts\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",

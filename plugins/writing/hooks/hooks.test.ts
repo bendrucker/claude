@@ -38,12 +38,11 @@ function findCommand(matcher: string, script: string): string {
 }
 
 describe("PostToolUse", () => {
-  test("file edits route to the dispatcher unguarded", () => {
+  test("file edits and Bash calls route to the dispatcher unguarded", () => {
+    const lint = [{ type: "command", command: 'bun "${CLAUDE_PLUGIN_ROOT}/hooks/lint.ts"' }];
     expect(config.hooks.PostToolUse).toEqual([
-      {
-        matcher: "Write|Edit|MultiEdit",
-        hooks: [{ type: "command", command: 'bun "${CLAUDE_PLUGIN_ROOT}/hooks/lint.ts"' }],
-      },
+      { matcher: "Write|Edit|MultiEdit", hooks: lint },
+      { matcher: "Bash", hooks: lint },
     ]);
   });
 });
@@ -60,7 +59,10 @@ describe("PreToolUse gating", () => {
       ]),
     );
     expect(view).toEqual({
-      Bash: [{ script: "lint", guarded: true }],
+      Bash: [
+        { script: "worktree-snapshot", guarded: false },
+        { script: "lint", guarded: true },
+      ],
       "mcp__.*": [{ script: "lint", guarded: true }],
     });
   });

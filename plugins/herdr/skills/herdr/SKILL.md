@@ -4,8 +4,8 @@ description: >-
   Drive the herdr terminal workspace manager, as the herdr TUI or the Herdr app and its herdr-core (`hc`) server: inspect workspaces, tabs, and panes, hand work to sibling coding agents in other panes (distinct from in-session `Agent` subagents), split panes for collaborative file viewing or long-running processes, and correlate panes to Claude sessions. Load this when the decision to hand a task to another pane's agent arrives mid-task, and when opening a file alongside the user, starting a dev server or log tail the user should watch, capturing another pane's output, or asking what else is running. Pane, tab, workspace, and split are herdr's terms. In a session herdr hosts, a request naming one is a herdr request even when it never says herdr.
 argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts)
-  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh)
+  - 'Bash(bun "${CLAUDE_SKILL_DIR}/scripts/orient.ts")'
+  - 'Bash(bash "${CLAUDE_SKILL_DIR}/scripts/commands.sh")'
   - Bash(herdr api snapshot:*)
   - Bash(herdr --help:*)
   - Bash(herdr agent --help:*)
@@ -60,7 +60,7 @@ Dispatch a sibling agent by creating its worktree with `wt switch --create <bran
 
 ## Command Surface
 
-!`bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh`
+!`bash "${CLAUDE_SKILL_DIR}/scripts/commands.sh"`
 
 For flags not shown above, `herdr <group> <command> --help` is complete: defaults, enum values, preconditions. Where the CLI and this file disagree, follow the CLI.
 
@@ -68,7 +68,7 @@ Bare `herdr` launches or attaches the TUI in this pane. A mutating command in ba
 
 ## Current Workspace
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts`
+!`bun "${CLAUDE_SKILL_DIR}/scripts/orient.ts"`
 
 Columns are workspace, then `pane  agent/status  session  cwd  title`, with `cwd` shown only when it differs from the workspace checkout. That view projects `herdr api snapshot`, which returns this machine's workspaces, tabs, panes, layouts, and agents in one call. Prefer it to a sequence of `list` calls, and read it raw when the projection is wrong: `herdr api snapshot | jq .`
 

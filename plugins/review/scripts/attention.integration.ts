@@ -132,6 +132,8 @@ describe.skipIf(!ready)("attention under Rex", () => {
     for (const watch of watches.splice(0)) watch.kill();
     const split = await reviewBlock(agent);
     if (split !== undefined) Bun.spawnSync(["rex", "block", "close", split]);
+    // A review that failed to settle leaves its record behind for the next test.
+    await rm(join(stateDir, "blocks", agent), { force: true });
   });
 
   afterAll(async () => {

@@ -8,6 +8,8 @@ allowed-tools:
   - Bash(rex do review_reply:*)
   - "Bash([:*)"
   - Bash(printf:*)
+  - Bash(plannotator review:*)
+  - Bash(plannotator annotate:*)
 ---
 
 # Human Review
@@ -70,6 +72,8 @@ To walk Ben through the diff in Hunk or leave notes of your own there, load `hun
 ## Browser Gate
 
 1. `attention.ts raise --kind <kind> --summary "..."`
-2. Load `plannotator:gate` and run its gate on the diff, passing `--base <ref>` when the caller resolved one, or on the file.
-3. `attention.ts clear` after each gate returns.
-4. Act on the decision as `plannotator:gate` says, until it reports approval or a startup error.
+2. Run `plannotator review --git --json` on the diff, adding `--base <ref>` when the caller resolved one, or `plannotator annotate <file> --gate --json --require-approval` on the file. Run it in the background, since Ben's decision can outlast the foreground timeout. Once its output shows `Plannotator session ready: http://localhost:<port>`, post that full URL in chat so Ben can tap it in the Rex iPhone app, which forwards the port and opens the review.
+3. `attention.ts clear` after each run returns.
+4. `approved` ends the review. On `annotated`, `dismissed`, or exit 1 from `annotate`, fold the feedback in and run it again. Exit 2 is a startup error: report it and stop.
+
+For any other Plannotator command or flag, load the `plannotator` skill that Plannotator's installer provides.

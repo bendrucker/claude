@@ -55,7 +55,7 @@ A skill that loads a skill from another plugin creates a plugin dependency. Decl
 
 - A skill is unusable without the target.
 - A tool plugin layers Ben's conventions for one external tool over that tool's upstream plugin. Write the upstream as `<plugin>@<marketplace>` and add its marketplace to `allowCrossMarketplaceDependenciesOn` in `.claude-plugin/marketplace.json`. Put the marketplace in `extraKnownMarketplaces` in `user/settings.json`, pinned to a tag.
-- A workflow plugin routes to the tool plugins for the reviewers, viewers, or CLIs it opens, as `review` depends on `hunk` and `plannotator`. Write a plugin in this marketplace as its bare name.
+- A workflow plugin routes to the tool plugins for the reviewers, viewers, or CLIs it opens, as `review` depends on `hunk` and `plannotator@plannotator`. Write a plugin in this marketplace as its bare name.
 
 Keep instructions specific to one tool in that tool's plugin, and keep the workflow plugin's skills to routing and the steps every tool shares.
 

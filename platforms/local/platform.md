@@ -35,6 +35,13 @@ When already on a topic branch in a worktree, stay there.
 
 herdr, the Herdr app, and Rex host sessions here. Open panes, tabs, and splits with the multiplexer hosting this session: `rex:rex` when the session-start context names a Rex terminal, `herdr:herdr` otherwise. `herdr:herdr` covers both herdr TUI and the Herdr app. Sibling-agent dispatch goes through `dispatch:dispatch` from Rex or herdr TUI, and through the herdr skill's Herdr App steps from the app. Claude sessions talk to each other over `SendMessage`.
 
+I organize multiplexer sessions (Rex sessions, herdr workspaces) by area of work, with several tabs on that area in each. The inbox session `I/O` takes scratch work, coordinators, and light follow-ups to existing work, such as a small CI fix. New non-trivial work goes to an area session.
+
+- Pick the session before opening a tab, because Rex can't move a tab afterwards. To move a Claude tab already in the wrong session, use `dispatch:close` relocate.
+- Keep at most 4 tiled panes visible in a tab. Put a watcher or any extra pane in a minimized floating pane.
+- Create a new session only when I agree to it.
+- `rex -S <host>` reaches the other machine's sessions. Consider them only when I name that host, or when the repo has no checkout on this machine.
+
 In a Rex tab still labeled `Window <id>`, once the task is clear, rename the tab with `rex window rename` to two to four Title Case words naming the task, and leave the Rex session label as it is.
 
 To show me an image (PNG, JPEG, or SVG), open a pane and render it with `chafa -f kitty -s <cols>x<rows> <file>` sized to the pane. Rex, herdr, kitty, Ghostty, and WezTerm all support kitty graphics, but chafa detects that by terminal name and falls back to block art in Rex without `-f kitty`.

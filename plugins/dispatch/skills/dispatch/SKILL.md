@@ -8,6 +8,8 @@ allowed-tools:
   - Bash(claude-dispatch:*)
   - Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh:*)
   - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help)"
+  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions:*)"
+  - Bash(rex new:*)
 ---
 
 # Dispatch
@@ -37,6 +39,19 @@ A tab is a workstream with this session as its lead, and a pane is one task with
 - `bg`, a `claude --bg` session with no terminal: a small, self-contained change with a clear completion criterion, few questions, and little for the user to read before the PR. Pass `--mux bg`.
 - A pane in this tab: a side issue inside this tab's current workstream that the user will want to watch or steer. Under Rex, pass `--split`. Under herdr, open a tab.
 - A new tab (`rex` or `herdr`): an unrelated theme, or exploratory work that needs decisions, reading, or review as it goes.
+
+### Session
+
+Under Rex, a tab can't move between sessions after it opens, so pick its session first. The user keeps one Rex session per area of work, plus the inbox `I/O` for scratch work and light follow-ups. The candidates, with each session's tabs, working directories, and description, and recently closed areas:
+
+!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions`
+
+Take the first rule that fits:
+
+- A light follow-up to existing work, such as a small CI fix: stay in this session, or pass `--session I/O`.
+- One area session clearly matches the repo, a working directory, a tab label, or the description: pass `--session <label>` without asking.
+- Several sessions match, or none does: ask with `AskUserQuestion`. Offer the closest areas, a new session named for the area, and any recent area that fits. On a new-session answer, run `rex new <label> --json`, then dispatch with `--session <label>`.
+- The repo has no checkout on this machine, or the user named another host: list that host's sessions with `bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions --host <label>`, then dispatch with `--host <label> --session <label> --repo <path>`.
 
 `--help` above names the tab multiplexer `--mux` defaults to. When the task calls for a pane or tab and `--help` says to pass `--mux` instead, ask the user with `AskUserQuestion` whether to use `rex` or `herdr`.
 

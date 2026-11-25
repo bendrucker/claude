@@ -7,6 +7,17 @@ const RexWindow = z.object({ block_ids: z.array(z.string()).min(1) });
 
 const BlockInfo = z.object({ block: z.object({ window_id: z.string() }) });
 
+const WindowLabel = z.object({ label: z.string() });
+
+const Resolved = z.object({
+  results: z.array(
+    z.object({
+      status: z.string(),
+      target: z.object({ session_id: z.string(), label: z.string().nullish() }).optional(),
+    }),
+  ),
+});
+
 const Layer = z.object({
   layer_id: z.string(),
   kind: z.string(),
@@ -31,6 +42,65 @@ async function rexJson<T>(run: Runner, schema: z.ZodType<T>, argv: string[]): Pr
   const result = await run(["rex", ...argv]);
   if (result.code !== 0) throw new CloseError(`${label} failed: ${result.stderr.trim()}`);
   return parseOutput(schema, result.stdout, label);
+}
+
+export async function windowLabel(run: Runner, session: string, block: string): Promise<string> {
+  const info = await rexJson(run, BlockInfo, ["block", "inspect", "-s", session, block, "--json"]);
+  const window = await rexJson(run, WindowLabel, [
+    "window",
+    "inspect",
+    "-s",
+    session,
+    info.block.window_id,
+    "--json",
+  ]);
+  return window.label;
+}
+
+export interface RexSession {
+  id: string;
+  label: string;
+}
+
+export async function resolveSession(run: Runner, query: string): Promise<RexSession> {
+  const resolved = await rexJson(run, Resolved, [
+    "api",
+    "call",
+    "target.resolve",
+    JSON.stringify({ kinds: ["session"], queries: [query] }),
+  ]);
+  const [result] = resolved.results;
+  if (result?.status !== "resolved" || result.target == null)
+    throw new CloseError(
+      `Rex session ${query} ${result?.status === "ambiguous" ? "is ambiguous" : "was not found"}`,
+      2,
+    );
+  return { id: result.target.session_id, label: result.target.label ?? query };
+}
+
+export async function openResumeWindow(
+  run: Runner,
+  options: { to: string; label: string; cwd: string; session: string },
+): Promise<string> {
+  const { to, label, cwd, session } = options;
+  const created = await run([
+    "rex",
+    "window",
+    "new",
+    "-s",
+    to,
+    label,
+    "-c",
+    cwd,
+    "--focus=false",
+    "--json",
+    "--",
+    "claude",
+    "--resume",
+    session,
+  ]);
+  if (created.code !== 0) throw new CloseError(`rex window new failed: ${created.stderr.trim()}`);
+  return parseOutput(RexWindow, created.stdout, "rex window new").block_ids[0] ?? "";
 }
 
 export function rex({ env, run }: MuxContext): Muxer {

@@ -6,9 +6,9 @@ argument-hint: "--branch <branch | pr:<n> | mr:<n>> --prompt <file>"
 effort: low
 allowed-tools:
   - Bash(claude-dispatch:*)
-  - Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh:*)
-  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help)"
-  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions:*)"
+  - 'Bash(sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh":*)'
+  - 'Bash(bun "${CLAUDE_SKILL_DIR}/scripts/dispatch.ts" --help)'
+  - 'Bash(bun "${CLAUDE_SKILL_DIR}/scripts/dispatch.ts" sessions:*)'
   - Bash(rex new:*)
 ---
 
@@ -24,7 +24,7 @@ Write the prompt to a file under `tmp/` from what this conversation already know
 
 `--help`, run for this session:
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help`
+!`bun "${CLAUDE_SKILL_DIR}/scripts/dispatch.ts" --help`
 
 Pass `--title` with two to four Title Case words naming the task. The script ends a pane or tab session's prompt with an instruction to run `dispatch:close` once its PR is open. Pass `--keep-open` to leave that instruction out when the user wants to keep the session open.
 
@@ -44,13 +44,13 @@ A tab is a workstream with this session as its lead, and a pane is one task with
 
 Under Rex, a tab can't move between sessions after it opens, so pick its session first. The user keeps one Rex session per area of work, plus the inbox `I/O` for scratch work and light follow-ups. The candidates, with each session's tabs, working directories, and description, and recently closed areas. Listing them also moves the sessions that `~/.config/rex/sessions.toml` gives an `order` to the top of Rex's session list:
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions --apply-order`
+!`bun "${CLAUDE_SKILL_DIR}/scripts/dispatch.ts" sessions --apply-order`
 
 Take the first rule that fits:
 
 - A light follow-up to existing work, such as a small CI fix: stay in this session, or pass `--session I/O`.
 - One area session clearly matches the repo, a working directory, a tab label, or the description: pass `--session <label>` without asking.
-- Several sessions match, or none does: ask with `AskUserQuestion`. Offer the closest areas, a new session named for the area, and any recent area that fits. On a new-session answer, run `rex new <label> --json` and then `bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts sessions --apply-order`, then dispatch with `--session <label>`.
+- Several sessions match, or none does: ask with `AskUserQuestion`. Offer the closest areas, a new session named for the area, and any recent area that fits. On a new-session answer, run `rex new <label> --json` and then `bun "${CLAUDE_SKILL_DIR}/scripts/dispatch.ts" sessions --apply-order`, then dispatch with `--session <label>`.
 - The repo has no checkout on this machine, or the user named another host: list that host's sessions with `claude-dispatch sessions --host <label>`, then dispatch with `--host <label> --session <label> --repo <path>`.
 
 `--help` above names the tab multiplexer `--mux` defaults to. When the task calls for a pane or tab and `--help` says to pass `--mux` instead, ask the user with `AskUserQuestion` whether to use `rex` or `herdr`.
@@ -59,7 +59,7 @@ The user finds a background session in `claude agents` and picks it up with `cla
 
 ## Run It
 
-!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh claude-dispatch`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" claude-dispatch`
 
 ```bash
 claude-dispatch --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...

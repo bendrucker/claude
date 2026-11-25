@@ -16,7 +16,8 @@ async function git(path: string, ...args: string[]): Promise<string> {
   return result.stdout.trim();
 }
 
-describe("resolveRepo against GitHub", () => {
+// Actions has no user login holding the fork, only a repository token.
+describe.skipIf(process.env.GITHUB_ACTIONS === "true")("resolveRepo against GitHub", () => {
   test("clones a repository the viewer can push to with origin upstream", async () => {
     const home = mkdtempSync(join(tmpdir(), "dispatch-clone-"));
     const path = await resolveRepo(PUSHABLE, spawnRunner, home);

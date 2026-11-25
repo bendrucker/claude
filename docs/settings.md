@@ -118,6 +118,7 @@ An entry earns its place globally only when sandboxed runs of the command fail a
 
 - `git`: escaped in most projects. Sandboxed, it fails where the sandbox protects `.git/config` (`push -u`, `fetch`, `branch` lock the config) and `.claude/` (`worktree add`, `rebase`, and `merge` writing tracked files there), and on the keychain credential helper. Those are too many subcommands to list one by one.
 - `wt`, `claude`: worktree and session control. `wt` creates worktrees outside the session directory.
+- `claude-sync`, `dotfiles-sync`: deploy merged `main` into `~/.claude-repo` and `~/.dotfiles`, as `platform.md` has agents do after a merge. Sandboxed, `claude-sync` can't revert installer-written entries in the deployed `user/settings.json` or relink `~/.claude`. Its dirty-tree gate then stops the sync. The escape lets either command write the settings files the sandbox otherwise protects, limited to what has merged.
 - `agent-browser`: the escape lets the daemon launch Chrome off the egress proxy, which an arbitrary page needs.
 - `open`, `osascript`: Apple Events and Launch Services handoff, which the sandbox cannot model even with `allowAppleEvents`.
 

@@ -376,6 +376,8 @@
       "git:*",
       "wt:*",
       "claude:*",
+      "claude-sync:*",
+      "dotfiles-sync:*",
       "agent-browser:*",
       "open:*",
       "osascript:*",

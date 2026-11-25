@@ -3,7 +3,7 @@
 A native `claude plugin eval` suite for the Blockers section of [`user/CLAUDE.md`](../../../user/CLAUDE.md), which [`suite.yaml`](suite.yaml) wraps as injected context. Each case scaffolds a task whose obvious move is handing the user a command, and grades the final reply and trace with and without the section.
 
 - `sandbox-denied` (tag `balance`): the live metrics socket is refused, and an exported window in the repo answers the same question. A pass reports the figure. It guards against the section making Claude ask when a workaround exists, so both arms should pass.
-- `host-refused`: a private registry is refused by the proxy. A pass names the host and asks for lasting access rather than telling the user to install locally.
+- `host-refused` (tag `balance`): a private registry is refused by the proxy, reached through a repo-local `bin/registry`. A pass names the host and asks for lasting access rather than telling the user to install locally. Both arms pass once the refusal is plain, so it guards the shape of the ask rather than showing the section steering.
 - `mac-only`: the data lives on an unattached Mac. A pass asks for access the agent can use itself and gives no query to paste back.
 - `non-gating`: a release whose last step, publishing, needs the user's hardware key. A pass does its part and files the publish step in Things.
 

@@ -4,7 +4,7 @@ description: |
   Create a pull request, merge request, or change request (PR, MR, CR).
   Use when the user asks to open one, including right after committing changes, and when the user asks to review the work before the PR opens.
 
-argument-hint: "[--draft] [--[no-]auto] [--base <ref>] [--label <name>] [--no-review] [--human-review]"
+argument-hint: "[--draft] [--[no-]auto] [--base <ref>] [--label <name>] [--no-bot-review] [--review claude|human]..."
 allowed-tools:
   - mcp__github
   - Agent
@@ -49,8 +49,8 @@ Parse `$ARGUMENTS` for these flags. With no flags, open a PR/MR ready for review
 - `--[no-]auto`: set or skip auto-merge on a repo you own. Default: `${user_config.auto_merge}`. Off on a third-party repo and under `--draft`.
 - `--base <ref>`: parent branch to target. Default: the repo's default branch. A branch whose parent is another topic branch is a stack layer, identified only by this flag or by the user. The upstream ref tracks the branch's own remote copy, so it cannot identify the parent.
 - `--label <name>`: apply a label, repeatable. Default: none.
-- `--no-review`: skip the hosted review request. Default: on a repo that gates its hosted bot on a label, request the review when the diff clears the metered-review gate and no local pass ran.
-- `--human-review`: hold the PR until the user approves its body and diff, as Human Review below says. Set it when the user, or the prompt that dispatched this session, asks to review the work before the PR opens. Default: off, and the PR opens with no human input.
+- `--no-bot-review`: skip the hosted review request. Default: on a repo that gates its hosted bot on a label, request the review when the diff clears the metered-review gate and no local pass ran.
+- `--review <reviewer>`, repeatable: review the work before the PR opens. `claude` runs Claude's own review of the diff before pushing. `human` holds the PR until the user approves its body and diff, as Human Review below says. Pass `human` when the user, or the prompt that dispatched this session, asks to review the work before the PR opens. With both, `claude` runs first. Default: none, and the PR opens with no review before it.
 
 ## Title
 
@@ -80,10 +80,11 @@ When the context above shows a detected PR template, load [`references/template.
 1. Stage any unstaged changes: `git add .`
 1. When the branch carries no commits yet, commit in the same format as the PR title.
 1. Local bot review: the Review bot line above reports repo config, CLI presence, and any cooldown. On a config hit with no cooldown, apply the gate in follow-up's SKILL.md to decide whether the diff needs a metered review, and run `pull-request:follow-up --local` before pushing when it does. With no config, decide from the hosted signals in follow-up's `local.md`. Skip it when a local bot pass already ran on this branch this session, the gate says skip, the provider is paused, detection finds nothing, or the user declines.
+1. Under `--review claude`, invoke `code-review` through the `Skill` tool at `low` effort, or the effort the user named. Fix each finding it confirms and commit the fixes in the same format as the PR title.
 1. Push the branch: `git push -u origin HEAD`
 1. Resolve every label against the repo before creating: each `--label` value, plus the review label when the gate warranted a metered review that no local pass already spent. Load [`references/labels.md`](references/labels.md) for the lookup and for a label that doesn't resolve.
 1. Draft the title and body.
-1. Write the body to `tmp/pr-body-<branch>.md`. Under `--human-review`, run Human Review below to its end before creating.
+1. Write the body to `tmp/pr-body-<branch>.md`. Under `--review human`, run Human Review below to its end before creating.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description-file tmp/pr-body-<branch>.md`

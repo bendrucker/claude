@@ -21,7 +21,7 @@
     "review_skill": {
       "type": "string",
       "title": "Review skill",
-      "description": "Skill that --human-review runs on the drafted PR body and the diff together, called with --diff --doc <file> --kind pr-body --base <ref> --summary <text>. Empty makes --human-review stop before creating.",
+      "description": "Skill that --review human runs on the drafted PR body and the diff together, called with --diff --doc <file> --kind pr-body --base <ref> --summary <text>. Empty makes --review human stop before creating.",
       "default": ""
     }
   }

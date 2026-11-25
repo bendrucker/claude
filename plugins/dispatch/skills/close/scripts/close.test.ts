@@ -84,7 +84,7 @@ function makeDeps(
   const dataDir = mkdtempSync(join(tmpdir(), "close-test-"));
   const deps: Deps = {
     run,
-    env,
+    env: { CLAUDE_CONFIG_DIR: mkdtempSync(join(tmpdir(), "close-config-")), ...env },
     cwd: "/work/tree",
     dataDir,
     now: () => new Date("2026-11-03T12:00:00.000Z"),
@@ -303,6 +303,28 @@ describe("closeSession --handoff", () => {
     expect(readLedger(dataDir)).toMatchObject([{ fork: "sess-1", pr: options.pr }]);
   });
 
+  test("resumes the live session from the pid file, not a stale --session", async () => {
+    const config = mkdtempSync(join(tmpdir(), "close-config-"));
+    await Bun.write(join(config, "sessions", "9.json"), JSON.stringify({ sessionId: "live-1" }));
+    const { deps, dataDir, spawned } = makeDeps({}, { ...env, CLAUDE_CONFIG_DIR: config });
+    const report = await closeSession({ ...options, session: "planning-1" }, deps);
+    expect(spawned[0]?.argv.slice(2, 5)).toEqual(["resume", "--session", "live-1"]);
+    expect(report).toMatchObject({ fork: "live-1", row: { session: "live-1" } });
+    expect(readLedger(dataDir)).toMatchObject([{ session: "live-1", fork: "live-1" }]);
+  });
+
+  test.each<{ name: string; entry: string | null }>([
+    { name: "missing", entry: null },
+    { name: "unparseable", entry: "{" },
+    { name: "without a sessionId", entry: '{"name":"x"}' },
+  ])("falls back to --session when the pid file is $name", async ({ entry }) => {
+    const config = mkdtempSync(join(tmpdir(), "close-config-"));
+    if (entry != null) await Bun.write(join(config, "sessions", "9.json"), entry);
+    const { deps, spawned } = makeDeps({}, { ...env, CLAUDE_CONFIG_DIR: config });
+    await closeSession(options, deps);
+    expect(spawned[0]?.argv.slice(2, 5)).toEqual(["resume", "--session", "sess-1"]);
+  });
+
   test.each([undefined, "", "abc", "0", "1.5"])(
     "refuses CLAUDE_PID %p and starts nothing",
     async (pid) => {
@@ -482,6 +504,16 @@ const REX_LAYERS = (window: CommandResult) => ({
 const PARK = { session: "sess-1", pr: "https://github.com/o/r/pull/1", summary: "done" };
 
 describe("parkSession", () => {
+  test("records the live session from the pid file, not a stale --session", async () => {
+    const config = mkdtempSync(join(tmpdir(), "close-config-"));
+    await Bun.write(join(config, "sessions", "9.json"), JSON.stringify({ sessionId: "live-1" }));
+    const { deps } = makeDeps(
+      REX_LAYERS(windowWith({ id: "layer:tiled", kind: "tiled", blocks: ["block:7", "block:8"] })),
+      { ...REX_ENV, CLAUDE_PID: "9", CLAUDE_CONFIG_DIR: config },
+    );
+    expect((await parkSession(PARK, deps)).row.session).toBe("live-1");
+  });
+
   test("rex floats a tiled block, minimizes its layer, and records a parked row", async () => {
     const { deps, calls, dataDir } = makeDeps(
       REX_LAYERS(windowWith({ id: "layer:tiled", kind: "tiled", blocks: ["block:7", "block:8"] })),

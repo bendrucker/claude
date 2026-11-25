@@ -382,6 +382,25 @@ export async function readSender(
   run: Runner = spawnRunner,
   host: string = hostname(),
 ): Promise<Sender | null> {
+  const entry = await readSessionEntry(env, SessionEntry);
+  if (entry == null) return null;
+  return { name: entry.name, mux: await senderMux(env, run, host) };
+}
+
+const LiveSession = z.object({ sessionId: z.string().min(1) });
+
+// After a plan's "clear context", CLAUDE_SESSION_ID still names the planning
+// session while this entry stores the id of the transcript being written.
+export async function readLiveSession(
+  env: Readonly<Record<string, string | undefined>>,
+): Promise<string | null> {
+  return (await readSessionEntry(env, LiveSession))?.sessionId ?? null;
+}
+
+async function readSessionEntry<T>(
+  env: Readonly<Record<string, string | undefined>>,
+  schema: z.ZodType<T>,
+): Promise<T | null> {
   const pid = env.CLAUDE_PID;
   if (pid == null || !/^\d+$/.test(pid)) return null;
   const file = Bun.file(join(claudeConfigDir(env), "sessions", `${pid}.json`));
@@ -389,12 +408,11 @@ export async function readSender(
   try {
     json = JSON.parse(await file.text());
   } catch {
-    // A missing or unreadable entry leaves the prompt without a return address.
+    // A missing or unreadable entry means the caller falls back to what it was given.
     return null;
   }
-  const parsed = SessionEntry.safeParse(json);
-  if (!parsed.success) return null;
-  return { name: parsed.data.name, mux: await senderMux(env, run, host) };
+  const parsed = schema.safeParse(json);
+  return parsed.success ? parsed.data : null;
 }
 
 async function senderMux(

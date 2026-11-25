@@ -1,6 +1,11 @@
 #!/usr/bin/env bun
 import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typings";
-import { readSender, type Sender, spawnRunner } from "../../dispatch/scripts/dispatch";
+import {
+  readLiveSession,
+  readSender,
+  type Sender,
+  spawnRunner,
+} from "../../dispatch/scripts/dispatch";
 import {
   appendDispatch,
   type ClosedRow,
@@ -101,17 +106,29 @@ export interface CloseReport {
   row: ClosedRow;
 }
 
-function handoffOf(options: CloseOptions): { session: string; pr: string } | null {
+function handoffOf(
+  options: CloseOptions,
+  session: string | undefined,
+): { session: string; pr: string } | null {
   if (options.handoff !== true) return null;
-  const { target, session, pr } = options;
+  const { target, pr } = options;
   if (target != null) throw new CloseError("--handoff cannot be combined with --target", 2);
   if (session == null || pr == null)
     throw new CloseError("--handoff requires --session and --pr", 2);
   return { session, pr };
 }
 
+async function ownSession<T extends string | undefined>(
+  fallback: T,
+  deps: Deps,
+): Promise<string | T> {
+  return (await readLiveSession(deps.env)) ?? fallback;
+}
+
 export async function closeSession(options: CloseOptions, deps: Deps): Promise<CloseReport> {
-  const handoff = handoffOf(options);
+  const session =
+    options.target == null ? await ownSession(options.session, deps) : options.session;
+  const handoff = handoffOf(options, session);
   const child = options.target == null ? null : await resolveChildPane(options.target, deps);
   const host = child == null ? hostMuxer(deps) : muxer(child.mux, deps);
   const pane: Pane = { mux: host.kind, target: child?.target ?? host.ownPane() };
@@ -128,7 +145,7 @@ export async function closeSession(options: CloseOptions, deps: Deps): Promise<C
     facts,
     {
       ts: deps.now().toISOString(),
-      session: options.session ?? "",
+      session: session ?? "",
       fork,
       pr: options.pr ?? null,
       summary: options.summary ?? null,
@@ -204,7 +221,7 @@ export async function parkSession(options: ParkOptions, deps: Deps): Promise<Par
     facts,
     {
       ts: deps.now().toISOString(),
-      session: options.session,
+      session: await ownSession(options.session, deps),
       fork: null,
       pr: options.pr,
       summary: options.summary ?? null,

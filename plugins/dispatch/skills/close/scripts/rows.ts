@@ -31,24 +31,15 @@ export function parkedRow(facts: GitFacts, fields: RowFields, pane: Pane): Close
   return { event: "parked", ...base(facts, fields), mux: pane.mux, target: pane.target };
 }
 
-export function relocatedRow(
-  facts: GitFacts,
-  fields: RowFields,
-  pane: Pane,
-  to: string,
-): ClosedRow {
-  return { event: "relocated", ...base(facts, fields), mux: pane.mux, target: pane.target, to };
-}
-
 export function endedRow(facts: GitFacts, fields: RowFields, outcome: Outcome): ClosedRow {
   return { event: "ended", ...base(facts, fields), mux: null, target: null, outcome };
 }
 
-// A parked or relocated session is still running and owns its work.
+// A parked session is still running and owns its work.
 export function leftBehind(rows: readonly ClosedRow[]): ClosedRow[] {
   const latest = new Map<string, ClosedRow>();
   for (const row of rows) {
-    if (row.event === "parked" || row.event === "relocated") continue;
+    if (row.event === "parked") continue;
     const key = row.path ?? row.branch ?? row.ts;
     latest.delete(key);
     latest.set(key, row);
@@ -62,7 +53,7 @@ export function closedRows(dataDir: string, onlyLeftBehind: boolean): ClosedRow[
 }
 
 export function eventCounts(rows: readonly ClosedRow[]): Record<ClosedRow["event"], number> {
-  const counts = { closed: 0, parked: 0, ended: 0, relocated: 0 };
+  const counts = { closed: 0, parked: 0, ended: 0 };
   for (const row of rows) counts[row.event] += 1;
   return counts;
 }

@@ -17,15 +17,12 @@ import {
   kill,
   processId,
   recordEnded,
-  reopenSession,
   type ResumeDeps,
   resumeSession,
   spawnDetached,
-  startReopener,
   startResumer,
 } from "./resume";
-import { resolveSession, windowLabel } from "./rex";
-import { closedRow, closedRows, eventCounts, parkedRow, relocatedRow } from "./rows";
+import { closedRow, closedRows, eventCounts, parkedRow } from "./rows";
 
 export interface Deps extends ResumeDeps {
   sender: () => Promise<Sender | null>;
@@ -174,65 +171,6 @@ function withdrawClose(row: ClosedRow, resumer: number | null, cause: unknown, d
     throw new CloseError(`${summary}. Kill process ${resumer} by hand before this session exits.`);
 }
 
-export interface RelocateOptions {
-  session: string;
-  to: string;
-  summary?: string;
-}
-
-export interface RelocateReport {
-  resumer: number;
-  label: string;
-  pane: Pane;
-  row: ClosedRow;
-}
-
-function rexHost(deps: Deps) {
-  try {
-    const host = hostMuxer(deps);
-    if (host.kind === "rex") return host;
-  } catch (error) {
-    if (!(error instanceof CloseError)) throw error;
-  }
-  throw new CloseError("relocate moves a Rex tab, and this session is not running in Rex", 2);
-}
-
-export async function relocateSession(
-  options: RelocateOptions,
-  deps: Deps,
-): Promise<RelocateReport> {
-  const host = rexHost(deps);
-  const pane: Pane = { mux: host.kind, target: host.ownPane() };
-  const own = deps.env.REX_SESSION ?? "";
-  const to = await resolveSession(deps.run, options.to);
-  const label = await windowLabel(deps.run, own, pane.target);
-  const facts = await gitFacts(deps.run, deps.cwd);
-  const cwd = facts.toplevel ?? deps.cwd;
-  const resumer = await startReopener(deps, { session: options.session, to: to.id, label, cwd });
-  const row = relocatedRow(
-    facts,
-    {
-      ts: deps.now().toISOString(),
-      session: options.session,
-      fork: null,
-      pr: null,
-      summary: options.summary ?? null,
-    },
-    pane,
-    to.label,
-  );
-  const report: RelocateReport = { resumer, label, pane, row };
-  try {
-    appendDispatch(row, deps.dataDir);
-    deps.out(JSON.stringify(report));
-    await host.closePane(pane.target);
-  } catch (error) {
-    withdrawClose(row, resumer, error, deps);
-    throw error;
-  }
-  return report;
-}
-
 export interface ParkOptions {
   session: string;
   pr: string;
@@ -302,12 +240,6 @@ async function guarded(action: () => Promise<void>): Promise<void> {
   }
 }
 
-function pidArg(value: string): number {
-  const pid = processId(value);
-  if (pid == null) throw new InvalidArgumentError(`${value} is not a process id`);
-  return pid;
-}
-
 export function createProgram(deps: Deps): Command {
   const close = new Command("close")
     .description("Close this session's pane, or a pane it dispatched.")
@@ -367,27 +299,15 @@ export function createProgram(deps: Deps): Command {
     .description("Wait for a closed session's process to exit, then resume it in the background.")
     .requiredOption("--session <id>", "session id to resume")
     .requiredOption("--pr <url>", "pull request the background session watches")
-    .requiredOption("--pid <pid>", "process id of the session's foreground claude", pidArg)
+    .requiredOption("--pid <pid>", "process id of the session's foreground claude", (value) => {
+      const pid = processId(value);
+      if (pid == null) throw new InvalidArgumentError(`${value} is not a process id`);
+      return pid;
+    })
     .action((options) => guarded(async () => void (await resumeSession(options, deps))));
 
-  const relocate = new Command("relocate")
-    .description("Move this session's tab to another Rex session.")
-    .requiredOption("--session <id>", "this session's id")
-    .requiredOption("--to <session>", "Rex session label or id to move to")
-    .option("--summary <text>", "one to three lines on what the session did")
-    .action((options) => guarded(async () => void (await relocateSession(options, deps))));
-
-  const reopen = new Command("reopen")
-    .description("Wait for a relocated session's process to exit, then resume it in a new tab.")
-    .requiredOption("--session <id>", "session id to resume")
-    .requiredOption("--pid <pid>", "process id of the session's foreground claude", pidArg)
-    .requiredOption("--to <session>", "Rex session id to open the tab in")
-    .requiredOption("--label <label>", "label for the new tab")
-    .requiredOption("--cwd <path>", "working directory for the resumed session")
-    .action((options) => guarded(async () => void (await reopenSession(options, deps))));
-
   const report = new Command("report")
-    .description("Print the ledger's close, park, relocate, and end rows as JSON lines.")
+    .description("Print the ledger's close, park, and end rows as JSON lines.")
     .option("--left-behind", "only branches whose latest row has dirty or unpushed work")
     .option("--count", "print one line counting the rows per event instead")
     .action((options) => {
@@ -408,8 +328,6 @@ export function createProgram(deps: Deps): Command {
     .addCommand(attach)
     .addCommand(ended)
     .addCommand(resume)
-    .addCommand(relocate)
-    .addCommand(reopen)
     .addCommand(report);
 }
 

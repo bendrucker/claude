@@ -190,7 +190,6 @@
     "issue@bendrucker": true,
     "review@bendrucker": true,
     "hunk@bendrucker": true,
-    "plannotator@bendrucker": true,
     "plannotator@plannotator": true,
     "newline@bendrucker": true,
     "github@bendrucker": true,

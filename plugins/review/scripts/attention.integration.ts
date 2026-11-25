@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { z } from "zod";
@@ -31,16 +31,36 @@ async function until<T>(
   return until(what, probe, end);
 }
 
-const ReviewState = z.object({ review: z.string() });
+const ReviewState = z.object({
+  agent: z.string(),
+  review: z.string().optional(),
+  doc: z.string().optional(),
+});
+type ReviewState = z.infer<typeof ReviewState>;
 
-async function reviewBlock(agent: string): Promise<string | undefined> {
-  try {
-    const id = (await Bun.file(join(stateDir, "blocks", agent)).text()).trim();
-    return ReviewState.parse(await Bun.file(join(stateDir, `${id}.json`)).json()).review;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
-    throw error;
-  }
+// Every review open for the agent, one state file each.
+async function reviews(agent: string): Promise<ReviewState[]> {
+  const names = (await readdir(stateDir).catch(() => [])).filter(
+    (name) => name.endsWith(".json") && !name.endsWith(".result.json"),
+  );
+  const states = await Promise.all(
+    names.map(async (name) => {
+      const parsed = ReviewState.safeParse(
+        await Bun.file(join(stateDir, name))
+          .json()
+          .catch(() => null),
+      );
+      return parsed.success ? [parsed.data] : [];
+    }),
+  );
+  return states.flat().filter((state) => state.agent === agent);
+}
+
+async function reviewBlock(
+  agent: string,
+  which: (state: ReviewState) => boolean = () => true,
+): Promise<string | undefined> {
+  return (await reviews(agent)).find(which)?.review;
 }
 
 // The review's state records the split's id before Rex has created it.
@@ -128,8 +148,9 @@ describe.skipIf(!ready)("attention under Rex", () => {
 
   afterEach(async () => {
     for (const watch of watches.splice(0)) watch.kill();
-    const split = await reviewBlock(agent);
-    if (split !== undefined) Bun.spawnSync(["rex", "block", "close", split]);
+    for (const { review } of await reviews(agent)) {
+      if (review !== undefined) Bun.spawnSync(["rex", "block", "close", review]);
+    }
   });
 
   afterAll(async () => {
@@ -138,7 +159,7 @@ describe.skipIf(!ready)("attention under Rex", () => {
   });
 
   test("a saved Hunk note reaches watch, and closing the split ends it", async () => {
-    expect(open(agent, repo, "--diff")).toBe(`opened Hunk beside ${agent}`);
+    expect(open(agent, repo, "--diff", "--reviewer", "hunk")).toBe(`opened Hunk beside ${agent}`);
     const watch = new Watch(agent, repo);
     const hunk = await until("the Hunk split", () => reviewBlock(agent));
     await until("Hunk's live status line", () =>
@@ -179,6 +200,29 @@ describe.skipIf(!ready)("attention under Rex", () => {
     await until("the saved comment", () =>
       screen(tui).includes("comment saved") ? true : undefined,
     );
+    sh("rex", "send", "-b", tui, "A");
+    expect(await watch.next("[review: closed]")).toBe("[review: closed] approved");
+    expect(await watch.exited).toBe(0);
+  }, 30_000);
+
+  test("a combined review keeps watch running until both splits end", async () => {
+    expect(open(agent, repo, "--diff", "--reviewer", "hunk", "--doc", "design.md")).toBe(
+      `opened Hunk beside ${agent}\nopened plannotator-tui beside ${agent}`,
+    );
+    const watch = new Watch(agent, repo);
+    const hunk = await until("the Hunk split", () =>
+      reviewBlock(agent, (s) => s.doc === undefined),
+    );
+    const tui = await until("the plannotator split", () =>
+      reviewBlock(agent, (s) => s.doc !== undefined),
+    );
+    await until("plannotator's document", () =>
+      screen(tui).includes("The cache keeps") ? true : undefined,
+    );
+
+    sh("rex", "block", "close", hunk);
+    expect(await watch.next("[review: ended]")).toMatch(/^\[review: ended\] \w+ diff$/);
+
     sh("rex", "send", "-b", tui, "A");
     expect(await watch.next("[review: closed]")).toBe("[review: closed] approved");
     expect(await watch.exited).toBe(0);

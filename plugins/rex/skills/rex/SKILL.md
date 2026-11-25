@@ -10,6 +10,8 @@ allowed-tools:
   - Bash(rex block ls:*)
   - Bash(rex capture:*)
   - Bash(rex hosts list:*)
+  - Bash(rex api call -s * session.float_block:*)
+  - Bash(rex api call -s * session.set_layer_state:*)
   - Bash(rex --help:*)
   - Bash(rex split --help:*)
   - Bash(rex window new --help:*)
@@ -71,6 +73,19 @@ Reserve `run_in_background` for work the user has no reason to see. `rex wait <b
 Read with `rex capture -b <block> --trim --unwrap`. A block ID lasts only as long as its pane, so take IDs from the listing above or a fresh `rex block ls`.
 
 The `❯` line at the bottom of a Claude pane shows Claude Code's own prompt suggestion, ghost text the harness wrote rather than input the user typed. Take a pane's content from above that line and leave the line out of what you report.
+
+## Sessions
+
+A tab or pane can't move between Rex sessions, so choose the session before opening one. A tab already in the wrong session stays there unless the user moves it.
+
+Keep at most 4 tiled panes visible in a tab. Float an extra pane, then minimize its layer:
+
+```bash
+rex api call -s <session> session.float_block '{"block_id":"<block>","bounds":[0.2,0.15,0.6,0.7]}'
+rex api call -s <session> session.set_layer_state '{"layer_id":"<layer_id>","state":"minimized"}'
+```
+
+Take `<layer_id>` from the first call's `layer_id`.
 
 ## Machines
 

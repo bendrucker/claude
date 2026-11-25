@@ -22,7 +22,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --since 2026-07-01 --json
 bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --log /path/to/log.jsonl
 ```
 
-It reads the default log (plus its `.1` rotation) and reports run count, outcomes, latency percentiles including the silent hot path, and per check its fire count, an acted-on column, and the alerts no whole-file re-lint reached.
+It reads the default log (plus its `.1` rotation) and reports run count, outcomes, a per-source split (file edits against Bash PostToolUse) of rows, injection rate, and acted-on rate, latency percentiles including the silent hot path, and per check its fire count, an acted-on column, and the alerts no whole-file re-lint reached.
 
 The acted-on column pairs each shown alert with the next whole-file re-lint of the same file: a check that re-lint no longer raises was acted on, one it still raises was written past. Every file edit since the PostToolUse move lints the saved file. Older entries count only a `Write` as whole-file. Every shown alert no re-lint reached counts as `unconfirmed`, so the two columns account for all of them. The acted-on column reads `n/a` until pairs close. Recall is not measurable from this log, since a check that never fires leaves no line.
 

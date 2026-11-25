@@ -22,7 +22,7 @@ This table and the Tier-2 list below are generated from the `-- ---` headers on 
 |-----------|---------------|-----------------|
 | Hook latency | `hook-self-timing` | `hooks` |
 | Hook blocks | `hook-block-then-retry-success` | `hook-blocks`, `hooks` |
-| Hook coverage | `hook-config-vs-observed` | `hooks` |
+| Hook coverage | `hook-config-vs-observed`, `writing-bash-coverage` | `hooks` |
 | Permissions and sandbox | `already-allowed-still-prompting`, `sandbox-bypass-effective-command`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox_bypasses` |
 | Tool failures | `cli-health`, `tool-failure-rates` | `tool-failure-rates` |
 | Context tax | `catalog-reinjection-thrash-sessions`, `memory-loads` | `activity`, `hooks` (additionalContext) |

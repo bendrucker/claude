@@ -1,9 +1,9 @@
-# evidence: per 10k words in the voice corpus, Ben's PRs 1.72, issues 0.94, mail 1.13, dictation 0.18, against 3.1 to 3.3 in repo markdown. Ben flagged "has no milk" and "has no owner" as old-timey, dramatic register on 2026-11-23. `ai-tells.NegatedObject` skips has/have by design, since the docs corpora use it as ordinary English.
+# evidence: per 10k words in the voice corpus, Ben's PRs 1.72, issues 0.94, mail 1.13, dictation 0.18, against 3.1 to 3.3 in repo markdown. Ben flagged "has no milk" and "has no owner" as old-timey, dramatic register on 2026-11-23. `ai-tells.NegatedObject` skips has/have by design, since the docs corpora use it as ordinary English. Judged 2026-11-24: 8 of 8 sampled repo-markdown hits read worse than the rewrite, as did 8 of 8 ai-tells.NegatedObject hits.
 # retire when: judged hits stop reading worse than their rewrites.
 extends: existence
 message: "Stilted negation: '%s'. Negate the verb instead: \"doesn't have an ...\"."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/NegatedPossession.yml
-level: suggestion
+level: warning
 nonword: true
 ignorecase: true
 # Same exemptions as ai-tells.NegatedObject plus idioms that read as everyday English ("has no effect," "have no idea," "has no choice," "has no need"). A quote or backtick may open the object. "There's no" and "there is no" have no verb before "no" and never match.
@@ -50,7 +50,7 @@ tests:
     input: |
       The directory has an owner.
     absent: Writing.NegatedPossession
-  - name: "allows there is no"
+  - name: "allows an existential with no verb"
     input: |
       There's no owner. There is no owner.
     absent: Writing.NegatedPossession

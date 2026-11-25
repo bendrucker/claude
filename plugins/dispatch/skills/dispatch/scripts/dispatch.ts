@@ -4,7 +4,8 @@ import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
-import { appendDispatch, resolveDataDir } from "./ledger";
+import { appendDispatch, type DispatchLedgerRow, resolveDataDir } from "./ledger";
+import { createSessionsCommand, resolveSessionLabel } from "./sessions";
 
 const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 // wt's pr:<n> and mr:<n> shortcuts, or a PR or MR URL.
@@ -1433,7 +1434,9 @@ function inspectHint(record: DispatchRecord): string {
   return `herdr agent read ${record.name}`;
 }
 
-if (import.meta.main) {
+if (import.meta.main && process.argv[2] === "sessions") {
+  await createSessionsCommand(spawnRunner).parseAsync(process.argv.slice(3), { from: "user" });
+} else if (import.meta.main) {
   const argv = cli({
     name: "dispatch",
     help: {
@@ -1591,6 +1594,13 @@ if (import.meta.main) {
     process.exit(2);
   }
   const sender = await readSender(process.env);
+  // REX_SESSION names a session on this machine, never the host's.
+  const rexSessionValue =
+    argv.flags.session ?? (argv.flags.host == null ? process.env.REX_SESSION : undefined);
+  const rexSession =
+    mux === "rex" && rexSessionValue != null && rexSessionValue !== "" && argv.flags.host == null
+      ? await resolveSessionLabel(spawnRunner, rexSessionValue)
+      : undefined;
 
   // The session is already running and the caller needs its identifiers, so a
   // ledger failure warns rather than failing the dispatch.
@@ -1600,25 +1610,24 @@ if (import.meta.main) {
     outcome: "dispatched" | "orphaned" | "failed",
   ) => {
     try {
-      appendDispatch(
-        {
-          ts: new Date().toISOString(),
-          task: taskSummary(prompt),
-          repo,
-          branch: record.branch,
-          path: record.path,
-          mux: record.mux,
-          target: record.target,
-          host: record.host,
-          name: record.name,
-          title: record.title,
-          place: record.place,
-          session: record.session,
-          sender: sender?.name ?? null,
-          outcome,
-        },
-        resolveDataDir(argv.flags.dataDir),
-      );
+      const row: DispatchLedgerRow = {
+        ts: new Date().toISOString(),
+        task: taskSummary(prompt),
+        repo,
+        branch: record.branch,
+        path: record.path,
+        mux: record.mux,
+        target: record.target,
+        host: record.host,
+        name: record.name,
+        title: record.title,
+        place: record.place,
+        session: record.session,
+        sender: sender?.name ?? null,
+        outcome,
+      };
+      if (rexSession != null) row.rexSession = rexSession;
+      appendDispatch(row, resolveDataDir(argv.flags.dataDir));
     } catch (error) {
       process.stderr.write(
         `warning: dispatch ledger not written: ${error instanceof Error ? error.message : String(error)}\n`,
@@ -1637,9 +1646,7 @@ if (import.meta.main) {
       timeout: argv.flags.timeout,
       mux,
       split: argv.flags.split,
-      // REX_SESSION names a session on this machine, never the host's.
-      rexSession:
-        argv.flags.session ?? (argv.flags.host == null ? process.env.REX_SESSION : undefined),
+      rexSession: rexSessionValue,
       host: argv.flags.host,
       rexBlock: process.env.REX_BLOCK,
       settings,

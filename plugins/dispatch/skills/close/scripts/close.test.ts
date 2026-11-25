@@ -60,9 +60,15 @@ interface Spawned {
   argv: string[];
   cwd: string;
   logPath: string;
+  env: Readonly<Record<string, string>>;
 }
 
-const REX_ENV = { REX_SESSION: "main", REX_BLOCK: "block:7" };
+const REX_ENV = { REX_BLOCK: "block:7" };
+// A background continuation inherits the closed pane's block and the session close resolved for it.
+const BACKGROUND_REX_ENV = { REX_BLOCK: "block:7", REX_SESSION: "main" };
+const OWN_SESSION = {
+  "rex block inspect -s block:7 block:7 --json": ok(JSON.stringify({ session_id: "main" })),
+};
 const HERDR_ENV = { HERDR_ENV: "1", HERDR_PANE_ID: "pane-9" };
 
 function makeDeps(
@@ -77,14 +83,14 @@ function makeDeps(
   spawned: Spawned[];
   killed: number[];
 } {
-  const { run, calls } = scripted({ ...GIT, ...answers });
+  const { run, calls } = scripted({ ...GIT, ...OWN_SESSION, ...answers });
   const out: string[] = [];
   const spawned: Spawned[] = [];
   const killed: number[] = [];
   const dataDir = mkdtempSync(join(tmpdir(), "close-test-"));
   const deps: Deps = {
     run,
-    env,
+    env: { CLAUDE_CONFIG_DIR: mkdtempSync(join(tmpdir(), "close-config-")), ...env },
     cwd: "/work/tree",
     dataDir,
     now: () => new Date("2026-11-03T12:00:00.000Z"),
@@ -93,8 +99,8 @@ function makeDeps(
       out.push(line);
     },
     sender: () => Promise.resolve(sender == null ? null : { name: sender, mux: null }),
-    spawnDetached: (argv, cwd, logPath) => {
-      spawned.push({ argv: [...argv], cwd, logPath });
+    spawnDetached: (argv, cwd, logPath, spawnEnv) => {
+      spawned.push({ argv: [...argv], cwd, logPath, env: spawnEnv });
       return Promise.resolve(RESUMER);
     },
     alive: () => false,
@@ -160,7 +166,7 @@ describe("hostMuxer", () => {
     return { mux: host.kind, target: host.ownPane() };
   };
 
-  test("rex uses the session and block", () => {
+  test("rex uses its block", () => {
     expect(ownPane(REX_ENV)).toEqual({ mux: "rex", target: "block:7" });
   });
 
@@ -297,10 +303,33 @@ describe("closeSession --handoff", () => {
     ]);
     expect(spawned[0]?.cwd).toBe("/work/tree");
     expect(spawned[0]?.logPath).toBe(resumerLog(dataDir, "sess-1"));
+    expect(spawned[0]?.env).toEqual({ REX_SESSION: "main" });
     expect(argvs(calls).some((line) => line.startsWith("claude"))).toBe(false);
     expect(argvs(calls).at(-1)).toBe("rex block close -s main block:7");
     expect(report).toMatchObject({ fork: "sess-1", resumer: RESUMER });
     expect(readLedger(dataDir)).toMatchObject([{ fork: "sess-1", pr: options.pr }]);
+  });
+
+  test("resumes the live session from the pid file, not a stale --session", async () => {
+    const config = mkdtempSync(join(tmpdir(), "close-config-"));
+    await Bun.write(join(config, "sessions", "9.json"), JSON.stringify({ sessionId: "live-1" }));
+    const { deps, dataDir, spawned } = makeDeps({}, { ...env, CLAUDE_CONFIG_DIR: config });
+    const report = await closeSession({ ...options, session: "planning-1" }, deps);
+    expect(spawned[0]?.argv.slice(2, 5)).toEqual(["resume", "--session", "live-1"]);
+    expect(report).toMatchObject({ fork: "live-1", row: { session: "live-1" } });
+    expect(readLedger(dataDir)).toMatchObject([{ session: "live-1", fork: "live-1" }]);
+  });
+
+  test.each<{ name: string; entry: string | null }>([
+    { name: "missing", entry: null },
+    { name: "unparseable", entry: "{" },
+    { name: "without a sessionId", entry: '{"name":"x"}' },
+  ])("falls back to --session when the pid file is $name", async ({ entry }) => {
+    const config = mkdtempSync(join(tmpdir(), "close-config-"));
+    if (entry != null) await Bun.write(join(config, "sessions", "9.json"), entry);
+    const { deps, spawned } = makeDeps({}, { ...env, CLAUDE_CONFIG_DIR: config });
+    await closeSession(options, deps);
+    expect(spawned[0]?.argv.slice(2, 5)).toEqual(["resume", "--session", "sess-1"]);
   });
 
   test.each([undefined, "", "abc", "0", "1.5"])(
@@ -351,8 +380,10 @@ describe("spawnDetached", () => {
   test("returns the pid of the backgrounded command and appends its output to the log", async () => {
     const dir = mkdtempSync(join(tmpdir(), "close-spawn-"));
     const log = join(dir, "resume.log");
-    const pid = await defaultDeps().spawnDetached(["sh", "-c", "echo $$"], dir, log);
-    expect(await written(log)).toBe(String(pid));
+    const pid = await defaultDeps().spawnDetached(["sh", "-c", "echo $$ $MARK"], dir, log, {
+      MARK: "set",
+    });
+    expect(await written(log)).toBe(`${pid} set`);
   });
 });
 
@@ -482,6 +513,16 @@ const REX_LAYERS = (window: CommandResult) => ({
 const PARK = { session: "sess-1", pr: "https://github.com/o/r/pull/1", summary: "done" };
 
 describe("parkSession", () => {
+  test("records the live session from the pid file, not a stale --session", async () => {
+    const config = mkdtempSync(join(tmpdir(), "close-config-"));
+    await Bun.write(join(config, "sessions", "9.json"), JSON.stringify({ sessionId: "live-1" }));
+    const { deps } = makeDeps(
+      REX_LAYERS(windowWith({ id: "layer:tiled", kind: "tiled", blocks: ["block:7", "block:8"] })),
+      { ...REX_ENV, CLAUDE_PID: "9", CLAUDE_CONFIG_DIR: config },
+    );
+    expect((await parkSession(PARK, deps)).row.session).toBe("live-1");
+  });
+
   test("rex floats a tiled block, minimizes its layer, and records a parked row", async () => {
     const { deps, calls, dataDir } = makeDeps(
       REX_LAYERS(windowWith({ id: "layer:tiled", kind: "tiled", blocks: ["block:7", "block:8"] })),
@@ -489,6 +530,7 @@ describe("parkSession", () => {
     );
     const report = await parkSession(PARK, deps);
     expect(argvs(calls).filter((line) => line.startsWith("rex"))).toEqual([
+      "rex block inspect -s block:7 block:7 --json",
       "rex block inspect -s main block:7 --json",
       "rex window inspect -s main window:1 --json",
       'rex api call -s main session.float_block {"block_id":"block:7","bounds":[0.2,0.15,0.6,0.7]}',
@@ -577,20 +619,30 @@ describe("parkSession", () => {
 });
 
 describe("restoreSession", () => {
-  test("sets the block's floating layer normal without focus", async () => {
-    const { deps, calls } = makeDeps(
-      REX_LAYERS(
-        windowWith(
-          { id: "layer:tiled", kind: "tiled", blocks: ["block:8"] },
-          { id: "layer:mine", kind: "floating", state: "minimized", blocks: ["block:7"] },
-        ),
-      ),
+  const parked = REX_LAYERS(
+    windowWith(
+      { id: "layer:tiled", kind: "tiled", blocks: ["block:8"] },
+      { id: "layer:mine", kind: "floating", state: "minimized", blocks: ["block:7"] },
+    ),
+  );
+
+  test("sets the block's floating layer normal without focus and marks its tab unread", async () => {
+    const { deps, calls } = makeDeps(parked, REX_ENV);
+    expect(await restoreSession(deps)).toEqual({ mux: "rex", target: "block:7" });
+    expect(argvs(calls).slice(-2)).toEqual([
+      'rex api call -s main session.set_layer_state {"layer_id":"layer:mine","state":"normal","focus":false}',
+      "rex do client.tab.unread block_id=block:7 unread=true",
+    ]);
+  });
+
+  test("a failed unread mark says the pane is already shown", async () => {
+    const { deps } = makeDeps(
+      { ...parked, "rex do client.tab.unread": fail("no client is connected") },
       REX_ENV,
     );
-    expect(await restoreSession(deps)).toEqual({ mux: "rex", target: "block:7" });
-    expect(argvs(calls).at(-1)).toBe(
-      'rex api call -s main session.set_layer_state {"layer_id":"layer:mine","state":"normal","focus":false}',
-    );
+    const error = await failureOf(restoreSession(deps));
+    expect(error.message).toContain("the pane is shown again");
+    expect(error.message).toContain("no client is connected");
   });
 
   test("a tiled block is not parked", async () => {
@@ -603,17 +655,27 @@ describe("restoreSession", () => {
 });
 
 describe("attachSession", () => {
-  test("rex names only the session and never the stale block", async () => {
+  test("rex opens the tab in the handed-off session once the stale block is gone", async () => {
     const { deps, calls } = makeDeps(
-      { "rex window new": ok(JSON.stringify({ block_ids: ["block:a"], window_id: "w" })) },
-      REX_ENV,
+      {
+        "rex block inspect -s block:7 block:7 --json": fail("block not found"),
+        "rex window new": ok(JSON.stringify({ block_ids: ["block:a"], window_id: "w" })),
+      },
+      BACKGROUND_REX_ENV,
     );
     expect(await attachSession(FORK, deps)).toEqual({ mux: "rex", pane: "block:a" });
-    const line = argvs(calls).join("\n");
-    expect(line).toBe(
+    expect(argvs(calls).at(-1)).toBe(
       `rex window new -s main attach-${FORK} --focus=false --json -- claude attach ${FORK}`,
     );
-    expect(line).not.toContain("block:7");
+  });
+
+  test("rex refuses when neither the block nor REX_SESSION names a session", async () => {
+    const { deps, calls } = makeDeps(
+      { "rex block inspect -s block:7 block:7 --json": fail("block not found") },
+      REX_ENV,
+    );
+    expect((await failureOf(attachSession(FORK, deps))).exitCode).toBe(2);
+    expect(argvs(calls).some((line) => line.startsWith("rex window new"))).toBe(false);
   });
 
   test("herdr creates an unfocused workspace and runs attach in its root pane", async () => {

@@ -4,7 +4,8 @@ import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
-import { appendDispatch, resolveDataDir } from "./ledger";
+import { appendDispatch, type DispatchLedgerRow, resolveDataDir } from "./ledger";
+import { createSessionsCommand, currentSession, resolveSessionLabel } from "./sessions";
 
 const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 // wt's pr:<n> and mr:<n> shortcuts, or a PR or MR URL.
@@ -382,6 +383,25 @@ export async function readSender(
   run: Runner = spawnRunner,
   host: string = hostname(),
 ): Promise<Sender | null> {
+  const entry = await readSessionEntry(env, SessionEntry);
+  if (entry == null) return null;
+  return { name: entry.name, mux: await senderMux(env, run, host) };
+}
+
+const LiveSession = z.object({ sessionId: z.string().min(1) });
+
+// After a plan's "clear context", CLAUDE_SESSION_ID still names the planning
+// session while this entry stores the id of the transcript being written.
+export async function readLiveSession(
+  env: Readonly<Record<string, string | undefined>>,
+): Promise<string | null> {
+  return (await readSessionEntry(env, LiveSession))?.sessionId ?? null;
+}
+
+async function readSessionEntry<T>(
+  env: Readonly<Record<string, string | undefined>>,
+  schema: z.ZodType<T>,
+): Promise<T | null> {
   const pid = env.CLAUDE_PID;
   if (pid == null || !/^\d+$/.test(pid)) return null;
   const file = Bun.file(join(claudeConfigDir(env), "sessions", `${pid}.json`));
@@ -389,12 +409,11 @@ export async function readSender(
   try {
     json = JSON.parse(await file.text());
   } catch {
-    // A missing or unreadable entry leaves the prompt without a return address.
+    // A missing or unreadable entry means the caller falls back to what it was given.
     return null;
   }
-  const parsed = SessionEntry.safeParse(json);
-  if (!parsed.success) return null;
-  return { name: parsed.data.name, mux: await senderMux(env, run, host) };
+  const parsed = schema.safeParse(json);
+  return parsed.success ? parsed.data : null;
 }
 
 async function senderMux(
@@ -1433,7 +1452,9 @@ function inspectHint(record: DispatchRecord): string {
   return `herdr agent read ${record.name}`;
 }
 
-if (import.meta.main) {
+if (import.meta.main && process.argv[2] === "sessions") {
+  await createSessionsCommand(spawnRunner).parseAsync(process.argv.slice(3), { from: "user" });
+} else if (import.meta.main) {
   const argv = cli({
     name: "dispatch",
     help: {
@@ -1470,7 +1491,7 @@ if (import.meta.main) {
       },
       session: {
         type: String,
-        description: "Rex session ID or label for the new tab; defaults to REX_SESSION",
+        description: "Rex session ID or label for the new tab; defaults to this pane's session",
       },
       split: {
         type: Boolean,
@@ -1591,6 +1612,16 @@ if (import.meta.main) {
     process.exit(2);
   }
   const sender = await readSender(process.env);
+  // This pane's session is on this machine, never the host's.
+  const rexSessionValue =
+    argv.flags.session ??
+    (argv.flags.host == null && mux === "rex"
+      ? await currentSession(process.env, spawnRunner)
+      : undefined);
+  const rexSession =
+    mux === "rex" && rexSessionValue != null && rexSessionValue !== "" && argv.flags.host == null
+      ? await resolveSessionLabel(spawnRunner, rexSessionValue)
+      : undefined;
 
   // The session is already running and the caller needs its identifiers, so a
   // ledger failure warns rather than failing the dispatch.
@@ -1600,25 +1631,24 @@ if (import.meta.main) {
     outcome: "dispatched" | "orphaned" | "failed",
   ) => {
     try {
-      appendDispatch(
-        {
-          ts: new Date().toISOString(),
-          task: taskSummary(prompt),
-          repo,
-          branch: record.branch,
-          path: record.path,
-          mux: record.mux,
-          target: record.target,
-          host: record.host,
-          name: record.name,
-          title: record.title,
-          place: record.place,
-          session: record.session,
-          sender: sender?.name ?? null,
-          outcome,
-        },
-        resolveDataDir(argv.flags.dataDir),
-      );
+      const row: DispatchLedgerRow = {
+        ts: new Date().toISOString(),
+        task: taskSummary(prompt),
+        repo,
+        branch: record.branch,
+        path: record.path,
+        mux: record.mux,
+        target: record.target,
+        host: record.host,
+        name: record.name,
+        title: record.title,
+        place: record.place,
+        session: record.session,
+        sender: sender?.name ?? null,
+        outcome,
+      };
+      if (rexSession != null) row.rexSession = rexSession;
+      appendDispatch(row, resolveDataDir(argv.flags.dataDir));
     } catch (error) {
       process.stderr.write(
         `warning: dispatch ledger not written: ${error instanceof Error ? error.message : String(error)}\n`,
@@ -1637,9 +1667,7 @@ if (import.meta.main) {
       timeout: argv.flags.timeout,
       mux,
       split: argv.flags.split,
-      // REX_SESSION names a session on this machine, never the host's.
-      rexSession:
-        argv.flags.session ?? (argv.flags.host == null ? process.env.REX_SESSION : undefined),
+      rexSession: rexSessionValue,
       host: argv.flags.host,
       rexBlock: process.env.REX_BLOCK,
       settings,

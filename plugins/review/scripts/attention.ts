@@ -346,30 +346,27 @@ export function sessionHost(env: Record<string, string | undefined> = process.en
   return { kind: "none" };
 }
 
-export const reviewers = ["hunk", "plannotator"] as const;
-export type Reviewer = (typeof reviewers)[number];
+export const apps = ["hunk", "plannotator"] as const;
+export type App = (typeof apps)[number];
 
-export function isReviewer(value: string): value is Reviewer {
-  return (reviewers as readonly string[]).includes(value);
+export function isApp(value: string): value is App {
+  return (apps as readonly string[]).includes(value);
 }
 
 export interface RexReview {
   base?: string | undefined;
   batch?: boolean;
-  reviewer?: Reviewer | undefined;
+  app?: App | undefined;
   doc?: string | undefined;
 }
 
-// A document always opens in plannotator-tui, which the review CLI picks from `doc`.
+// A document always opens in plannotator-tui. Only Hunk has a live mode.
 export function rexReviewArgs(block: string, review: RexReview = {}): string[] {
   const args = ["do", "review_changes", `block=${block}`];
-  if (review.doc != null) args.push(`doc=${resolve(review.doc)}`);
-  else {
-    if (review.base != null && review.base !== "") args.push(`revisions=${review.base}..HEAD`);
-    if (review.reviewer != null) args.push(`reviewer=${review.reviewer}`);
-  }
-  args.push(`mode=${review.batch === true ? "batch" : "live"}`);
-  return args;
+  if (review.doc != null) return [...args, `doc=${resolve(review.doc)}`];
+  if (review.base != null && review.base !== "") args.push(`base=${review.base}`);
+  if (review.app !== "hunk") return args;
+  return [...args, "app=hunk", `mode=${review.batch === true ? "batch" : "live"}`];
 }
 
 export const CLOSED = "[review: closed]";
@@ -590,8 +587,7 @@ function rexOpen(block: string, review: RexReview): void {
     stdio: ["ignore", "inherit", "inherit"],
   });
   if (result.exitCode !== 0) process.exit(1);
-  const surface =
-    review.doc != null || review.reviewer === "plannotator" ? "plannotator-tui" : "Hunk";
+  const surface = review.doc == null && review.app === "hunk" ? "Hunk" : "plannotator-tui";
   console.log(`opened ${surface} beside ${block}`);
 }
 
@@ -680,9 +676,9 @@ const openCmd = command(
         type: Boolean,
         description: "Under Rex, hold notes for Send instead of delivering each to `watch`",
       },
-      reviewer: {
+      app: {
         type: String,
-        description: `Under Rex, the diff reviewer: ${reviewers.join(" or ")}`,
+        description: `Under Rex, the app that shows the diff: ${apps.join(" or ")}`,
       },
     },
   },
@@ -695,15 +691,14 @@ const openCmd = command(
     if (host.kind === "none") fail("no herdr pane or Rex block: run the browser gate");
     const doc = parsed.flags.doc;
     if (doc != null && !(await Bun.file(doc).exists())) fail(`no such file: ${doc}`);
-    const { reviewer } = parsed.flags;
-    if (reviewer != null && !isReviewer(reviewer))
-      fail(`--reviewer must be ${reviewers.join(" or ")}`);
+    const { app } = parsed.flags;
+    if (app != null && !isApp(app)) fail(`--app must be ${apps.join(" or ")}`);
     if (host.kind === "rex") {
       rexOpen(host.block, {
         doc: doc ?? undefined,
         base: parsed.flags.base,
         batch: parsed.flags.batch === true,
-        reviewer: reviewer ?? undefined,
+        app: app ?? undefined,
       });
       process.exit(0);
     }
@@ -766,7 +761,7 @@ const watchCmd = command(
   {
     name: "watch",
     help: {
-      description: "Under Rex, print each Hunk note as Ben saves it until the review closes",
+      description: "Under Rex, print each review note as Ben saves it until the review closes",
     },
   },
   async () => {

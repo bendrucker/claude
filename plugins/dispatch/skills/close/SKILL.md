@@ -41,7 +41,7 @@ Get a finished session out of the user's way without losing work. The pane close
 
 1. Run `pull-request:babysit <url>` in this session.
 2. Once every check passes, run the `close --handoff` command above.
-3. When a failure needs the user's judgment, run `claude-dispatch-close restore --session ${CLAUDE_SESSION_ID}`, then ask with `AskUserQuestion`.
+3. When a failure needs the user's judgment, run `claude-dispatch-close restore --session ${CLAUDE_SESSION_ID}`, then ask with `AskUserQuestion`. `restore` shows the pane without taking focus and marks its tab unread.
 
 ## Close a Child Pane
 

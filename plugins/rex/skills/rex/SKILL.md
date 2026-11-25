@@ -10,6 +10,8 @@ allowed-tools:
   - Bash(rex block ls:*)
   - Bash(rex capture:*)
   - Bash(rex hosts list:*)
+  - Bash(rex api call -s * session.float_block:*)
+  - Bash(rex api call -s * session.set_layer_state:*)
   - Bash(rex --help:*)
   - Bash(rex split --help:*)
   - Bash(rex window new --help:*)
@@ -36,7 +38,7 @@ Default to a sibling split of this pane that leaves focus where it is:
 rex split --split=right --focus=false -c <cwd> --json
 ```
 
-Rex scopes every command to this session and anchors splits on this pane from `REX_SESSION` and `REX_BLOCK`. Write each argument literally: `<cwd>` is the absolute working directory, and `<block>` is a block ID. A worktree session refuses a `rex` command that contains a shell variable. Add `-s <session>` only to target another session.
+Rex scopes every command to this session and anchors splits on this pane from `REX_BLOCK`, which names this pane's block. Rex no longer sets `REX_SESSION` in new terminals, so take this session's ID from the listing above or `rex whoami --json`. Write each argument literally: `<cwd>` is the absolute working directory, and `<block>` is a block ID. A worktree session refuses a `rex` command that contains a shell variable. Add `-s <session>` only to target another session.
 
 Split `right` on a wide pane and `below` on a tall one, alternating direction across successive splits. A new tab, session, or host needs the user to ask for it. Take the new block from `.block_ids[0]`.
 
@@ -72,9 +74,31 @@ Read with `rex capture -b <block> --trim --unwrap`. A block ID lasts only as lon
 
 The `❯` line at the bottom of a Claude pane shows Claude Code's own prompt suggestion, ghost text the harness wrote rather than input the user typed. Take a pane's content from above that line and leave the line out of what you report.
 
+## Sessions
+
+A tab or pane can't move between Rex sessions, so choose the session before opening one. A tab already in the wrong session stays there unless the user moves it.
+
+Keep at most 4 tiled panes visible in a tab. Float an extra pane, then minimize its layer:
+
+```bash
+rex api call -s <session> session.float_block '{"block_id":"<block>","bounds":[0.2,0.15,0.6,0.7]}'
+rex api call -s <session> session.set_layer_state '{"layer_id":"<layer_id>","state":"minimized"}'
+```
+
+Take `<layer_id>` from the first call's `layer_id`.
+
 ## Machines
 
 Put `-S <label>` on every command that touches a saved host. Commands run on that machine, so paths and programs must exist there. When a command fails to connect, report "host `<label>` is unreachable".
+
+Run a one-off command on a saved host through Rex rather than `ssh`, then read its output and close the block:
+
+```bash
+rex -S <label> run --wait --keep-open --focus=false -c <cwd> --json -- <command>
+rex -S <label> capture -b <block> --trim --unwrap
+```
+
+After starting a server on another host, open it on this machine with `rex -S <label> forward open <block>`. Rex forwards a local port to the port the server's terminal listens on and opens the URL.
 
 When more than one Rex app is connected, client actions such as `rex do` need `-C <client>`, a label from `rex client ls`.
 

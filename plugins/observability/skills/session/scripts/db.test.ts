@@ -3844,6 +3844,7 @@ describe("native harness fields", () => {
 const fixtureGlobs: Record<string, string> = {
   frontmatter_glob: join(import.meta.dirname, "..", "SKILL.md"),
   metrics_glob: join(fixturesDir, "..", "hook-metrics", "*.jsonl"),
+  log_path: join(fixturesDir, "..", "writing-hooks", "log.jsonl"),
   plans_glob: join(plansFixtureDir, "*.md"),
   plugin_skill_glob: join(skillsFixtureDir, "cache/*/*/*/skills/*/SKILL.md"),
   user_skill_glob: join(skillsFixtureDir, "user/*/SKILL.md"),

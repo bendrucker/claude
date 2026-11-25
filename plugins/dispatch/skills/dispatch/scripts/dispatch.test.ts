@@ -1725,7 +1725,7 @@ describe("cli", () => {
   const dir = mkdtempSync(join(tmpdir(), "dispatch-cli-"));
   const filled = join(dir, "prompt.txt");
   const badJson = join(dir, "bad.json");
-  const rex = { REX_BLOCK: "block:1", REX_SESSION: "session:1" };
+  const rex = { REX_BLOCK: "block:1" };
 
   beforeAll(async () => {
     await Bun.write(filled, "do the thing\n");
@@ -1810,7 +1810,7 @@ describe("cli", () => {
       expected: /must hold a JSON object/,
     },
     {
-      name: "a host with only this machine's REX_SESSION",
+      name: "a host with only this machine's Rex pane",
       args: ["--branch", "ok", "--prompt", filled, "--host", "studio"],
       env: rex,
       status: 1,

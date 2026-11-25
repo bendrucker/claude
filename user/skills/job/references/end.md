@@ -13,8 +13,6 @@ Dispatch parallel read-only sub-agents, under the reporting contract and deadlin
 - Worktrees: every worktree's uncommitted and unpushed state (details under the sweep below).
 - Tracker: your in-flight issues, their current states, and their projects.
 
-Agents are gathered inline, not by a sub-agent: run `claude agents --json --all` in the orchestrator and join its records per the Agents rules in `SKILL.md`.
-
 ## Outbox Clearing
 
 Everything pushed today should leave tonight with:
@@ -48,7 +46,7 @@ Offer per worktree: commit and push as WIP (safe on your own branch), or record 
 
 ## Unattended Agents
 
-Every blocked or failed agent leaves the day resumed, focused into its herdr pane when one matched, stopped, or captured as a follow-up. Route captures per Tracker Hygiene below. A blocked agent carries what it is waiting on in `waitingFor`, and that belongs in the capture, since tomorrow's answer is worthless without the question.
+Every blocked or failed agent leaves the day resumed, focused into its pane when one matched, stopped, or captured as a follow-up. Route captures per Tracker Hygiene below. A blocked agent carries what it is waiting on in `waitingFor`, and that belongs in the capture, since tomorrow's answer is worthless without the question.
 
 A `working` agent can be left running overnight. That is a choice, so record it in the completion summary along with what it is expected to have finished by morning.
 
@@ -59,4 +57,4 @@ A `working` agent can be left running overnight. That is a choice, so record it 
 
 ## Brief and Act
 
-Assemble the brief grouped by project per the contract in `SKILL.md` and execute per that shared contract.
+Assemble the brief and execute per `SKILL.md`.

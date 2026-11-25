@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Runner } from "../../dispatch/scripts/dispatch";
+import { currentSession } from "../../dispatch/scripts/sessions";
 import { CloseError } from "./errors";
 import { type Muxer, type MuxContext, parseOutput, required } from "./muxer";
 
@@ -35,17 +36,23 @@ async function rexJson<T>(run: Runner, schema: z.ZodType<T>, argv: string[]): Pr
 
 export function rex({ env, run }: MuxContext): Muxer {
   // A background session inherits the closed pane's stale REX_BLOCK. Every command names the session instead.
-  const session = required(env, "REX_SESSION");
+  let resolved: Promise<string> | undefined;
+  const session = () =>
+    (resolved ??= currentSession(env, run).then((id) => {
+      if (id == null)
+        throw new CloseError("neither REX_BLOCK nor REX_SESSION names a live Rex session", 2);
+      return id;
+    }));
 
-  const call = <T>(schema: z.ZodType<T>, method: string, args: object) =>
-    rexJson(run, schema, ["api", "call", "-s", session, method, JSON.stringify(args)]);
+  const call = async <T>(schema: z.ZodType<T>, method: string, args: object) =>
+    rexJson(run, schema, ["api", "call", "-s", await session(), method, JSON.stringify(args)]);
 
   async function layersOf(target: string): Promise<Layer[]> {
     const block = await rexJson(run, BlockInfo, [
       "block",
       "inspect",
       "-s",
-      session,
+      await session(),
       target,
       "--json",
     ]);
@@ -53,7 +60,7 @@ export function rex({ env, run }: MuxContext): Muxer {
       "window",
       "inspect",
       "-s",
-      session,
+      await session(),
       block.block.window_id,
       "--json",
     ]);
@@ -81,8 +88,9 @@ export function rex({ env, run }: MuxContext): Muxer {
   return {
     kind: "rex",
     ownPane: () => required(env, "REX_BLOCK"),
+    handoffEnv: async () => ({ REX_SESSION: await session() }),
     async closePane(target) {
-      const result = await run(["rex", "block", "close", "-s", session, target]);
+      const result = await run(["rex", "block", "close", "-s", await session(), target]);
       if (result.code !== 0)
         throw new CloseError(`rex block close failed: ${result.stderr.trim()}`);
     },
@@ -92,7 +100,7 @@ export function rex({ env, run }: MuxContext): Muxer {
         "window",
         "new",
         "-s",
-        session,
+        await session(),
         `attach-${fork}`,
         "--focus=false",
         "--json",
@@ -120,6 +128,17 @@ export function rex({ env, run }: MuxContext): Muxer {
         state: "normal",
         focus: false,
       });
+      const marked = await run([
+        "rex",
+        "do",
+        "client.tab.unread",
+        `block_id=${target}`,
+        "unread=true",
+      ]);
+      if (marked.code !== 0)
+        throw new CloseError(
+          `the pane is shown again, but rex could not mark its tab unread: ${marked.stderr.trim()}`,
+        );
     },
   };
 }

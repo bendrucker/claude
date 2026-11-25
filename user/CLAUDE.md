@@ -26,7 +26,8 @@ Before adding a skill, hook, rule, or CLAUDE.md line, define what evidence shows
 - A skill that instructs a subagent fan-out or background dispatch carries my authorization for `Agent`. Run it as written. When `Agent` is absent, run it inline and say so.
 - Prefer `analyst` over `general-purpose` for read-only spawns. Pass `model: haiku` for pure lookup.
 - When debugging Claude Code itself (harness, classifier, hooks, plugins, startup), launch the observed session with `DEBUG_SDK=1 claude`, which writes `~/.claude/debug/<session-id>.txt`. Set it in the launch environment, since Claude Code ignores it in `settings.json` `env`.
-- Open a PR with `pull-request:create`, or with an empty body when it's unavailable. Open PRs ready for review. Use draft only for speculative changes.
+- Open a PR with `pull-request:create`, or with an empty body when it's unavailable. Open it ready when it already qualifies under the next line, and as a draft otherwise.
+- Mark a draft ready once I could merge it as is: its evidence is in (tests for code, an eval or bench table in the body for a prompt, skill, or performance change), required checks pass on the head, and follow-ups such as threshold tuning are filed as todos. Flip it yourself. After ready, push only conflict, CI, and review fixes.
 - Watch every PR you open without asking: `subscribe_pr_activity` in a cloud session, `pull-request:babysit` locally. Drive CI and bot review to green, then tell me it's ready to merge.
 - Send build output to `/dev/null`. Store temporary files in `tmp/`.
 

@@ -4,11 +4,11 @@ stage:
   - plugins/pull-request/evals/pr-body/limits.ts
   - plugins/pull-request/evals/pr-body/structure.ts
 graders:
-  limit-prose-words: "work-*"
-  limit-max-block: "work-*"
-  limit-prose-code-spans: "work-*"
-  limit-path-spans: "work-*"
-  limit-contrast-phrases: "work-*"
-  limit-hidden-words: "work-*"
-  limit-list-items: "work-*"
-  limit-wall-lists: "work-*"
+  limit-visible-words: ["work-*", "distractor-*"]
+  limit-max-block: ["work-*", "distractor-*"]
+  limit-prose-code-spans: ["work-*", "distractor-*"]
+  limit-path-spans: ["work-*", "distractor-*"]
+  limit-contrast-phrases: ["work-*", "distractor-*"]
+  limit-hidden-words: ["work-*", "distractor-*"]
+  limit-list-items: ["work-*", "distractor-*"]
+  limit-wall-lists: ["work-*", "distractor-*"]

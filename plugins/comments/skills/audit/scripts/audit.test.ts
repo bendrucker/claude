@@ -112,7 +112,7 @@ function capture(): Capture {
   };
 }
 
-const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+const ANSI = new RegExp(`${String.fromCodePoint(27)}\\[[0-9;]*m`, "g");
 const strip = (text: string) => text.replaceAll(ANSI, "");
 
 /** The message a promise rejects with. Fails the test if it resolves. */

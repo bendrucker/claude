@@ -253,6 +253,11 @@ export async function valeAlerts(text: string, source: ValeSource): Promise<Vale
   return alertsOf(await runVale(args, { cwd, stdin: text }));
 }
 
+/** Whether Vale lints the file at `filePath`, under the repo's config if it has one and the plugin's otherwise. */
+export async function isLinted(filePath: string): Promise<boolean> {
+  return !(await pluginSkips(filePath, await repoConfigRoot(filePath)));
+}
+
 /** Lint the file at `filePath` as saved, under the repo's Vale config if it has one and the plugin's otherwise. */
 export async function lintFile(filePath: string): Promise<ValeAlert[]> {
   const root = await repoConfigRoot(filePath);

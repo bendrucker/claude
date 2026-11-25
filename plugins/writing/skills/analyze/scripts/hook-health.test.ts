@@ -90,6 +90,15 @@ describe("summarize", () => {
           "p95": 20,
           "silentP95": 4,
         },
+        "sources": [
+          {
+            "accepted": 0,
+            "injected": 3,
+            "revisited": 0,
+            "rows": 5,
+            "source": "file edits",
+          },
+        ],
         "total": 6,
       }
     `);
@@ -221,6 +230,24 @@ describe("acceptance", () => {
   });
 });
 
+describe("sources", () => {
+  it("splits file-edit rows from Bash PostToolUse rows", () => {
+    const health = summarize([
+      entry({ tool: "Edit", outcome: "context", emitted: ["filler"], target: "f1" }),
+      entry({ tool: "Write", ts: "2026-07-01T00:01:00.000Z", target: "f1", checks: [] }),
+      entry({ tool: "MultiEdit" }),
+      entry({ tool: "Bash", event: "PostToolUse", outcome: "context", emitted: ["filler"] }),
+      entry({ tool: "Bash", event: "PostToolUse" }),
+      entry({ tool: "Bash", event: "PreToolUse" }),
+    ]);
+    expect(health.sources).toEqual([
+      { source: "file edits", rows: 3, injected: 1, revisited: 1, accepted: 1 },
+      { source: "bash", rows: 2, injected: 1, revisited: 0, accepted: 0 },
+    ]);
+    expect(renderReport(health)).toContain("injection rate");
+  });
+});
+
 describe("renderReport", () => {
   test("marks a check with no closed pair n/a and prints the ratio once one closes", () => {
     const report = renderReport(
@@ -238,6 +265,12 @@ describe("renderReport", () => {
       ╟──────────────┼──────────────────────────╢
       ║ latency (ms) │ p50=5 p95=5 silent-p95=5 ║
       ╚══════════════╧══════════════════════════╝
+
+      ╔════════════╤══════╤════════════════╤══════════╗
+      ║ source     │ rows │ injection rate │ acted on ║
+      ╟────────────┼──────┼────────────────┼──────────╢
+      ║ file edits │ 3    │ 2/3 67%        │ 1/1 100% ║
+      ╚════════════╧══════╧════════════════╧══════════╝
 
       ╔═══════════╤═══════╤══════════╤═════════════╗
       ║ check     │ fired │ acted on │ unconfirmed ║

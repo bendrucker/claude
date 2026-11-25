@@ -2,30 +2,85 @@
 
 What goes in a PR body. Used by the create and update skills.
 
-The body covers what the diff can't: why the change exists, the decisions behind it, and how you know it works. The reviewer reads the code for what changed.
+A reviewer reads the body once, before the diff, to learn what problem the change solves and what it does about it. Write the body that answers those two questions and stop. The diff shows how the code does it.
 
-Write the body to stand alone. The reviewer sees only the diff and links that open for them: issues, PRs, permalinks. State each decision itself, rather than as its difference from a plan, an instruction, or a session the reviewer never saw.
+The body is all the reviewer gets. The reviewer sees only the diff and links that open for them: issues, PRs, permalinks. Describe the change in the repo's own terms.
 
-Use active voice, first person for your own decisions ("I chose X over Y because…"). Keep the prose plain and technical, per the `writing` skill. Describe the change in the repo's own terms rather than this document's vocabulary.
+## Layout
 
-## Audience
+The body is one paragraph of two to four sentences, in this order:
 
-Set depth from the repo's owner and visibility. The rules below apply at every tier.
+1. The motivation: the problem as the user saw it, in active voice with a concrete subject ("nightly backups to the replica failed for a week before anyone noticed"). State the harm or property plainly ("The log line omits the request path"), never a dramatized outcome. When a check or limit is involved, say what it protects ("to keep secrets out of build logs"). When no failure motivated the change, state the condition it improves ("Error codes were bare integers repeated across the handlers"). Open on this motivation, never on how the system works underneath.
+1. What the change does, as "This fixes that by ...", "This adds ...", or "This replaces ...". When the old state explains itself, merge it into this sentence ("This replaces the hard-coded retry count with a config value") and skip the problem sentence.
+1. When the change introduces a named piece, how that piece behaves, in one sentence. Describe it by its defining property ("rejects any key not on the list"), not its configuration.
+1. When the session measured the failure at the scale where it happens, that one figure, in one sentence.
 
-- **Personal** (a repo you own, public or private): no one else reads the body. One to three paragraphs: intent and the decisions worth re-examining. Skip background you already have.
-- **Corporate** (a private or org-owned repo): coworkers skim it. Put the intent in the first sentence and keep supporting detail moderate.
-- **Open source** (a public repo you don't own): maintainers scrutinize it. Spend the most here on decisions, rejected alternatives, and evidence.
+A change to existing behavior can open instead with two bullets, `Before:` and `After:`, one sentence each, stating the behavior and the assumption behind it.
 
-## Intent
+After the paragraph, add at most two short sentences, each holding a fact a reviewer would get wrong without being told. Take them from this list, in order:
 
-Intent is what the code can't say: why the change exists, the requirement it satisfies, the constraint that forced the design, the alternative you rejected. Cut any sentence the reviewer could reconstruct from the changed code, including a higher-level walk through its control flow. Quote or link the issue requirement instead of paraphrasing the code.
+- Evidence that answers the reviewer's first question, led by its verdict ("The benchmark shows no regression.") and then the figure.
+- The constraint behind a design choice (why a threshold, default, or limit is set where it is).
+- The scope ("Only the CI profile sets the limit.").
+- A dependency on another PR.
 
-## Density
+State it as a plain fact. Estimates, rejected alternatives, rollout steps, and removed tests never fill this line.
 
-- One thread per paragraph. Split past three or four sentences.
-- One idea per sentence. A sentence stacking clauses behind three or more commas is a list. Format it as one.
-- Add headings once prose passes four or five paragraphs.
-- Prose for connected reasoning, lists for parallel items (findings, cases covered, checks run). "Default to prose" bans the reflexive `## Changes` plus `## Testing` scaffold, not lists.
+Add a `## Deferred` list only when the change leaves its own goal unfinished, such as a limit raised partway with the next step known. Follow-ups that build on a finished change, and loose ends found during the work, stay out of the body.
+
+Aim for about 60 words.
+
+## Selection
+
+The session produces many true facts, and the body states the problem, the change, and the one fact a reviewer needs. A fact gets a sentence only when a reviewer would review the diff differently without it. When a secondary mechanism answers part of the stated problem, give it one sentence saying what it does.
+
+These stay in the session, even when they were hard-won:
+
+- Alternatives you rejected.
+- The mechanism: file paths, type names, the type it introduces, what a helper takes, what the query counts, the README it updates.
+- Verification: test runs, previews, benchmark output, and claims about what fails without the change or what stays byte-identical.
+- Cleanup and side fixes in the same diff, including removed tests and sandbox or config fixes the change needed to run.
+- Figures for spend, counts, and history, other than the one measurement in the paragraph.
+- Follow-ups, bugs, and ideas outside this change's goal. They belong in an issue.
+- Caveats and edge cases (empty inputs, name collisions, values aged from a default), threshold estimates, and assurances that change nothing for the reviewer.
+
+## Completion
+
+After drafting, run a cut pass before writing the file. Tag each sentence with the one slot it fills:
+
+- `problem`: the motivation, from the paragraph's first step.
+- `change`: what the change does.
+- `behavior`: how a new piece behaves.
+- `figure`: the one measurement at the failure's scale.
+- `fact`: a sentence from the list after the paragraph, at most two.
+- `deferred`: an item in the `## Deferred` list.
+- `ref`: the closing issue reference.
+
+Delete every sentence without a tag, and every sentence past a tag's limit. When a tagged sentence also states a second fact, cut the second fact. The body is done when every sentence carries a tag. Write the body without the tags.
+
+## Sentences
+
+- Use the shortest words that state the fact. Fold an elaboration clause into one adjective: "untyped config keys", not "config keys, with no type saying what each one holds".
+- State scope and behavior directly ("Only the CI profile sets the limit."), without inverted conditionals ("leaving the flag off keeps the old path") or reassurance ("so nothing changes there").
+- Open on the state this change fixes, never on a follow-up. A follow-up fits in one clause at the end.
+- Join sentences with plain connectives.
+- One fact per sentence. State an effect as its own sentence, not as a ", so ..." tail.
+- Give a before/after timing as a percent change plus both raw values ("drops 30%, from 10:00 to 7:00").
+- State the behavior the change produces. The hook, API, or field it uses is in the diff.
+
+## Examples
+
+Bodies written by hand for real changes, quoted verbatim:
+
+> When a required provider is passed down to a module, the `terraform_unused_required_providers` rule still reports the provider as unused. This checks all provider configurations _explicitly_ passed into modules and counts those required providers as used.
+>
+> It remains a lint error to declare a required provider when it is _implicitly_ inherited by the child module, as that declaration is the child's responsibility.
+>
+> Closes #1189
+
+> Fixes a regression, described in #1450. When evaluating an entry in `required_providers`, this adds a variable (dynamic value) with the provider's name, allowing the evaluation of `configuration_aliases`. This evaluation is looser than Terraform would perform, e.g., `configuration_aliases = [aws.foo.bar]` would presumably be considered valid. References to other providers should still fail.
+>
+> Closes #1450
 
 ## Headings
 
@@ -33,7 +88,7 @@ A heading is two or three words in AP title case, usually a noun phrase. Put the
 
 - Cut qualifying tails (`Structural audit sourced from the hook` → `Structural Audit`), parentheticals (`Context Tier (Soft Reminder Only)` → `Context Tier`), and colon-spliced status (`Not Yet Met: The Live Proof` → `Deferred Proof`).
 - Drop context the parent heading already gives, nesting so the child stays bare: under `## Decisions`, `Why Not an N-Gram View in DuckDB` → `N-Gram View`.
-- Name the topic, not the question: `What I Didn't Do` → `Deferred Work`. No `Why`/`What`/`How` headings. Put the why in the prose below or in a parent section (`## Decisions`, `## Alternatives`).
+- Name the topic, not the question: `What I Didn't Do` → `Deferred`. No `Why`/`What`/`How` headings. Put the why in the prose below.
 - Drop articles and trailing clauses from imperatives: `Hide the Inherited --format Flag` → `Hide Inherited --format Flag`.
 - No `## Summary` heading outside a template. The first paragraph is the summary.
 
@@ -47,43 +102,3 @@ The PR-body hook re-cases every heading through `heading-case.ts`. For a body fi
 - A hyphenated compound capitalizes each element and applies the same list past the first: `Follow-up Tasks` → `Follow-Up Tasks`, while `Ready-to-Ship Checklist` keeps its lowercase `to`.
 - Inline code spans, unbackticked CLI flags (`--body-file`), identifiers with an internal capital (`gitLab`), and unbackticked filenames or config names carrying a dot (`tmux.conf`) pass through as written.
 
-## Session Content
-
-The best material happened in the session but never reached the code. Review the conversation and pick the two or three items that would change how someone reviews the change, one or two sentences each. In rough order of value:
-
-- A decision with a rejected alternative: what lost and why.
-- Scope added or dropped.
-- Test observations: the actual result or failure, with real output. Name what you couldn't test and the concrete blocker ("brew install failed locally", not "needs a real machine").
-- A follow-up, named concretely ("follow-up in #N to…").
-
-A disproved theory, a rejected workaround, or a name the user settled by hand gets one sentence, and only when it changes the review. When sub-agents did the work, pull the material from their returned summaries.
-
-### By Change Type
-
-- Visual or GUI work: screenshots or a recording, uploaded so they render (`--attach` per `github:attach`, or `--attach` on `glab mr create`) rather than linked by a local path. Rejected layouts. Bugs found only by rendering it live.
-- Backend or API work: an example request and response. What breaks without the fix. Performance numbers.
-- Config, tooling, or prose: scope added or dropped, what you chose not to build, the evidence behind the design.
-
-## Evidence
-
-Show instead of asserting: permalink the exact lines instead of paraphrasing code, blockquote the spec you reason from, paste the real error or test output in a fence.
-
-## Optional Sections
-
-### Changes
-
-Organize by concept: one bullet per conceptual change, even when it spans files, rather than one per path. Name an identifier only when it adds what the diff doesn't. Enumerate or summarize, without a count on top. Skip cleanup that follows from the main change.
-
-For a schema change, name the tables and columns touched, since file names rarely show them. Past roughly ten columns, summarize and name only the columns that involved a decision. When the schema is generated from a model that names the table, add only what that mapping doesn't show. Describe a hand-written, date-prefixed migration. Skip a regenerated schema file.
-
-### Testing
-
-Include only when a test or hand check tells the reviewer something the status checks won't. State what the test proves: the falsification ("reverting the fix makes `TestX` fail with `exit 2`"), the edge cases covered, what you verified by hand and what you couldn't. Leave pass results and test counts to CI. Name a check only when CI doesn't show its result: an intentional exclusion (`ruff over the repo, generated tree excluded`), a pre-existing warning left in place.
-
-### References
-
-Links that aren't the motivating issue: `Closes #N` for what this resolves, `Relates to #N` for context. Every link must open for the reviewer. On a corporate or open-source repo, drop a private task-tracker URL or replace it with the artifact it points to. On a personal repo the owner is the reviewer, so an `Original Task:` Things link stays.
-
-## Connectives
-
-Join sentences with plain connectives. State a contrast only when the reviewer would otherwise consider the rejected option.

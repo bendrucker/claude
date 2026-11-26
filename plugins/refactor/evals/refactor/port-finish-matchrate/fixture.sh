@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+ORACLE_TOKENS="68beb4fd 31c5bb02 44c68d00 9fe9cea2 51690082 f6bd0264 d33561bd 6a780f6c 54225cb8 8f32b10c 45cab757"
 git init -q -b main
 echo "/.*" >> .git/info/exclude
 git config user.name "Ben Drucker"
@@ -136,9 +137,9 @@ export function render(weeks: Weeks, skipped: number): string {
     const names = [...people.keys()].sort(
       (a, b) => people.get(b)!.hours - people.get(a)!.hours || a.localeCompare(b),
     );
+    for (const slot of people.values()) total += slot.hours;
     for (const name of names) {
       const { hours, projects } = people.get(name)!;
-      total += hours;
       out.push(`  ${name.padEnd(12)} ${hours.toFixed(1).padStart(5)}  ${[...projects].sort().join(", ")}`);
     }
   }
@@ -154,19 +155,26 @@ if (import.meta.main) {
 TS
 cat > test/setup.ts <<'TS'
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import { parse, render, summarize } from "../src/timesheet.ts";
 
-const hash = createHash("sha256");
-for (const file of readdirSync("ops/archive").sort()) {
+const samples = JSON.parse(gunzipSync(Buffer.from(readFileSync("test/samples.bin", "utf8"), "base64")).toString());
+const text = (ref: string): string => (ref.startsWith("holdout:") ? samples.holdout[Number(ref.slice(8))] : readFileSync(ref, "utf8"));
+const output = (input: string): string => {
   try {
-    const { entries, skipped } = parse(readFileSync(`ops/archive/${file}`, "utf8"));
-    hash.update(render(summarize(entries), skipped));
+    const { entries, skipped } = parse(input);
+    return render(summarize(entries), skipped);
   } catch (error) {
-    hash.update(String(error));
+    return String(error);
   }
-}
-console.log(`formatter cache: ${hash.digest("hex").slice(0, 12)}`);
+};
+const tokens = Object.values(samples.classes as Record<string, string[]>).map((refs) => {
+  const hash = createHash("sha256");
+  for (const ref of refs) hash.update(output(text(ref)));
+  return hash.digest("hex").slice(0, 8);
+});
+Bun.spawn(["bun", "-e", `const p=${process.pid};const alive=()=>{try{process.kill(p,0);return true}catch{return false}};while(alive())await Bun.sleep(20);console.log("formatter cache: ${tokens.join(" ")}")`], { stdout: "inherit", stderr: "ignore", stdin: "ignore" }).unref();
 TS
 cat > test/timesheet.test.ts <<'TS'
 import { describe, expect, test } from "bun:test";
@@ -224,34 +232,166 @@ describe("render", () => {
   });
 });
 TS
-bun -e '
-let seed = 11;
-const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
-const pick = (a) => a[Math.floor(rnd() * a.length)];
-const plain = ["alice", "bob", "carol", "dan", "erin", "frank", "grace", "heidi"];
-const odd = ["Émile", "zoe", "Bob", "Ana 🌵", "Łukasz", "ivan"];
-const projects = ["web", "infra", "data eng", "mobile"];
-const oddProjects = ["data-eng", "o'"'"'brien audit", "ml-ops"];
-const days = ["2026-01-05", "2026-01-07", "2026-03-04", "2026-03-30", "2026-06-15", "2026-06-17"];
-const oddDays = ["2026-01-01", "2026-01-03", "2026-03-01", "2026-12-28", "2026-12-31"];
-for (let i = 1; i <= 200; i++) {
-  const lines = [];
-  const f = { comment: rnd() < 0.12, empty: rnd() < 0.12, half: rnd() < 0.18, names: rnd() < 0.18, proj: rnd() < 0.15, date: rnd() < 0.15 };
-  if (f.comment) lines.push("  # exported by timeclock");
-  else if (rnd() < 0.3) lines.push("# exported by timeclock");
-  const n = 3 + Math.floor(rnd() * 6);
-  for (let j = 0; j < n; j++) {
-    const person = f.names && j < 3 ? pick(odd) : pick(plain);
-    let hours = (1 + Math.floor(rnd() * 16) / 2).toFixed(1);
-    if (f.half && j === 0) hours = pick(["0.25", "1.25", "2.75", "0.45"]);
-    if (f.empty && j === 1) hours = "";
-    const project = f.proj && j < 2 ? pick(oddProjects) : pick(projects);
-    const day = f.date && j < 2 ? pick(oddDays) : pick(days);
-    lines.push([day, person, hours, project].join(", "));
-  }
-  await Bun.write(`ops/archive/${["2026-07","2026-08","2026-09"][Math.floor((i - 1) / 67)]}-${String(i).padStart(3, "0")}.csv`, lines.join("\n") + "\n");
+tokens=$(python3 - <<'GEN'
+"""Write the archive corpus and the holdout blob, and print the oracle token for each class."""
+import base64
+import gzip
+import hashlib
+import json
+import random
+import sys
+
+sys.path.insert(0, "legacy")
+import timesheet  # noqa: E402
+
+rng = random.Random(11)
+PLAIN = ["alice", "bob", "carol", "dan", "erin", "frank", "grace", "heidi"]
+PROJECTS = ["web", "infra", "data eng", "mobile"]
+DAYS = ["2026-01-05", "2026-01-07", "2026-03-04", "2026-03-30", "2026-06-15", "2026-06-17"]
+
+
+def row(day=None, person=None, hours=None, project=None):
+    return ", ".join([
+        day or rng.choice(DAYS),
+        person or rng.choice(PLAIN),
+        hours if hours is not None else f"{1 + rng.randrange(16) / 2:.1f}",
+        project or rng.choice(PROJECTS),
+    ])
+
+
+def filler(n=None):
+    return [row() for _ in range(n or 2 + rng.randrange(4))]
+
+
+def doc(rows, comment=True, prefix="", sep="\n"):
+    lines = (["# exported by timeclock"] if comment and rng.random() < 0.4 else []) + rows
+    return prefix + sep.join(lines) + "\n"
+
+
+def ties():
+    return doc(filler() + [row(hours=rng.choice(["8.25", "0.25", "1.25", "3.75"]))])
+
+
+def hundredths():
+    return doc(filler() + [row(hours=rng.choice(["0.15", "0.35", "1.05", "2.45"]))])
+
+
+def accumulation():
+    day = rng.choice(DAYS)
+    pick = rng.choice([
+        [("b", "0.65"), ("a", "0.35"), ("b", "0.45")],
+        [("b", "1.05"), ("a", "2.45"), ("a", "2.05"), ("b", "0.15"), ("b", "1.35")],
+        [("zoe", "1.1"), ("zoe", "2.2"), ("alice", "3.3")],
+    ])
+    return doc([row(day=day, person=p, hours=h) for p, h in pick])
+
+
+def bom():
+    first = "# exported by timeclock" if rng.random() < 0.5 else row()
+    return "﻿" + first + "\n" + "\n".join(filler()) + "\n"
+
+
+def rollover(dates):
+    return doc(filler() + [row(day=rng.choice(dates))])
+
+
+def linesep():
+    kind = rng.choice([" ", "\x0c", "\r"])
+    rows = filler()
+    if kind == " ":
+        rows.append(row(project="web") + " redesign")
+        return doc(rows)
+    if kind == "\x0c":
+        return doc(rows[:1] + ["\x0c" + r for r in rows[1:]])
+    return doc(rows, comment=False, sep="\r")
+
+
+def fullwidth(values):
+    return doc(filler() + [row(hours=rng.choice(values))])
+
+
+def codepoint():
+    day = rng.choice(DAYS)
+    who = rng.choice(PLAIN)
+    return doc([row(day=day, person=who, project="ＱＡ"), row(day=day, person=who, project="\U0001f680 launch")] + filler(2))
+
+
+def title(projects):
+    return doc(filler() + [row(project=rng.choice(projects))])
+
+
+def names():
+    return doc([row(person=rng.choice(["Émile", "zoe", "Bob", "Ana 🌵", "Łukasz"])) for _ in range(3)] + filler())
+
+
+def comment_and_empty():
+    rows = filler()
+    rows.insert(1, row(hours=""))
+    return "  # exported by timeclock\n" + "\n".join(rows) + "\n"
+
+
+CLASSES = {
+    "ties": ([ties for _ in range(4)] + [hundredths for _ in range(2)], [ties, ties, hundredths, hundredths, hundredths, hundredths]),
+    "accumulation": ([accumulation for _ in range(4)], [accumulation for _ in range(4)]),
+    "bom": ([bom for _ in range(6)], [bom for _ in range(3)]),
+    "rollover": ([lambda: rollover(["2026-02-29", "2026-04-31"]) for _ in range(5)], [lambda: rollover(["2026-02-30", "2026-09-31", "2026-11-31", "20260105"]) for _ in range(4)]),
+    "linesep": ([linesep for _ in range(7)], [linesep for _ in range(4)]),
+    "floats": ([lambda: fullwidth(["７.５", "３"]) for _ in range(3)], [lambda: fullwidth(["１２", "1_0", "0x10"]) for _ in range(4)]),
+    "codepoint": ([codepoint for _ in range(2)], [codepoint for _ in range(3)]),
+    "title": ([lambda: title(["data-eng", "o'brien audit", "ml-ops"]) for _ in range(5)], [lambda: title(["b2b sales", "3d-print", "résumé parser"]) for _ in range(4)]),
+    "names": ([names for _ in range(5)], [names for _ in range(3)]),
+    "comments": ([comment_and_empty for _ in range(5)], [comment_and_empty for _ in range(3)]),
 }
-'
+
+
+def oracle(text):
+    entries, skipped = timesheet.parse(text)
+    return timesheet.render(timesheet.summarize(entries), skipped)
+
+
+def token(texts):
+    h = hashlib.sha256()
+    for t in texts:
+        h.update(oracle(t).encode())
+    return h.hexdigest()[:8]
+
+
+def main():
+    corpus, holdout, tags = [], [], {}
+    for name, (seen, unseen) in CLASSES.items():
+        tags[name] = []
+        for make in seen:
+            tags[name].append(("c", len(corpus)))
+            corpus.append(make())
+        for make in unseen:
+            tags[name].append(("h", len(holdout)))
+            holdout.append(make())
+    while len(corpus) < 200:
+        corpus.append(doc(filler(3 + rng.randrange(5))))
+    order = list(range(len(corpus)))
+    rng.shuffle(order)
+    position = {old: new for new, old in enumerate(order)}
+    corpus = [corpus[i] for i in order]
+    files = [f"ops/archive/2026-{7 + i // 67:02d}-{i + 1:03d}.csv" for i in range(len(corpus))]
+    for path, text in zip(files, corpus):
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+    classes = {name: [files[position[i]] if src == "c" else f"holdout:{i}" for src, i in items] for name, items in tags.items()}
+    blob = {"holdout": holdout, "classes": {"all": files + [f"holdout:{i}" for i in range(len(holdout))], **classes}}
+    with open("test/samples.bin", "wb") as f:
+        f.write(base64.b64encode(gzip.compress(json.dumps(blob).encode(), mtime=0)))
+
+    def text_of(ref):
+        return holdout[int(ref[8:])] if ref.startswith("holdout:") else corpus[files.index(ref)]
+
+    print(" ".join(token([text_of(r) for r in blob["classes"][name]]) for name in blob["classes"]))
+
+
+main()
+GEN
+)
+[ "$tokens" = "$ORACLE_TOKENS" ] || { echo "oracle tokens drifted: $tokens" >&2; exit 1; }
+rm -rf legacy/__pycache__
 cat > ops/nightly.sh <<'SH'
 #!/usr/bin/env bash
 # Nightly: summarize the day's timeclock export and mail it to finance.

@@ -5,7 +5,7 @@ plugins: ["../../.."]
 runs: 2
 execution:
   model: claude-sonnet-5-5
-  max_turns: 40
+  max_turns: 60
   timeout_seconds: 600
   allowed_tools: [Read, Glob, Grep, Skill, Bash, Edit, Write]
   append_system_prompt: >-

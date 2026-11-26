@@ -2,7 +2,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { $ } from "bun";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import {
   getDataDir,
   getImportsDir,
@@ -15,29 +15,22 @@ import {
 import { dirExists } from "./file-catalog";
 import { isLockError, refreshIndex } from "./index-writer";
 
-const argv = cli({
-  name: "import",
-  flags: {
-    host: {
-      type: String,
-      description: "Label for the imported machine (lands in the host column)",
-      required: true as const,
-    },
-    source: {
-      type: String,
-      description:
-        "rsync source, recorded in the manifest for re-sync (e.g. work:.claude/projects/)",
-      default: "",
-    },
-    egress: {
-      type: Boolean,
-      description: "Allow this host's rows in output that leaves the machine (default: blocked)",
-      default: false,
-    },
-  },
-});
+export const program = new Command("import")
+  .option("--host <label>", "Label for the imported machine (lands in the host column)")
+  .option(
+    "--source <source>",
+    "rsync source, recorded in the manifest for re-sync (e.g. work:.claude/projects/)",
+    "",
+  )
+  .option(
+    "--egress",
+    "Allow this host's rows in output that leaves the machine (default: blocked)",
+    false,
+  );
 
-const label = argv.flags.host;
+const flags = (await program.parseAsync()).opts();
+
+const label = flags.host;
 
 if (label == null || label === "") {
   console.error("--host is required.");
@@ -59,7 +52,7 @@ const projectsDir = join(root, "projects");
 if (!dirExists(projectsDir)) {
   console.error(`No corpus at ${projectsDir}.`);
   console.error("Sync the source machine's ~/.claude/projects/ there first, then re-run:");
-  const source = argv.flags.source;
+  const source = flags.source;
   const shown = source !== "" ? source : "<source>";
   console.error(`  rsync -av --update ${shown} ${projectsDir}/`);
   process.exit(1);
@@ -73,9 +66,9 @@ if (!existing) {
   await mkdir(getImportsDir(), { recursive: true, mode: 0o700 });
   const manifest: Manifest = {
     host: label,
-    source: argv.flags.source,
+    source: flags.source,
     imported_at: new Date().toISOString(),
-    policy: { block_egress: !argv.flags.egress },
+    policy: { block_egress: !flags.egress },
   };
   await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   // Lock down the import tree: 0700 dirs, 0600 manifest (no Bun chmod API).
@@ -95,6 +88,6 @@ try {
   process.exit(1);
 }
 
-const blockEgress = existing ? (existing.policy.block_egress ?? true) : !argv.flags.egress;
+const blockEgress = existing ? (existing.policy.block_egress ?? true) : !flags.egress;
 console.log(`${existing ? "Re-indexed" : "Imported"} host "${label}" from ${projectsDir}`);
 console.log(`  egress: ${blockEgress ? "blocked" : "allowed"}`);

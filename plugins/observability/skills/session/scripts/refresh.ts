@@ -1,40 +1,38 @@
 #!/usr/bin/env bun
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { getDataDir, sessionDbPath } from "./db";
 import { checkStamp, recordKilled, refreshIndex } from "./index-writer";
 
-const argv = cli({
-  name: "refresh",
-  help: {
-    description: "Ensure the session index is current and print its path.",
-  },
-  flags: {
-    refresh: {
-      type: Boolean,
-      description: "Rescan even if the index was refreshed within --max-age",
-      default: false,
-    },
-    maxAge: {
-      type: Number,
-      description: "Seconds a prior refresh stays fresh (skipping the rescan)",
-      default: 300,
-    },
-    compact: {
-      type: Boolean,
-      description:
-        "Compact the database into a fresh copy at STORAGE_VERSION, applying a pending rewrite of raw first. Implies --refresh",
-      default: false,
-    },
-  },
-});
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+export const program = new Command("refresh")
+  .description("Ensure the session index is current and print its path.")
+  .option("--refresh", "Rescan even if the index was refreshed within --max-age", false)
+  .option(
+    "--max-age <seconds>",
+    "Seconds a prior refresh stays fresh (skipping the rescan)",
+    number,
+    300,
+  )
+  .option(
+    "--compact",
+    "Compact the database into a fresh copy at STORAGE_VERSION, applying a pending rewrite of raw first. Implies --refresh",
+    false,
+  );
+
+const flags = (await program.parseAsync()).opts();
 
 const dataDir = getDataDir();
 const dbPath = sessionDbPath(dataDir);
-const compact = argv.flags.compact;
+const compact = flags.compact;
 
-if (!argv.flags.refresh && !compact && (await checkStamp(dataDir, argv.flags.maxAge * 1000))) {
+if (!flags.refresh && !compact && (await checkStamp(dataDir, flags.maxAge * 1000))) {
   process.stdout.write(`${dbPath}\n`);
   process.exit(0);
 }

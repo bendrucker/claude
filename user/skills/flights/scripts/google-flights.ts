@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli, command } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 
 import { parseBooking } from "./booking";
@@ -316,8 +316,8 @@ export function parseGrid(text: string): GridCell[] {
   }));
 }
 
-// cleye casts a Number flag with `Number()` and does not check the result, so a
-// non-numeric --truncate arrives as NaN and slices every airline name to "".
+// The `number` parser rejects NaN but accepts a fraction or zero, which would
+// slice every airline name to "".
 function width(truncate: number): number {
   if (!Number.isInteger(truncate) || truncate < 1) {
     throw new Error(`--truncate must be a whole number of at least 1, got ${truncate}`);
@@ -343,36 +343,31 @@ function render(rows: Row[], truncate: number): string {
   });
 }
 
-const urlCmd = command(
-  {
-    name: "url",
-    parameters: ["<origin>", "<destination>", "<depart>", "[return]"],
-    help: {
-      description:
-        "Build a Google Flights search URL. Dates are YYYY-MM-DD. Omit [return] for one-way.",
-    },
-    flags: {
-      cabin: {
-        type: String,
-        default: "economy",
-        description: "economy, premium, business, or first",
-      },
-      stops: {
-        type: Boolean,
-        description: "Allow connections (default is nonstop only)",
-      },
-      carryOn: {
-        type: Number,
-        default: 1,
-        description: "Carry-on bags. 1 filters out Basic Economy; pass 0 to see it",
-      },
-      checked: { type: Number, default: 0, description: "Checked bags" },
-    },
-  },
-  (parsed) => {
-    const { origin, destination, depart } = parsed._;
-    const back = parsed._.return;
-    const cabin = parsed.flags.cabin;
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+const urlCmd = new Command("url")
+  .description(
+    "Build a Google Flights search URL. Dates are YYYY-MM-DD. Omit [return] for one-way.",
+  )
+  .argument("<origin>")
+  .argument("<destination>")
+  .argument("<depart>")
+  .argument("[return]")
+  .option("--cabin <cabin>", "economy, premium, business, or first", "economy")
+  .option("--stops", "Allow connections (default is nonstop only)")
+  .option(
+    "--carry-on <n>",
+    "Carry-on bags. 1 filters out Basic Economy; pass 0 to see it",
+    number,
+    1,
+  )
+  .option("--checked <n>", "Checked bags", number, 0)
+  .action((origin, destination, depart, back, flags) => {
+    const cabin = flags.cabin;
     if (!isCabin(cabin)) {
       throw new Error(
         `unknown cabin ${JSON.stringify(cabin)}; expected ${Object.keys(CABINS).join(", ")}`,
@@ -386,28 +381,20 @@ const urlCmd = command(
       searchUrl({
         legs,
         cabin,
-        nonstop: !parsed.flags.stops,
-        carryOn: parsed.flags.carryOn,
-        checked: parsed.flags.checked,
+        nonstop: !flags.stops,
+        carryOn: flags.carryOn,
+        checked: flags.checked,
       }),
     );
-  },
-);
+  });
 
-const parseCmd = command(
-  {
-    name: "parse",
-    help: {
-      description: "Parse `agent-browser read` output of a results page, from stdin.",
-    },
-    flags: {
-      json: { type: Boolean, description: "Emit rows as JSON" },
-      truncate: { type: Number, default: 38, description: "Max airline name width" },
-      noRedEye: { type: Boolean, description: "Drop red-eyes instead of marking them" },
-      noBasic: { type: Boolean, description: "Drop Basic Economy fares instead of marking them" },
-    },
-  },
-  async (parsed) => {
+const parseCmd = new Command("parse")
+  .description("Parse `agent-browser read` output of a results page, from stdin.")
+  .option("--json", "Emit rows as JSON")
+  .option("--truncate <n>", "Max airline name width", number, 38)
+  .option("--no-red-eye", "Drop red-eyes instead of marking them")
+  .option("--no-basic", "Drop Basic Economy fares instead of marking them")
+  .action(async (flags) => {
     const parsedRows = parseResults(await Bun.stdin.text());
     // An empty page and a filter that matched nothing are different failures, and
     // retrying the page load only helps the first. Report them apart.
@@ -417,20 +404,19 @@ const parseCmd = command(
     }
 
     let rows = parsedRows;
-    if (parsed.flags.noRedEye) rows = rows.filter((row) => !row.redEye);
-    if (parsed.flags.noBasic) rows = rows.filter((row) => !row.basic);
+    if (!flags.redEye) rows = rows.filter((row) => !row.redEye);
+    if (!flags.basic) rows = rows.filter((row) => !row.basic);
     if (rows.length === 0) {
       console.error(`every one of the ${parsedRows.length} itineraries was filtered out`);
       process.exit(1);
     }
 
-    if (parsed.flags.json) {
+    if (flags.json) {
       console.log(JSON.stringify(rows, null, 2));
       return;
     }
-    console.log(render(rows, width(parsed.flags.truncate)));
-  },
-);
+    console.log(render(rows, width(flags.truncate)));
+  });
 
 /** Round trips lay out as a departure-by-return matrix. One-ways are a single row. */
 function renderGrid(cells: GridCell[]): string {
@@ -461,24 +447,18 @@ function renderGrid(cells: GridCell[]): string {
   ]);
 }
 
-const bookingCmd = command(
-  {
-    name: "booking",
-    help: {
-      description:
-        "Parse `agent-browser read` output of a booking page, from stdin. Gives flight numbers, aircraft, and the fare ladder.",
-    },
-    flags: {
-      json: { type: Boolean, description: "Emit the booking as JSON" },
-    },
-  },
-  async (parsed) => {
+const bookingCmd = new Command("booking")
+  .description(
+    "Parse `agent-browser read` output of a booking page, from stdin. Gives flight numbers, aircraft, and the fare ladder.",
+  )
+  .option("--json", "Emit the booking as JSON")
+  .action(async (flags) => {
     const booking = parseBooking(await Bun.stdin.text());
     if (booking.segments.length === 0) {
       console.error("no segments parsed. The page may not have rendered yet.");
       process.exit(1);
     }
-    if (parsed.flags.json) {
+    if (flags.json) {
       console.log(JSON.stringify(booking, null, 2));
       return;
     }
@@ -505,27 +485,20 @@ const bookingCmd = command(
         ]),
       );
     }
-  },
-);
+  });
 
-const gridCmd = command(
-  {
-    name: "grid",
-    help: {
-      description:
-        "Parse the Date grid overlay from `agent-browser snapshot` output, on stdin. Prices every nearby date pair in one page load.",
-    },
-    flags: {
-      json: { type: Boolean, description: "Emit cells as JSON" },
-    },
-  },
-  async (parsed) => {
+const gridCmd = new Command("grid")
+  .description(
+    "Parse the Date grid overlay from `agent-browser snapshot` output, on stdin. Prices every nearby date pair in one page load.",
+  )
+  .option("--json", "Emit cells as JSON")
+  .action(async (flags) => {
     const cells = parseGrid(await Bun.stdin.text());
     if (cells.length === 0) {
       console.error("no grid parsed. Snapshot the page after clicking 'Date grid'.");
       process.exit(1);
     }
-    if (parsed.flags.json) {
+    if (flags.json) {
       console.log(JSON.stringify(cells, null, 2));
       return;
     }
@@ -533,20 +506,18 @@ const gridCmd = command(
     console.log(
       `${GREEN}green${RESET} is Google's cheapest, ${YELLOW}yellow${RESET} its low-price tier`,
     );
-  },
-);
+  });
+
+export const program = new Command("google-flights")
+  .description("Build Google Flights search URLs and parse rendered results.")
+  .addCommand(urlCmd)
+  .addCommand(parseCmd)
+  .addCommand(gridCmd)
+  .addCommand(bookingCmd)
+  .action(() => {
+    program.help();
+  });
 
 if (import.meta.main) {
-  void cli(
-    {
-      name: "google-flights",
-      commands: [urlCmd, parseCmd, gridCmd, bookingCmd],
-      help: {
-        description: "Build Google Flights search URLs and parse rendered results.",
-      },
-    },
-    (parsed) => {
-      parsed.showHelp();
-    },
-  );
+  await program.parseAsync();
 }

@@ -2,7 +2,7 @@
 
 // The removal signal for the find-scope hook, per docs/settings.md.
 
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 import {
   getDataDir,
@@ -106,25 +106,22 @@ export function format(result: Audit): string {
   ].join("\n");
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "find-scope-audit",
-    help: {
-      description: "Report whether the find-scope hook still earns its place.",
-    },
-    flags: {
-      since: {
-        type: String,
-        default: "2026-09-09",
-        description: "Only count Bash calls on or after this date (YYYY-MM-DD)",
-      },
-    },
+export const program = new Command("find-scope-audit")
+  .description("Report whether the find-scope hook still earns its place.")
+  .option(
+    "--since <date>",
+    "Only count Bash calls on or after this date (YYYY-MM-DD)",
+    "2026-09-09",
+  )
+  .action(async (flags) => {
+    try {
+      console.log(format(audit(await readBashCalls(flags.since))));
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
   });
 
-  try {
-    console.log(format(audit(await readBashCalls(argv.flags.since))));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
+if (import.meta.main) {
+  await program.parseAsync();
 }

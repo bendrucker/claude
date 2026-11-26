@@ -5,7 +5,7 @@
 // failure path prints nothing and exits 0.
 
 import { join } from "node:path";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 
 export const Change = z.looseObject({
@@ -230,33 +230,26 @@ async function diffRef(base: string): Promise<string> {
   return (local === base ? null : await mergeBase(local)) ?? base;
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "sem-context",
-    help: {
-      description: "Print the branch's entity-level changes as context for a PR body.",
-    },
-    flags: {
-      base: {
-        type: String,
-        description:
-          "Base ref to diff against. Default: the PR base, then the stack parent, then the repo default branch.",
-      },
-      stackFile: {
-        type: String,
-        default: "",
-        description:
-          "Stack file, relative to the git common dir: one branch per line, tab-indented under its parent. Empty skips the stack lookup.",
-      },
-    },
+export const program = new Command("sem-context")
+  .description("Print the branch's entity-level changes as context for a PR body.")
+  .option(
+    "--base <ref>",
+    "Base ref to diff against. Default: the PR base, then the stack parent, then the repo default branch.",
+  )
+  .option(
+    "--stack-file <path>",
+    "Stack file, relative to the git common dir: one branch per line, tab-indented under its parent. Empty skips the stack lookup.",
+    "",
+  )
+  .action(async (flags) => {
+    const base = flags.base ?? (await resolveBase(gitLookups(flags.stackFile)));
+    const result = await runSem(await diffRef(base));
+
+    if (result.kind === "missing") {
+      console.log("sem: not installed (brew install sem-cli)");
+    } else if (result.kind === "ok") {
+      console.log(render(result.changes, { base }));
+    }
   });
 
-  const base = argv.flags.base ?? (await resolveBase(gitLookups(argv.flags.stackFile)));
-  const result = await runSem(await diffRef(base));
-
-  if (result.kind === "missing") {
-    console.log("sem: not installed (brew install sem-cli)");
-  } else if (result.kind === "ok") {
-    console.log(render(result.changes, { base }));
-  }
-}
+if (import.meta.main) await program.parseAsync();

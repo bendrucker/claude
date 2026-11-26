@@ -2,7 +2,7 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { cli, command } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { toString } from "mdast-util-to-string";
 import { z } from "zod";
@@ -630,43 +630,31 @@ async function clear(paneId: string): Promise<void> {
   if (herdr(clearArgs(paneId)) || expired) await marker.delete();
 }
 
-const raiseCmd = command(
-  {
-    name: "raise",
-    help: { description: "Label the pane as awaiting review and show a toast" },
-    flags: {
-      kind: { type: String, description: `What Ben is asked for: ${kinds.join(", ")}` },
-      summary: { type: String, description: "One line on what Ben needs to do" },
-    },
-  },
-  async (parsed) => {
-    const { kind, summary } = parsed.flags;
+const raiseCmd = new Command("raise")
+  .description("Label the pane as awaiting review and show a toast")
+  .option("--kind <kind>", `What Ben is asked for: ${kinds.join(", ")}`)
+  .option("--summary <text>", "One line on what Ben needs to do")
+  .action(async (flags) => {
+    const { kind, summary } = flags;
     if (kind == null || !isKind(kind)) fail(`--kind must be one of: ${kinds.join(", ")}`);
     if (summary == null || oneLine(summary) === "") fail("--summary is required");
     const paneId = currentPane();
     if (paneId == null) return;
     await raise(paneId, kind, summary);
     herdr(notificationArgs(summary));
-  },
-);
+  });
 
-const clearCmd = command(
-  { name: "clear", help: { description: "Drop the review label once the review has landed" } },
-  async () => {
+const clearCmd = new Command("clear")
+  .description("Drop the review label once the review has landed")
+  .action(async () => {
     const paneId = currentPane();
     if (paneId == null) return;
     await clear(paneId);
-  },
-);
+  });
 
-const promptCmd = command(
-  {
-    name: "prompt",
-    help: {
-      description: "Hook entry: raise plan or question for a native prompt, clear once answered",
-    },
-  },
-  async () => {
+const promptCmd = new Command("prompt")
+  .description("Hook entry: raise plan or question for a native prompt, clear once answered")
+  .action(async () => {
     const paneId = currentPane();
     if (paneId == null) return;
     const action = promptAction(await Bun.stdin.text(), repoBranch);
@@ -674,76 +662,53 @@ const promptCmd = command(
     await (action.clear
       ? clear(paneId)
       : raise(paneId, action.kind, action.summary, PROMPT_MARKER));
-  },
-);
+  });
 
-const openCmd = command(
-  {
-    name: "open",
-    help: { description: "Open a review surface beside this pane, or both with --diff and --doc" },
-    flags: {
-      diff: { type: Boolean, description: "Review the working diff" },
-      doc: { type: String, description: "Review this file" },
-      base: {
-        type: String,
-        description: "Under Rex, review <base>..HEAD instead of the working diff",
-      },
-      batch: {
-        type: Boolean,
-        description: "Under Rex, hold notes for Send instead of delivering each to `watch`",
-      },
-      app: {
-        type: String,
-        description: `Under Rex, the app that shows the diff: ${apps.join(" or ")}`,
-      },
-    },
-  },
-  async (parsed) => {
-    if (!parsed.flags.diff && parsed.flags.doc == null) {
-      parsed.showHelp();
-      process.exit(1);
+const openCmd = new Command("open")
+  .description("Open a review surface beside this pane, or both with --diff and --doc")
+  .option("--diff", "Review the working diff")
+  .option("--doc <file>", "Review this file")
+  .option("--base <ref>", "Under Rex, review <base>..HEAD instead of the working diff")
+  .option("--batch", "Under Rex, hold notes for Send instead of delivering each to `watch`")
+  .option("--app <app>", `Under Rex, the app that shows the diff: ${apps.join(" or ")}`)
+  .action(async (flags, cmd) => {
+    if (!flags.diff && flags.doc == null) {
+      cmd.help({ error: true });
     }
     const host = sessionHost();
     if (host.kind === "none") fail("no herdr pane or Rex block: run the browser gate");
-    const doc = parsed.flags.doc;
+    const doc = flags.doc;
     if (doc != null && !(await Bun.file(doc).exists())) fail(`no such file: ${doc}`);
-    const { app } = parsed.flags;
+    const { app } = flags;
     if (app != null && !isApp(app)) fail(`--app must be ${apps.join(" or ")}`);
     if (host.kind === "rex") {
-      if (parsed.flags.diff) {
+      if (flags.diff) {
         rexOpen(host.block, {
-          base: parsed.flags.base,
-          batch: parsed.flags.batch === true,
+          base: flags.base,
+          batch: flags.batch === true,
           app: app ?? undefined,
         });
       }
       if (doc != null) rexOpen(host.block, { doc });
       process.exit(0);
     }
-    if (parsed.flags.diff) openReviewr(host.pane);
+    if (flags.diff) openReviewr(host.pane);
     if (doc != null) await openDoc(host.pane, doc);
     process.exit(0);
-  },
-);
+  });
 
-const closeCmd = command(
-  {
-    name: "close",
-    help: { description: "Quit the review surfaces once Ben approves" },
-    flags: {
-      diff: { type: Boolean, description: "Quit reviewr over the working diff" },
-      doc: { type: String, description: "Quit plannotator-tui over this file" },
-    },
-  },
-  async (parsed) => {
-    if (!parsed.flags.diff && parsed.flags.doc == null) {
-      parsed.showHelp();
-      process.exit(1);
+const closeCmd = new Command("close")
+  .description("Quit the review surfaces once Ben approves")
+  .option("--diff", "Quit reviewr over the working diff")
+  .option("--doc <file>", "Quit plannotator-tui over this file")
+  .action(async (flags, cmd) => {
+    if (!flags.diff && flags.doc == null) {
+      cmd.help({ error: true });
     }
     const paneId = currentPane();
     if (paneId == null) return;
-    if (parsed.flags.doc != null) await closeDoc(paneId, parsed.flags.doc);
-    if (!parsed.flags.diff) process.exit(0);
+    if (flags.doc != null) await closeDoc(paneId, flags.doc);
+    if (!flags.diff) process.exit(0);
     const workspace =
       process.env.HERDR_WORKSPACE_ID ?? fail("HERDR_WORKSPACE_ID unset: cannot find reviewr");
     const open = existingReviewr(
@@ -755,17 +720,11 @@ const closeCmd = command(
       reportQuit(open.pane, quitSurface(open.pane, herdrSurface(open.pane, REVIEWR_PROCESS)));
     }
     process.exit(0);
-  },
-);
+  });
 
-const watchCmd = command(
-  {
-    name: "watch",
-    help: {
-      description: "Under Rex, print each review note as Ben saves it until the review closes",
-    },
-  },
-  async () => {
+const watchCmd = new Command("watch")
+  .description("Under Rex, print each review note as Ben saves it until the review closes")
+  .action(async () => {
     const host = sessionHost();
     if (host.kind !== "rex") fail("watch needs a Rex block: herdr delivers notes on Send");
     // Each stdout line is one Monitor event.
@@ -773,18 +732,19 @@ const watchCmd = command(
       console.log(line);
     });
     process.exit(0);
-  },
-);
+  });
+
+export const program = new Command("attention")
+  .addCommand(raiseCmd)
+  .addCommand(clearCmd)
+  .addCommand(promptCmd)
+  .addCommand(openCmd)
+  .addCommand(closeCmd)
+  .addCommand(watchCmd)
+  .action(() => {
+    program.help({ error: true });
+  });
 
 if (import.meta.main) {
-  await cli(
-    {
-      name: "attention",
-      commands: [raiseCmd, clearCmd, promptCmd, openCmd, closeCmd, watchCmd],
-    },
-    (parsed) => {
-      parsed.showHelp();
-      process.exit(1);
-    },
-  );
+  await program.parseAsync();
 }

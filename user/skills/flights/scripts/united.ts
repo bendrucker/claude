@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli, command } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { table } from "table";
 
 import { AMOUNT, amount, present, THOUSANDS } from "./page-text";
@@ -267,34 +267,20 @@ export function render(flights: UnitedFlight[]): string {
   );
 }
 
-const urlCmd = command(
-  {
-    name: "url",
-    parameters: ["<origin>", "<destination>", "<date>"],
-    help: {
-      description: "Build a united.com one-way search URL. Date is YYYY-MM-DD.",
-    },
-    flags: {
-      award: { type: Boolean, description: "Price in miles instead of dollars" },
-    },
-  },
-  (parsed) => {
-    const { origin, destination, date } = parsed._;
-    console.log(searchUrl(origin, destination, date, parsed.flags.award));
-  },
-);
+const urlCmd = new Command("url")
+  .description("Build a united.com one-way search URL. Date is YYYY-MM-DD.")
+  .argument("<origin>")
+  .argument("<destination>")
+  .argument("<date>")
+  .option("--award", "Price in miles instead of dollars")
+  .action((origin, destination, date, flags) => {
+    console.log(searchUrl(origin, destination, date, flags.award));
+  });
 
-const parseCmd = command(
-  {
-    name: "parse",
-    help: {
-      description: "Parse `agent-browser read` output of an award results page, from stdin.",
-    },
-    flags: {
-      json: { type: Boolean, description: "Emit flights as JSON" },
-    },
-  },
-  async (parsed) => {
+const parseCmd = new Command("parse")
+  .description("Parse `agent-browser read` output of an award results page, from stdin.")
+  .option("--json", "Emit flights as JSON")
+  .action(async (flags) => {
     const flights = parseAwardResults(await Bun.stdin.text());
     if (flights.length === 0) {
       console.error("no flights parsed. The page may not have rendered yet.");
@@ -317,7 +303,7 @@ const parseCmd = command(
       );
     }
 
-    if (parsed.flags.json) {
+    if (flags.json) {
       console.log(JSON.stringify(flights, null, 2));
       return;
     }
@@ -334,20 +320,16 @@ const parseCmd = command(
     } else {
       console.log(`${YELLOW}no saver space. Everything here is dynamically priced.${RESET}`);
     }
-  },
-);
+  });
+
+export const program = new Command("united")
+  .description("Build united.com search URLs and parse rendered award results.")
+  .addCommand(urlCmd)
+  .addCommand(parseCmd)
+  .action(() => {
+    program.help();
+  });
 
 if (import.meta.main) {
-  void cli(
-    {
-      name: "united",
-      commands: [urlCmd, parseCmd],
-      help: {
-        description: "Build united.com search URLs and parse rendered award results.",
-      },
-    },
-    (parsed) => {
-      parsed.showHelp();
-    },
-  );
+  await program.parseAsync();
 }

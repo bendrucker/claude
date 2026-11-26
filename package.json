@@ -25,7 +25,6 @@
   },
   "dependencies": {
     "@commander-js/extra-typings": "~15.0.0",
-    "cleye": "^2.2.1",
     "commander": "~15.0.0",
     "table": "^6.9.0",
     "typescript": "^7.0.0",

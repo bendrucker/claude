@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli, command } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { errorText, projectPath, repoArgs } from "../../../scripts/merge";
 
@@ -173,28 +173,18 @@ export async function runReview(
   return 0;
 }
 
-const reviewCmd = command(
-  {
-    name: "review",
-    parameters: ["<iid>"],
-    flags: {
-      input: { type: String, description: "JSON file with review entries" },
-      repo: { type: String, alias: "R", description: "Target group/project" },
-      submit: { type: Boolean, default: false, description: "Publish the drafts after creating" },
-      approve: { type: Boolean, default: false, description: "Approve after publishing" },
-      requestChanges: {
-        type: Boolean,
-        default: false,
-        description: "Set the reviewer state to requested_changes when publishing",
-      },
-      summary: { type: String, description: "Summary note posted with the publish" },
-      summaryFile: { type: String, description: "Read the summary from a file" },
-      sha: { type: String, description: "Approve only if the MR head matches this SHA" },
-    },
-  },
-  async (argv) => {
-    const { flags } = argv;
-    const invalid = validateOptions({ iid: argv._.iid, ...flags });
+const reviewCmd = new Command("review")
+  .argument("<iid>")
+  .option("--input <file>", "JSON file with review entries")
+  .option("-R, --repo <repo>", "Target group/project")
+  .option("--submit", "Publish the drafts after creating", false)
+  .option("--approve", "Approve after publishing", false)
+  .option("--request-changes", "Set the reviewer state to requested_changes when publishing", false)
+  .option("--summary <text>", "Summary note posted with the publish")
+  .option("--summary-file <file>", "Read the summary from a file")
+  .option("--sha <sha>", "Approve only if the MR head matches this SHA")
+  .action(async (iid, flags) => {
+    const invalid = validateOptions({ iid, ...flags });
     if (invalid != null) throw new Error(invalid);
     if (flags.input == null || flags.input === "") throw new Error("--input is required");
 
@@ -209,7 +199,7 @@ const reviewCmd = command(
       flags.summaryFile == null ? flags.summary : await Bun.file(flags.summaryFile).text();
     process.exit(
       await runReview(entries, {
-        iid: argv._.iid,
+        iid,
         repo: flags.repo,
         submit: flags.submit,
         approve: flags.approve,
@@ -218,15 +208,16 @@ const reviewCmd = command(
         sha: flags.sha,
       }),
     );
-  },
-);
+  });
+
+export const program = new Command("draft-note").addCommand(reviewCmd).action(() => {
+  program.outputHelp();
+  process.exit(1);
+});
 
 if (import.meta.main) {
   try {
-    await cli({ name: "draft-note", commands: [reviewCmd] }, (parsed) => {
-      parsed.showHelp();
-      process.exit(1);
-    });
+    await program.parseAsync();
   } catch (error) {
     console.error(errorText(error));
     process.exit(1);

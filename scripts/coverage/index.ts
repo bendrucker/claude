@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { join, relative } from "node:path";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { formatLcov } from "./lcov";
 import { githubReport, terminalReport } from "./report";
 import { repoRoot, runCoverage } from "./run";
@@ -31,62 +31,52 @@ async function persistLcov(reports: Parameters<typeof formatLcov>[0]): Promise<v
   await Bun.write(join(dir, "lcov.info"), formatLcov(reports));
 }
 
-const argv = cli({
-  name: "coverage",
-  parameters: ["[files...]"],
-  help: {
-    description: "Measure Bun test coverage and report uncovered lines.",
-  },
-  flags: {
-    report: {
-      type: String,
-      default: "terminal",
-      description: "Output format: terminal or github",
-    },
-    changed: {
-      type: Boolean,
-      description: "Restrict to files/lines changed against the base ref",
-    },
-    base: {
-      type: String,
-      default: "origin/main",
-      description: "Base ref for --changed comparison",
-    },
-  },
-});
+export const program = new Command("coverage")
+  .description("Measure Bun test coverage and report uncovered lines.")
+  .argument("[files...]")
+  .option("--report <format>", "Output format: terminal or github", "terminal")
+  .option("--changed", "Restrict to files/lines changed against the base ref")
+  .option("--base <ref>", "Base ref for --changed comparison", "origin/main")
+  .action(async (requested, flags) => {
+    let files = requested;
+    if (files.length === 0 && flags.changed === true) {
+      files = changedFiles(flags.base);
+      if (files.length === 0) {
+        console.log("No changed source files to measure.");
+        process.exit(0);
+      }
+    }
 
-let files = argv._.files;
-if (files.length === 0 && argv.flags.changed) {
-  files = changedFiles(argv.flags.base);
-  if (files.length === 0) {
-    console.log("No changed source files to measure.");
-    process.exit(0);
-  }
-}
+    const reports = await runCoverage(files);
 
-const reports = await runCoverage(files);
+    // Persist a merged report so the PostToolUse hook has fresh data to surface.
+    await persistLcov(reports);
 
-// Persist a merged report so the PostToolUse hook has fresh data to surface.
-await persistLcov(reports);
+    // When specific files were requested, focus the report on them.
+    const targets =
+      files.length > 0
+        ? new Set(files.map((f) => relative(repoRoot, join(process.cwd(), f))))
+        : null;
+    const scoped = targets ? reports.filter((fc) => targets.has(fc.file)) : reports;
 
-// When specific files were requested, focus the report on them.
-const targets =
-  files.length > 0 ? new Set(files.map((f) => relative(repoRoot, join(process.cwd(), f)))) : null;
-const scoped = targets ? reports.filter((fc) => targets.has(fc.file)) : reports;
+    if (flags.report === "github") {
+      const summary = githubReport(scoped);
+      const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+      if (summaryPath != null && summaryPath !== "") {
+        await Bun.write(
+          summaryPath,
+          `${await Bun.file(summaryPath)
+            .text()
+            .catch(() => "")}${summary}\n`,
+        );
+      } else {
+        console.log(summary);
+      }
+    } else {
+      console.log(terminalReport(scoped));
+    }
+  });
 
-if (argv.flags.report === "github") {
-  const summary = githubReport(scoped);
-  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-  if (summaryPath != null && summaryPath !== "") {
-    await Bun.write(
-      summaryPath,
-      `${await Bun.file(summaryPath)
-        .text()
-        .catch(() => "")}${summary}\n`,
-    );
-  } else {
-    console.log(summary);
-  }
-} else {
-  console.log(terminalReport(scoped));
+if (import.meta.main) {
+  await program.parseAsync();
 }

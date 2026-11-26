@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 import { getDataDir, sessionDbPath } from "./db";
@@ -132,44 +132,47 @@ export function formatTimeline(rows: Bucket[], session: string, bucket: number):
   return `${table(grid)}\n${summary}`;
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "usage",
-    help: {
-      description: "Render a session's token-burn timeline (or the top sessions by cost).",
-    },
-    flags: {
-      session: { type: String, description: "Session id to profile (omit for a top-cost list)" },
-      host: { type: String, description: "Scope to one imported host" },
-      bucket: { type: Number, default: 10, description: "Bucket size in minutes" },
-      days: { type: Number, default: 14, description: "Lookback window for the top-cost list" },
-    },
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+export const program = new Command("usage")
+  .description("Render a session's token-burn timeline (or the top sessions by cost).")
+  .option("--session <id>", "Session id to profile (omit for a top-cost list)")
+  .option("--host <label>", "Scope to one imported host")
+  .option("--bucket <minutes>", "Bucket size in minutes", number, 10)
+  .option("--days <n>", "Lookback window for the top-cost list", number, 14)
+  .action(async (flags) => {
+    const dbPath = sessionDbPath(getDataDir());
+    if (!(await Bun.file(dbPath).exists())) {
+      console.error(`Session index not found at ${dbPath}. Run scripts/refresh.ts first.`);
+      process.exit(1);
+    }
+
+    const adapter = cliAdapter(dbPath);
+    const { session, host, bucket, days } = flags;
+
+    if (session != null && session !== "") {
+      const rows = await runQuery(
+        adapter,
+        { name: "usage-timeline" },
+        Bucket,
+        timelineParams(session, host, bucket),
+      );
+      console.log(formatTimeline(rows, session, bucket));
+    } else {
+      const rows = await runQuery(
+        adapter,
+        { name: "top-sessions" },
+        SessionCost,
+        topSessionsParams(host, days),
+      );
+      console.log(formatTopSessions(rows, days));
+    }
   });
 
-  const dbPath = sessionDbPath(getDataDir());
-  if (!(await Bun.file(dbPath).exists())) {
-    console.error(`Session index not found at ${dbPath}. Run scripts/refresh.ts first.`);
-    process.exit(1);
-  }
-
-  const adapter = cliAdapter(dbPath);
-  const { session, host, bucket, days } = argv.flags;
-
-  if (session != null && session !== "") {
-    const rows = await runQuery(
-      adapter,
-      { name: "usage-timeline" },
-      Bucket,
-      timelineParams(session, host, bucket),
-    );
-    console.log(formatTimeline(rows, session, bucket));
-  } else {
-    const rows = await runQuery(
-      adapter,
-      { name: "top-sessions" },
-      SessionCost,
-      topSessionsParams(host, days),
-    );
-    console.log(formatTopSessions(rows, days));
-  }
+if (import.meta.main) {
+  await program.parseAsync();
 }

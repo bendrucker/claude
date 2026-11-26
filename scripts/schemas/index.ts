@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import { cli, command } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import {
   applyOverlay,
   fetchBase,
@@ -16,7 +16,7 @@ const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
 const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 
-const check = command({ name: "check" }, async () => {
+const check = new Command("check").action(async () => {
   let failed = false;
   let warned = false;
   for (const source of await loadSources(SCHEMAS_DIR)) {
@@ -60,16 +60,15 @@ const check = command({ name: "check" }, async () => {
   console.log(green("\nAll schema overlays are current with upstream."));
 });
 
-await cli(
-  {
-    name: "schemas",
-    commands: [check],
-    help: {
-      description:
-        "Manage upstream-backed JSON schemas. Each is the upstream SchemaStore base fetched live plus an RFC 6902 overlay of our edits, merged in memory at validation time. `check` fetches current upstream, verifies the overlay still applies, flags ops upstream has absorbed, and warns on ops that overwrite an upstream definition.",
-    },
-  },
-  (parsed) => {
-    parsed.showHelp();
-  },
-);
+export const program = new Command("schemas")
+  .description(
+    "Manage upstream-backed JSON schemas. Each is the upstream SchemaStore base fetched live plus an RFC 6902 overlay of our edits, merged in memory at validation time. `check` fetches current upstream, verifies the overlay still applies, flags ops upstream has absorbed, and warns on ops that overwrite an upstream definition.",
+  )
+  .addCommand(check)
+  .action(() => {
+    program.help();
+  });
+
+if (import.meta.main) {
+  await program.parseAsync();
+}

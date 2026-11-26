@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
-import { cli, command } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 import { errorText, projectPath } from "../../../scripts/merge";
@@ -207,82 +207,62 @@ async function fetchDiscussions(iid: string, repo?: string): Promise<Discussion[
   return parseNdjson(await $`glab ${discussionsArgs(parseIid(iid), repo)}`.text());
 }
 
-const repoFlag = {
-  type: String,
-  alias: "R",
-  description: "Target group/project instead of the checkout",
-} as const;
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
 
-const listCmd = command(
-  {
-    name: "list",
-    parameters: ["<iid>"],
-    flags: {
-      repo: repoFlag,
-      author: { type: String, description: "Filter by author username" },
-      bots: {
-        type: Boolean,
-        description: "Only review-bot discussions (plus --reviewers usernames)",
-        default: false,
-      },
-      reviewers: {
-        type: String,
-        description: "Comma-separated usernames --bots also matches",
-      },
-      resolvable: { type: Boolean, description: "Only resolvable discussions", default: false },
-      unresolved: { type: Boolean, description: "Only unresolved discussions", default: false },
-      dedupe: {
-        type: Boolean,
-        description: "Deduplicate by file path + body prefix",
-        default: false,
-      },
-      format: {
-        type: String,
-        description:
-          "Output format: json, table, digest, or raw (full discussions with every note)",
-        default: "json",
-      },
-      truncate: {
-        type: Number,
-        description: "Max body length for table and digest output",
-        default: DEFAULT_BODY_TRUNCATE,
-      },
-    },
-  },
-  async (parsed) => {
-    let discussions = await fetchDiscussions(parsed._.iid, parsed.flags.repo);
+const listCmd = new Command("list")
+  .argument("<iid>")
+  .option("-R, --repo <repo>", "Target group/project instead of the checkout")
+  .option("--author <username>", "Filter by author username")
+  .option("--bots", "Only review-bot discussions (plus --reviewers usernames)", false)
+  .option("--reviewers <usernames>", "Comma-separated usernames --bots also matches")
+  .option("--resolvable", "Only resolvable discussions", false)
+  .option("--unresolved", "Only unresolved discussions", false)
+  .option("--dedupe", "Deduplicate by file path + body prefix", false)
+  .option(
+    "--format <format>",
+    "Output format: json, table, digest, or raw (full discussions with every note)",
+    "json",
+  )
+  .option(
+    "--truncate <n>",
+    "Max body length for table and digest output",
+    number,
+    DEFAULT_BODY_TRUNCATE,
+  )
+  .action(async (iid, flags) => {
+    let discussions = await fetchDiscussions(iid, flags.repo);
 
-    discussions = filterDiscussions(discussions, buildFilterOptions(parsed.flags));
+    discussions = filterDiscussions(discussions, buildFilterOptions(flags));
 
-    if (parsed.flags.dedupe) {
+    if (flags.dedupe) {
       discussions = deduplicateDiscussions(discussions);
     }
 
-    if (parsed.flags.format === "raw") {
+    if (flags.format === "raw") {
       console.log(JSON.stringify(discussions, null, 2));
       return;
     }
 
     const summaries = discussions.map(summarize).filter((s): s is DiscussionSummary => s !== null);
 
-    if (parsed.flags.format === "table") {
-      console.log(formatTable(summaries, parsed.flags.truncate));
-    } else if (parsed.flags.format === "digest") {
-      console.log(formatDigest(summaries, parsed.flags.truncate));
+    if (flags.format === "table") {
+      console.log(formatTable(summaries, flags.truncate));
+    } else if (flags.format === "digest") {
+      console.log(formatDigest(summaries, flags.truncate));
     } else {
       console.log(JSON.stringify(summaries, null, 2));
     }
-  },
-);
+  });
 
-const summaryCmd = command(
-  {
-    name: "summary",
-    parameters: ["<iid>"],
-    flags: { repo: repoFlag },
-  },
-  async (parsed) => {
-    const discussions = await fetchDiscussions(parsed._.iid, parsed.flags.repo);
+const summaryCmd = new Command("summary")
+  .argument("<iid>")
+  .option("-R, --repo <repo>", "Target group/project instead of the checkout")
+  .action(async (iid, flags) => {
+    const discussions = await fetchDiscussions(iid, flags.repo);
 
     const resolvable = discussions.filter((d) => firstNote(d)?.resolvable);
     const resolved = resolvable.filter((d) => firstNote(d)?.resolved);
@@ -315,20 +295,18 @@ const summaryCmd = command(
     ]);
 
     console.log(table([["Author", "Resolved", "Unresolved", "Total"], ...rows]));
-  },
-);
+  });
+
+export const program = new Command("discussions")
+  .addCommand(listCmd)
+  .addCommand(summaryCmd)
+  .action(() => {
+    program.help();
+  });
 
 if (import.meta.main) {
   try {
-    await cli(
-      {
-        name: "discussions",
-        commands: [listCmd, summaryCmd],
-      },
-      (parsed) => {
-        parsed.showHelp();
-      },
-    );
+    await program.parseAsync();
   } catch (error) {
     console.error(errorText(error));
     process.exit(1);

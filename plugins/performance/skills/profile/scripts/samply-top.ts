@@ -4,7 +4,7 @@
 // dominate it, symbolicated from the `--unstable-presymbolicate` sidecar.
 
 import { gunzipSync } from "node:zlib";
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 
@@ -251,29 +251,23 @@ export function renderJson(s: Summary): string {
   );
 }
 
-async function main(): Promise<void> {
-  const argv = cli({
-    name: "samply-top",
-    parameters: ["<profile>"],
-    flags: {
-      process: { type: String, description: "Only threads of processes with this name or pid" },
-      wall: {
-        type: Boolean,
-        description: "Weight by wall time on main threads, to see where a waiting program blocks",
-      },
-      top: { type: Number, default: 25, description: "Rows per ranking" },
-      truncate: {
-        type: Number,
-        default: 100,
-        description: "Truncate function names to this width",
-      },
-      json: { type: Boolean, description: "Print the summary as compact JSON" },
-    },
-    help: {
-      description:
-        "Summarize a samply profile (.json or .json.gz) recorded with --unstable-presymbolicate",
-    },
-  });
+function parseNumber(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+async function main(
+  profilePath: string,
+  flags: {
+    process?: string | undefined;
+    wall?: true | undefined;
+    top: number;
+    truncate: number;
+    json?: true | undefined;
+  },
+): Promise<void> {
+  const argv = { _: { profile: profilePath }, flags };
   const path = argv._.profile;
   const bytes = await Bun.file(path).bytes();
   const profile = Profile.parse(
@@ -296,4 +290,18 @@ async function main(): Promise<void> {
   console.log(argv.flags.json === true ? renderJson(summary) : renderText(summary));
 }
 
-if (import.meta.main) await main();
+export const program = new Command("samply-top")
+  .description(
+    "Summarize a samply profile (.json or .json.gz) recorded with --unstable-presymbolicate",
+  )
+  .argument("<profile>")
+  .option("--process <name|pid>", "Only threads of processes with this name or pid")
+  .option("--wall", "Weight by wall time on main threads, to see where a waiting program blocks")
+  .option("--top <n>", "Rows per ranking", parseNumber, 25)
+  .option("--truncate <n>", "Truncate function names to this width", parseNumber, 100)
+  .option("--json", "Print the summary as compact JSON")
+  .action(async (profilePath, flags) => {
+    await main(profilePath, flags);
+  });
+
+if (import.meta.main) await program.parseAsync();

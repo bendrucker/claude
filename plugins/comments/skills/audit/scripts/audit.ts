@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
-import { cli, command } from "cleye";
+import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typings";
 import { z } from "zod";
 import type { SortKey } from "../../../detection/rank";
 import { agentJudge } from "../../../judge/adapter";
@@ -46,37 +46,32 @@ async function run(task: () => Promise<void>): Promise<void> {
   }
 }
 
-const preflightCmd = command(
-  {
-    name: "preflight",
-    flags: {
-      base: {
-        type: String,
-        description: "Diff scope: comments introduced vs the merge-base with <ref>",
-      },
-      mr: {
-        type: String,
-        description: "Diff scope: comments introduced by a GitLab merge request (iid)",
-      },
-      all: {
-        type: Boolean,
-        default: false,
-        description: "Repo scope: every tracked code file's comments",
-      },
-      path: { type: [String], description: "Narrow either scope to paths matching these globs" },
-      sort: { type: String, default: "score", description: "Rank by lines | chars | score" },
-      limit: { type: Number, description: "Keep only the top N ranked comments" },
-      shardSize: { type: Number, description: "Comments per judging agent (default 20)" },
-      fix: {
-        type: Boolean,
-        default: false,
-        description: "Ask the judge for a suggestion per finding",
-      },
-    },
-  },
-  (parsed) =>
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+function collect(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
+}
+
+const preflightCmd = new Command("preflight")
+  .option("--base <ref>", "Diff scope: comments introduced vs the merge-base with <ref>")
+  .option("--mr <iid>", "Diff scope: comments introduced by a GitLab merge request (iid)")
+  .option("--all", "Repo scope: every tracked code file's comments", false)
+  .option("--path <glob>", "Narrow either scope to paths matching these globs", collect, [])
+  .option("--sort <key>", "Rank by lines | chars | score", "score")
+  .option("--limit <n>", "Keep only the top N ranked comments", number)
+  .option("--shard-size <n>", "Comments per judging agent (default 20)", number)
+  .option("--fix", "Ask the judge for a suggestion per finding", false)
+  // The skill passes its whole argument list here, apply-time flags included, so accept and ignore them.
+  .addOption(new Option("--report").hideHelp())
+  .addOption(new Option("--format <template>").hideHelp())
+  .addOption(new Option("--max-width <n>").hideHelp())
+  .action((flags) =>
     run(async () => {
-      const { base, mr, all, path, sort, limit, shardSize, fix } = parsed.flags;
+      const { base, mr, all, path, sort, limit, shardSize, fix } = flags;
       await preflight(
         { base, mr, all, pathGlobs: path, sort: parseSort(sort), limit, shardSize, fix },
         {
@@ -87,41 +82,36 @@ const preflightCmd = command(
         },
       );
     }),
-);
+  );
 
-const applyCmd = command(
-  {
-    name: "apply",
-    flags: {
-      job: { type: String, description: "The job dir printed by preflight" },
-      report: { type: Boolean, default: false, description: "Print findings instead of applying" },
-      fix: { type: Boolean, default: false, description: "Include suggestions in the report" },
-      format: {
-        type: String,
-        description:
-          "Format each edited file through this shell template ({} = path, content on stdin)",
-      },
-      maxWidth: {
-        type: Number,
-        description:
-          "Refuse a splice past this line width (default: the replaced comment's width, at least 80)",
-      },
-    },
-  },
-  (parsed) =>
+const applyCmd = new Command("apply")
+  .option("--job <dir>", "The job dir printed by preflight")
+  .option("--report", "Print findings instead of applying", false)
+  .option("--fix", "Include suggestions in the report", false)
+  .option(
+    "--format <template>",
+    "Format each edited file through this shell template ({} = path, content on stdin)",
+  )
+  .option(
+    "--max-width <n>",
+    "Refuse a splice past this line width (default: the replaced comment's width, at least 80)",
+    number,
+  )
+  .action((flags) =>
     run(async () => {
-      const { job, report, fix, format, maxWidth } = parsed.flags;
+      const { job, report, fix, format, maxWidth } = flags;
       if (job == null || job === "") throw new AuditError("--job <dir> is required.");
       await apply({ job, report, fix, format, maxWidth }, consoleIo);
     }),
-);
+  );
 
-await cli(
-  {
-    name: "audit",
-    commands: [preflightCmd, applyCmd],
-  },
-  (parsed) => {
-    parsed.showHelp();
-  },
-);
+export const program = new Command("audit")
+  .addCommand(preflightCmd)
+  .addCommand(applyCmd)
+  .action(() => {
+    program.help();
+  });
+
+if (import.meta.main) {
+  await program.parseAsync();
+}

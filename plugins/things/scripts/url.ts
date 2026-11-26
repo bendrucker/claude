@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { join } from "node:path";
 import { $ } from "bun";
-import { cli } from "cleye";
+import { Command as CommanderCommand } from "@commander-js/extra-typings";
 import { findSiblingScript } from "../src/marketplace";
 import { requireTags, type TagRequirer } from "../src/mcp/tags";
 import { ensureThingsRunning } from "./ensure-running";
@@ -378,87 +378,83 @@ export function warnFallback(result: DispatchResult): void {
     console.error(result.fallbackDetail);
 }
 
-if (import.meta.main) {
-  await ensureThingsRunning();
+export const program = new CommanderCommand("url")
+  .argument("<command>")
+  .argument("[params...]")
+  .option("--callback", "Use xcall to get response from Things (disable with --no-callback)", true)
+  .option("--no-callback", "Send fire-and-forget via open -g instead of xcall")
+  .option(
+    "--create-tags",
+    "Create any tag that does not exist yet. Without it, an unknown tag fails",
+    false,
+  )
+  .option(
+    "--link-base <url>",
+    "Prefix for the printed todo link, followed by the todo id",
+    DEFAULT_LINK_BASE,
+  )
+  .action(async (command, rawParams, flags) => {
+    await ensureThingsRunning();
 
-  const argv = cli({
-    name: "url",
-    parameters: ["<command>", "[params...]"],
-    flags: {
-      callback: {
-        type: Boolean,
-        default: true,
-        description: "Use xcall to get response from Things (disable with --callback=false)",
-      },
-      createTags: {
-        type: Boolean,
-        default: false,
-        description: "Create any tag that does not exist yet. Without it, an unknown tag fails",
-      },
-      linkBase: {
-        type: String,
-        default: DEFAULT_LINK_BASE,
-        description: "Prefix for the printed todo link, followed by the todo id",
-      },
-    },
+    const ids: string[] = [];
+    const params = new Map<string, string>();
+    for (const arg of rawParams) {
+      const eqIndex = arg.indexOf("=");
+      if (eqIndex === -1) continue;
+      const key = arg.slice(0, eqIndex);
+      const value = arg.slice(eqIndex + 1);
+      if (key === "id") {
+        ids.push(value);
+      } else {
+        params.set(key, value);
+      }
+    }
+
+    // Resolved before either branch, so the bulk payload built from these same
+    // params carries the stored casing too. A raw `json data=...` payload is not
+    // reached: that one is the escape hatch, and its tags go through unchecked.
+    try {
+      await resolveTagParams(params, flags.createTags);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+
+    const useBulkJson = command === "update" && ids.length > 1;
+
+    const callbackActions: DispatchActions = flags.callback
+      ? defaultActions
+      : { ...defaultActions, findXcallRunner: () => Promise.resolve(null) };
+
+    let dispatchCommand: string;
+    let dispatchParams: Map<string, string>;
+    if (useBulkJson) {
+      const attributes: Record<string, string> = {};
+      for (const [key, value] of params) {
+        attributes[key] = value;
+      }
+      const payload = buildJsonPayload(ids, attributes);
+      dispatchParams = new Map<string, string>();
+      dispatchParams.set("data", payload);
+      dispatchCommand = "json";
+    } else {
+      const singleId = ids.at(0);
+      if (singleId !== undefined) {
+        params.set("id", singleId);
+      }
+      dispatchCommand = command;
+      dispatchParams = params;
+    }
+
+    const result = await dispatch(dispatchCommand, dispatchParams, callbackActions);
+    if (result.id !== null) {
+      console.log(`${flags.linkBase}${result.id}`);
+    } else if (result.output !== null) {
+      console.log(result.output);
+    }
+    if (flags.callback) warnFallback(result);
   });
 
-  const command = argv._.command;
-  const ids: string[] = [];
-  const params = new Map<string, string>();
-  for (const arg of argv._.params) {
-    const eqIndex = arg.indexOf("=");
-    if (eqIndex === -1) continue;
-    const key = arg.slice(0, eqIndex);
-    const value = arg.slice(eqIndex + 1);
-    if (key === "id") {
-      ids.push(value);
-    } else {
-      params.set(key, value);
-    }
-  }
-
-  // Resolved before either branch, so the bulk payload built from these same
-  // params carries the stored casing too. A raw `json data=...` payload is not
-  // reached: that one is the escape hatch, and its tags go through unchecked.
-  try {
-    await resolveTagParams(params, argv.flags.createTags);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
-
-  const useBulkJson = command === "update" && ids.length > 1;
-
-  const callbackActions: DispatchActions = argv.flags.callback
-    ? defaultActions
-    : { ...defaultActions, findXcallRunner: () => Promise.resolve(null) };
-
-  let dispatchCommand: string;
-  let dispatchParams: Map<string, string>;
-  if (useBulkJson) {
-    const attributes: Record<string, string> = {};
-    for (const [key, value] of params) {
-      attributes[key] = value;
-    }
-    const payload = buildJsonPayload(ids, attributes);
-    dispatchParams = new Map<string, string>();
-    dispatchParams.set("data", payload);
-    dispatchCommand = "json";
-  } else {
-    const singleId = ids.at(0);
-    if (singleId !== undefined) {
-      params.set("id", singleId);
-    }
-    dispatchCommand = command;
-    dispatchParams = params;
-  }
-
-  const result = await dispatch(dispatchCommand, dispatchParams, callbackActions);
-  if (result.id !== null) {
-    console.log(`${argv.flags.linkBase}${result.id}`);
-  } else if (result.output !== null) {
-    console.log(result.output);
-  }
-  if (argv.flags.callback) warnFallback(result);
+if (import.meta.main) {
+  await program.parseAsync();
 }

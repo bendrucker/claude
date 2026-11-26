@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
+import { Command } from "@commander-js/extra-typings";
 import { type Node, parse } from "acorn";
-import { cli } from "cleye";
 import { z } from "zod";
 
 const AstNode = z.looseObject({ type: z.string() });
@@ -151,47 +151,53 @@ export interface ParsedArgv {
   args: string[];
 }
 
-// The runner's own flags bind ahead of the script path. Everything past it
-// belongs to the target script, flags included, so cleye must not claim it.
-// ignoreArgv leaves ignored elements in the array cleye parses, which makes
-// those leftovers the verbatim argument list for the script.
-export function parseArgv(argv: string[]): ParsedArgv {
-  const args = [...argv];
+// Reads `-e=1` as `1`, where commander alone would keep the `=` in a short flag's value.
+function splitShortEquals(argv: string[]): string[] {
+  return argv.flatMap((token) => (token.startsWith("-e=") ? ["-e", token.slice(3)] : [token]));
+}
+
+export const program = new Command("jxa")
+  .description(
+    "Run a JXA expression or script file scoped to one macOS app. Arguments after the script path pass to the script verbatim.",
+  )
+  .argument("<app>")
+  .argument("[script]")
+  .option("-e, --expression <expression>", "Inline JXA expression");
+
+/**
+ * Where the runner's own arguments end: after the app once an expression is
+ * given, after the script path otherwise, or at a `--` ahead of either.
+ */
+function runnerArgvEnd(argv: string[]): number {
   let positionals = 0;
   let expression = false;
+  for (let i = 0; i < argv.length; i++) {
+    if (positionals >= (expression ? 1 : 2)) return i;
+    const token = argv[i] ?? "";
+    if (token === "--") return i;
+    if (token === "-e" || token === "--expression") {
+      expression = true;
+      i++;
+    } else if (token.startsWith("--expression=") || /^-e./.test(token)) {
+      expression = true;
+    } else if (token === "-" || !token.startsWith("-")) {
+      positionals += 1;
+    }
+  }
+  return argv.length;
+}
 
-  const parsed = cli(
-    {
-      name: "jxa",
-      parameters: ["<app>", "[script]"],
-      help: {
-        description:
-          "Run a JXA expression or script file scoped to one macOS app. Arguments after the script path pass to the script verbatim.",
-      },
-      flags: {
-        expression: {
-          type: String,
-          alias: "e",
-          description: "Inline JXA expression",
-        },
-      },
-      ignoreArgv: (type: string, flagOrArgv: string) => {
-        if (positionals >= (expression ? 1 : 2)) return true;
-        // Left to cleye, a separator ahead of the script path would sweep the
-        // script and its arguments into `_["--"]` and drop everything the
-        // parameters do not name.
-        if (type === "argument" && flagOrArgv === "--") return true;
-        if (type === "known-flag") {
-          if (flagOrArgv === "expression" || flagOrArgv === "e") expression = true;
-        } else if (type === "argument") {
-          positionals += 1;
-        }
-        return false;
-      },
-    },
-    undefined,
-    args,
-  );
+// The runner's own flags bind ahead of the script path. Everything past it
+// belongs to the target script, flags included, so commander never sees it:
+// the runner's arguments are split off first and parsed alone, and the rest is
+// the verbatim argument list for the script. A separator ahead of the script
+// path ends the runner's arguments there, so nothing after it binds as the
+// script.
+export function parseArgv(argv: string[]): ParsedArgv {
+  const end = runnerArgvEnd(argv);
+  const args = argv.slice(end);
+  program.parse(splitShortEquals(argv.slice(0, end)), { from: "user" });
+  const [app, script] = program.processedArgs;
 
   // Callers that wrote an explicit `--` to force passthrough keep working: the
   // runner absorbs one separator so osascript never receives it as an argument.
@@ -199,9 +205,9 @@ export function parseArgv(argv: string[]): ParsedArgv {
   if (separator !== -1) args.splice(separator, 1);
 
   return {
-    app: parsed._.app,
-    script: parsed._.script,
-    expression: parsed.flags.expression,
+    app,
+    script,
+    expression: program.opts().expression,
     args,
   };
 }

@@ -11,6 +11,8 @@ Record the pilot findings in a recipe file beside the ledger, such as `tmp/<task
 - The transformation, as steps a fresh agent can follow without this conversation.
 - Each quirk the pilots hit, with how to detect it in another unit and how it was settled.
 - The per-unit verification command and what a pass looks like.
+- The exact run command for each unit that needs more than the default, such as a wrapper, env, or stdin fixture, stored beside its inputs. A rerun that omits it can match because both sides take the same degenerate path.
+- An oracle checkout with its own dependency install. An oracle sharing the working tree's `node_modules` breaks once the port removes the old dependency.
 - The parts a codemod can do (`ast-grep`, `jscodeshift`, `comby`, `sed` over a fixed pattern), and the parts that need judgment.
 
 Run the codemod for the mechanical part before any agent starts. Agents handle only what the codemod leaves.

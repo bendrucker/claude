@@ -160,11 +160,11 @@ export function deduplicateDiscussions(discussions: Discussion[]): Discussion[] 
 }
 
 function buildFilterOptions(flags: {
-  author: string | undefined;
+  author?: string;
   resolvable: boolean;
   unresolved: boolean;
   bots: boolean;
-  reviewers: string | undefined;
+  reviewers?: string;
 }): FilterOptions {
   const opts: FilterOptions = {};
   if (flags.author != null && flags.author !== "") opts.author = flags.author;

@@ -1,0 +1,10 @@
+allow_tools: [Bash, Edit, Write]
+judge_model: claude-sonnet-5-5
+wrap:
+  skills: [user/skills/port]
+  context: [user/rules/testing.md]
+graders:
+  skill-fired: "port-*"
+  compared-both: "port-*"
+  old-kept: "port-*"
+  quiet: "quiet-*"

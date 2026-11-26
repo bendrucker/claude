@@ -27,3 +27,7 @@ Build filler instances of a domain type from a builder or generator defined besi
 #### Refactors
 
 Keep the same assertions and the same passing suite when refactoring a test. When a test is hard to write, reshape the interface under test before adding scaffolding to the test.
+
+#### Ports
+
+When a test moves to a new framework or follows code to a new implementation, keep every assertion at least as strong as the original: same expected values, same exit codes and stderr, same negative cases. Diff the old and new assertions before calling the conversion done, and list any assertion that was dropped, loosened to a substring or `toBeTruthy`, or turned into a snapshot of the new output.

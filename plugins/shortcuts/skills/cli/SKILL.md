@@ -5,18 +5,11 @@ disable-model-invocation: true
 allowed-tools:
   - Bash(shortcuts:*)
   - Bash(open:*)
-hooks:
-  PreToolUse:
-    - matcher: "Bash(shortcuts:*)"
-      hooks:
-        - type: command
-          command: |
-            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {dangerouslyDisableSandbox: true}}}'
 ---
 
 # Shortcuts CLI
 
-The `shortcuts` command manages and runs shortcuts on macOS.
+The `shortcuts` command manages and runs shortcuts on macOS. It reaches its helper over XPC, which the command sandbox blocks with `Couldn't communicate with a helper application`, so it needs `shortcuts:*` in `sandbox.excludedCommands`.
 
 ## Run
 

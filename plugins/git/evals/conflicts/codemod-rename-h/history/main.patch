@@ -1,0 +1,87 @@
+diff --git a/tally/audit.py b/tally/audit.py
+index 8ebd267..4727ed5 100644
+--- a/tally/audit.py
++++ b/tally/audit.py
+@@ -1,6 +1,6 @@
+-from tally.seq import split_chunks
++from tally.seq import batched
+ 
+ 
+ def group_sums(ids, group_size=10):
+     """Sums ids in consecutive groups for spot checks."""
+-    return [sum(group) for group in split_chunks(ids, group_size)]
++    return [sum(group) for group in batched(ids, group_size)]
+diff --git a/tally/ingest.py b/tally/ingest.py
+index e1ee12a..a6c87ed 100644
+--- a/tally/ingest.py
++++ b/tally/ingest.py
+@@ -1,4 +1,4 @@
+-from tally.seq import split_chunks
++from tally.seq import batched
+ 
+ BATCH = 100
+ 
+@@ -6,7 +6,7 @@ BATCH = 100
+ def load(rows, sink):
+     """Sends rows to sink in batches and returns how many batches went out."""
+     sent = 0
+-    for batch in split_chunks(rows, BATCH):
++    for batch in batched(rows, BATCH):
+         sink(batch)
+         sent += 1
+     return sent
+diff --git a/tally/render.py b/tally/render.py
+index fa9ec8c..7dd052a 100644
+--- a/tally/render.py
++++ b/tally/render.py
+@@ -1,6 +1,6 @@
+-from tally.seq import split_chunks
++from tally.seq import batched
+ 
+ 
+ def pages(lines, per_page):
+     """Joins lines into text pages of at most per_page lines."""
+-    return ["\n".join(chunk) for chunk in split_chunks(lines, per_page)]
++    return ["\n".join(chunk) for chunk in batched(lines, per_page)]
+diff --git a/tally/seq.py b/tally/seq.py
+index a0c07d9..1acea97 100644
+--- a/tally/seq.py
++++ b/tally/seq.py
+@@ -1,4 +1,4 @@
+-def split_chunks(items, size):
++def batched(items, size):
+     """Yields consecutive slices of items, each at most size long."""
+     for start in range(0, len(items), size):
+         yield items[start : start + size]
+diff --git a/tally/upload.py b/tally/upload.py
+index df9d032..6b40684 100644
+--- a/tally/upload.py
++++ b/tally/upload.py
+@@ -1,6 +1,6 @@
+-from tally.seq import split_chunks
++from tally.seq import batched
+ 
+ 
+ def parts(blob, size):
+     """Cuts a blob into upload parts of at most size bytes."""
+-    return list(split_chunks(blob, size))
++    return list(batched(blob, size))
+diff --git a/tests/test_seq.py b/tests/test_seq.py
+index 48df467..06e5968 100644
+--- a/tests/test_seq.py
++++ b/tests/test_seq.py
+@@ -1,11 +1,11 @@
+ import unittest
+ 
+-from tally.seq import split_chunks
++from tally.seq import batched
+ 
+ 
+ class SplitChunksTest(unittest.TestCase):
+     def test_last_chunk_is_short(self):
+-        self.assertEqual(list(split_chunks([1, 2, 3, 4, 5], 2)), [[1, 2], [3, 4], [5]])
++        self.assertEqual(list(batched([1, 2, 3, 4, 5], 2)), [[1, 2], [3, 4], [5]])
+ 
+     def test_empty_input_yields_nothing(self):
+-        self.assertEqual(list(split_chunks([], 3)), [])
++        self.assertEqual(list(batched([], 3)), [])

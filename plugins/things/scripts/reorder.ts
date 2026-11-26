@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: hands off to osascript via ensure-running, which the command sandbox blocks
-
 import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
 import { type DispatchResult, dispatch, warnFallback } from "./url";

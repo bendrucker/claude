@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Under a git hook these point at the hook's repository and identity, overriding what tests hand a spawned git.
+unset "${!GIT_@}"
+
 extract_dirs() {
   local depth=$1
   shift

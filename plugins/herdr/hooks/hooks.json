@@ -1,4 +1,4 @@
 {
-  "description": "Publishes the session's subagent and teammate counts and its branch as metadata tokens on the herdr pane hosting it (HERDR_ENV=1), leaving lifecycle to herdr's own integration",
+  "description": "Publishes the session's subagent and teammate counts, branch, context dial, and title as metadata tokens, and the Claude brand glyph, on the herdr pane hosting it (HERDR_ENV=1), leaving lifecycle to herdr's own integration",
   "modules": ["../mod/register.ts"]
 }

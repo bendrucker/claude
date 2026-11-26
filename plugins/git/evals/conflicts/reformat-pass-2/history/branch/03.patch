@@ -1,0 +1,30 @@
+diff --git a/src/imports.test.ts b/src/imports.test.ts
+index 68ee4b3..1fdc47b 100644
+--- a/src/imports.test.ts
++++ b/src/imports.test.ts
+@@ -66,6 +66,11 @@ test.each<{
+   );
+ });
+ 
++test("scanImports: leaves out URL specifiers", () => {
++  const source = `import x from "https://esm.sh/zod";\nimport { z } from "zod";`;
++  expect(scanImports(source)).toEqual(["zod"]);
++});
++
+ test("scanImports: parses JSX under the tsx loader", () => {
+   const source = `import { a } from "./a.tsx";\nexport const b = <Box flexDirection="column" />;`;
+   expect(scanImports(source, "tsx")).toContain("./a.tsx");
+diff --git a/src/imports.ts b/src/imports.ts
+index 2204539..6fde856 100644
+--- a/src/imports.ts
++++ b/src/imports.ts
+@@ -27,7 +27,8 @@ export function scanImports(
+ 
+   return transpilers[loader]
+     .scanImports(values)
+-    .map(({ path }) => path);
++    .map(({ path }) => path)
++    .filter((path) => !/^https?:/.test(path));
+ }
+ 
+ export function isBuiltin(specifier: string): boolean {

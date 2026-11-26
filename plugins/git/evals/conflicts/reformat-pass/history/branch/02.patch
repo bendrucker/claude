@@ -1,0 +1,33 @@
+diff --git a/src/model.test.ts b/src/model.test.ts
+index f55c773..618e33d 100644
+--- a/src/model.test.ts
++++ b/src/model.test.ts
+@@ -4,6 +4,7 @@ import { type ModelMarker, modelMarker } from "./model";
+ describe("modelMarker", () => {
+   test.each<[string, string | null, ModelMarker | null]>([
+     ["claude-opus-5", null, { letter: "o", isDefault: true }],
++    ["gemini-3-pro", null, { letter: "g", isDefault: false }],
+     ["claude-opus-4-8", null, { letter: "o", isDefault: true }],
+     ["claude-opus-4-8[1m]", null, { letter: "o", isDefault: true }],
+     ["claude-sonnet-5", null, { letter: "s", isDefault: false }],
+diff --git a/src/model.ts b/src/model.ts
+index 2428fd9..4a26b5f 100644
+--- a/src/model.ts
++++ b/src/model.ts
+@@ -3,7 +3,7 @@
+ // fallback for ids whose family we don't recognize, so a future model still
+ // gets a letter.
+ 
+-export const MODEL_FAMILIES = ["opus", "sonnet", "haiku", "fable"] as const;
++export const MODEL_FAMILIES = ["opus", "sonnet", "haiku", "fable", "gemini"] as const;
+ export type ModelFamily = (typeof MODEL_FAMILIES)[number];
+ 
+ const FAMILY_LETTERS: Record<ModelFamily, string> = {
+@@ -11,6 +11,7 @@ const FAMILY_LETTERS: Record<ModelFamily, string> = {
+   sonnet: "s",
+   haiku: "h",
+   fable: "f",
++  gemini: "g",
+ };
+ 
+ // The un-highlighted family. Any other model renders in the accent color so a

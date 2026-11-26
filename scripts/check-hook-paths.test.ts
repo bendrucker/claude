@@ -27,8 +27,8 @@ test.each<{ name: string; command: string; expected: string[] }>([
   },
   {
     name: "braced HOME",
-    command: `\${HOME}/.claude/scripts/statusline.ts`,
-    expected: ["user/scripts/statusline.ts"],
+    command: `\${HOME}/.claude/scripts/hook-metrics.ts`,
+    expected: ["user/scripts/hook-metrics.ts"],
   },
   {
     name: "nested in sh -c",

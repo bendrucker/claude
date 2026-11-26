@@ -1,0 +1,4 @@
+wt -C /tmp/eval/cwd switch --create log-attempts --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval log-attempts -c /tmp/eval/cwd/.worktrees/log-attempts --json -- claude --name log-attempts -- <prompt>
+launch log-attempts /tmp/eval/cwd/.worktrees/log-attempts
+allow Bash(bun test:*)

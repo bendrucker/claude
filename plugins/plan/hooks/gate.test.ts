@@ -245,9 +245,30 @@ describe("size advisory", () => {
     expect(await decision(bigPlan("b"))).toBeNull();
   });
 
-  it("gives the unchanged-plan reason when the oversized plan is also unchanged", async () => {
+  it("gives the size reason, not the unchanged one, when the oversized plan repeats", async () => {
     expect((await decision(bigPlan("a")))?.permissionDecisionReason).toBe(sizeReason(0));
-    expect((await decision(bigPlan("a")))?.permissionDecisionReason).toBe(DENY_REASON);
+    expect((await decision(bigPlan("a")))?.permissionDecisionReason).toBe(sizeReason(1));
+  });
+});
+
+// A size denial came from the gate, not the user, so it arms neither re-present rule.
+describe("after a size denial", () => {
+  const paragraph = (count: number, prefix: string) =>
+    Array.from({ length: count }, (_, i) => `${prefix} ${i} ${"x".repeat(120)}`);
+  const oversized = [...paragraph(77, "kept"), ...paragraph(3, "moved")].join("\n");
+  const sidecarred = [...paragraph(77, "kept"), "Rationale: see plan-decisions.md."].join("\n");
+
+  it("allows a resubmission that fits the limit while keeping most lines", async () => {
+    expect(oversized.length).toBeGreaterThan(SIZE_THRESHOLD);
+    expect(sidecarred.length).toBeLessThanOrEqual(SIZE_THRESHOLD);
+    expect(denialReason(await decision(oversized))).toBe(sizeReason(0));
+    expect(await decision(sidecarred)).toBeNull();
+  });
+
+  it("denies a repeat of the fitted plan as unchanged once it has reached the user", async () => {
+    await decision(oversized);
+    await decision(sidecarred);
+    expect(denialReason(await decision(sidecarred))).toBe(DENY_REASON);
   });
 });
 

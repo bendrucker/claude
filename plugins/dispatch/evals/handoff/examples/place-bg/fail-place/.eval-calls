@@ -1,0 +1,2 @@
+rex window new -s session:eval Add Lint Script -c /tmp/eval/cwd/.worktrees/add-lint-script --focus=false --json -- claude --name add-lint-script -- <prompt>
+launch add-lint-script /tmp/eval/cwd/.worktrees/add-lint-script place=tab title=Add Lint Script

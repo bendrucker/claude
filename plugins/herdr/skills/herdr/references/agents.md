@@ -1,9 +1,5 @@
 # Agents
 
-## Dispatch Result
-
-Read `prompted` on the JSON line `dispatch.ts` prints: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A non-null `retry` means the first submission left the agent idle and the script resent Enter (`enter`) or the whole prompt (`prompt`). A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
-
 ## Starting an Agent
 
 `agent start` attaches an agent to an existing free pane, sitting at its interactive prompt with nothing in the foreground. Split first, start second:

@@ -4,7 +4,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 
-const SOURCES = ["echo.ts", "gh.ts", "glab.ts", "snapshot.ts", "install.sh", "preamble.sh"];
+const SOURCES = [
+  "calls.ts",
+  "claude.ts",
+  "echo.ts",
+  "gh.ts",
+  "glab.ts",
+  "rex.ts",
+  "snapshot.ts",
+  "wt.ts",
+  "install.sh",
+  "preamble.sh",
+];
 
 // A --check module: one verdict line per body, from its word count.
 const CHECK = `export default (body: string) => [\`WORDS \${body.split(/\\s+/).length <= 3 ? "pass" : "fail"}\`];\n`;
@@ -73,13 +84,13 @@ describe("install.sh", () => {
     expect(proc.stderr.toString()).toContain("refusing to edit");
   });
 
-  test("puts self-contained gh and glab first on PATH through .zshenv and .bashrc", async () => {
+  test("puts self-contained stand-ins first on PATH through .zshenv and .bashrc", async () => {
     const run = await install();
     const line = `export PATH="${join(run.home, ".eval-stubs/bin")}:$PATH"\n`;
     const rcs = [".zshenv", ".bashrc"].map(async (rc) => Bun.file(join(run.home, rc)).text());
     expect(await Promise.all(rcs)).toEqual([line, line]);
     expect(await Bun.file(join(run.cwd, ".eval-verdicts")).exists()).toBe(false);
-    for (const tool of ["gh", "glab"]) {
+    for (const tool of ["gh", "glab", "rex", "wt", "claude"]) {
       expect(Bun.spawnSync(["test", "-x", join(run.home, ".eval-stubs/bin", tool)]).exitCode).toBe(
         0,
       );
@@ -160,11 +171,36 @@ describe("echo mode", () => {
     );
   });
 
+  test("glab accepts --attach on mr update and mr note create, echoing the body", () => {
+    expect(
+      stub(run, "glab", ["mr", "update", "1", "--attach", "tmp/s.png", "-d", "Edited"]).out,
+    ).toBe(block("", "Edited", gitlab));
+    expect(
+      stub(run, "glab", ["mr", "note", "create", "1", "--attach", "tmp/s.png", "-m", "Edited"]).out,
+    ).toBe(block("", "Edited", gitlab));
+  });
+
   test.each([
     ["glab", ["mr", "update", "1", "--description", "Edited"], gitlab],
     ["gh", ["pr", "edit", "1", "--body", "Edited"], "https://github.com/team/service/pull/1"],
+    ["glab", ["mr", "note", "1", "-m", "Edited"], gitlab],
+    ["glab", ["issue", "note", "1", "--message=Edited"], gitlab],
   ])("%s %j prints the edited body", (tool, args, url) => {
     expect(stub(run, tool, args).out).toBe(block("", "Edited", url));
+  });
+
+  test("glab api note posts read -F body=@<path> and send -f body=@<path> literally", async () => {
+    const file = join(run.cwd, "note.md");
+    await Bun.write(file, "From file\n");
+    const post = (...flags: string[]) =>
+      stub(run, "glab", ["api", "projects/:id/merge_requests/1/notes", "-X", "POST", ...flags]).out;
+    expect(post("-F", `body=@${file}`)).toBe(block("", "From file", gitlab));
+    expect(post(`--field=body=@${file}`)).toBe(block("", "From file", gitlab));
+    expect(post("-f", `body=@${file}`)).toBe(block("", `@${file}`, gitlab));
+    expect(post("--raw-field", "body=Inline")).toBe(block("", "Inline", gitlab));
+    const json = join(run.cwd, "payload.json");
+    await Bun.write(json, JSON.stringify({ body: "From JSON" }));
+    expect(post("--input", json)).toBe(block("", "From JSON", gitlab));
   });
 
   test("gh derives the URL from an ssh origin", async () => {
@@ -176,6 +212,8 @@ describe("echo mode", () => {
 
   test.each([
     ["glab", ["mr", "list"]],
+    ["glab", ["api", "projects/:id/merge_requests/1"]],
+    ["glab", ["api", "projects/:id/merge_requests/1/discussions", "--paginate"]],
     ["gh", ["pr", "view", "1"]],
     ["gh", ["api", "repos/x/y"]],
     ["gh", ["mr", "create"]],
@@ -463,6 +501,18 @@ describe("glab snapshot", () => {
     expect(list.indexOf("added 1 commit")).toBeLessThan(list.indexOf("Why b?"));
   });
 
+  test("prints one item per line for --paginate --output ndjson", () => {
+    const r = stub(run, "glab", [
+      "api",
+      "--paginate",
+      "--output",
+      "ndjson",
+      "projects/:id/merge_requests/89/discussions?per_page=100",
+    ]);
+    const lines = r.out.trimEnd().split("\n");
+    expect(lines.map((l) => /"id":"([^"]+)"/.exec(l)?.[1])).toEqual(["d1", "d2"]);
+  });
+
   test("lists participants once each", () => {
     const path = "projects/team%2Fservice/merge_requests/89/participants";
     const r = stub(run, "glab", ["api", path, "--jq", ".[].username"]);
@@ -477,8 +527,51 @@ describe("glab snapshot", () => {
     });
   });
 
+  test("expands --placeholder into one encoded path segment before matching", async () => {
+    await $`git branch release/rate-limit`.cwd(run.cwd);
+    const get = (...args: string[]) => stub(run, "glab", ["api", ...args]);
+    const encoded = get(
+      "projects/:id/repository/branches/:b",
+      "--placeholder",
+      "b=release/rate-limit",
+    );
+    expect(JSON.parse(encoded.out)).toMatchObject({
+      name: "release/rate-limit",
+      commit: { id: shas.head },
+    });
+    expect(get("projects/:id/repository/branches/release%2Frate-limit").code).toBe(0);
+    const raw = get("projects/:id/repository/branches/release/rate-limit");
+    expect(raw.code).toBe(1);
+    expect(raw.err).toContain("404");
+    expect(get("projects/:id/repository/branches/:b", "--placeholder", "b=nope").err).toContain(
+      "404",
+    );
+  });
+
+  test("keeps :b distinct from a longer placeholder name", () => {
+    const r = stub(run, "glab", [
+      "api",
+      "projects/:id/repository/branches/:branch",
+      "--placeholder",
+      "b=x",
+      "--placeholder",
+      "branch=release/rate-limit",
+    ]);
+    expect(JSON.parse(r.out)).toMatchObject({ name: "release/rate-limit" });
+  });
+
   test.each([
     [["mr", "note", "89", "-m", "hi"], "glab mr note"],
+    [["mr", "note", "create", "89", "--reply", "d1"], "glab mr note create"],
+    [["mr", "note", "create", "89", "-m", "/request_review @jlee"], "glab mr note create"],
+    [
+      ["mr", "note", "create", "89", "--attach", "tmp/shot.png", "-m", "see"],
+      "glab mr note create",
+    ],
+    [["mr", "note", "resolve", "89", "d1"], "glab mr note resolve"],
+    [["mr", "note", "reopen", "89", "d1"], "glab mr note reopen"],
+    [["mr", "update", "89", "--attach", "tmp/shot.png"], "glab mr update"],
+    [["mr", "update", "--attach", "tmp/a.png", "--attach", "tmp/b.png", "89"], "glab mr update"],
     [["mr", "approve", "89"], "glab mr approve"],
     [
       ["api", "-X", "PUT", "projects/:id/merge_requests/89/discussions/d1", "-f", "resolved=true"],
@@ -489,5 +582,266 @@ describe("glab snapshot", () => {
     const r = stub(run, "glab", args);
     expect(r.code).toBe(1);
     expect(r.err).toContain(what);
+  });
+});
+
+describe("dispatch stand-ins", () => {
+  const calls = async (run: Home) =>
+    (await Bun.file(join(run.cwd, ".eval-calls")).text()).trim().split("\n");
+  const line = (cli: string, argv: string[]) => [cli, ...argv].join(" ");
+
+  test.each([
+    [["whoami", "--json"], '{"tailscale":null}\n'],
+    [["window", "new", "-s", "session:eval", "eval-x"], '{"block_ids":["block:eval-1"]}\n'],
+    [["split", "-b", "block:sender", "--split=right"], '{"block_ids":["block:eval-2"]}\n'],
+    [
+      ["block", "inspect", "block:sender", "--json"],
+      '{"session_id":"session:eval","block":{"block_id":"block:sender","window_id":"window:eval"}}\n',
+    ],
+    [["block", "call", "-b", "block:sender", "size"], '{"columns":200,"rows":50}\n'],
+    [
+      ["block", "call", "-b", "block:eval-1", "program_status", "{}"],
+      '{"records":[{"state":"working","effective_app":"claude-code"}]}\n',
+    ],
+    [["capture", "-b", "block:eval-1", "--trim"], ""],
+    [["ls"], '[{"name":"local","address":"local","state":"connected"}]\n'],
+    [["hosts", "list"], '[{"name":"local","address":"local","state":"connected"}]\n'],
+  ])("rex %j", async (args, out) => {
+    // Each case shares one run so the block counter advances across them.
+    run ??= await install();
+    const r = stub(run, "rex", args);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe(out);
+    expect((await calls(run)).at(-1)).toBe(line("rex", args));
+  });
+
+  let run: Home | undefined;
+
+  test("rex reports the state in session-status, bare or as JSON", async () => {
+    const r = await install();
+    const poll = () =>
+      stub(r, "rex", ["block", "call", "-b", "b", "program_status", "{}"]).out.trim();
+    await Bun.write(join(r.home, ".eval-stubs/session-status"), "done\n");
+    expect(poll()).toBe('{"records":[{"state":"done","effective_app":"claude-code"}]}');
+    await Bun.write(
+      join(r.home, ".eval-stubs/session-status"),
+      '{"state":"blocked","kind":"permission","msg":"Bash"}',
+    );
+    expect(poll()).toBe(
+      '{"records":[{"state":"blocked","kind":"permission","msg":"Bash","effective_app":"claude-code"}]}',
+    );
+  });
+
+  test("install.sh starts an empty call log", async () => {
+    const r = await install();
+    expect(await Bun.file(join(r.cwd, ".eval-calls")).text()).toBe("");
+    expect(await Bun.file(join(r.cwd, ".eval-briefs.md")).text()).toBe("");
+  });
+
+  test("a launch logs its command without the prompt, which goes to the briefs file", async () => {
+    const r = await install();
+    const worktree = join(r.home, "wt1");
+    mkdirSync(join(worktree, ".claude"), { recursive: true });
+    await $`git init -q -b fix-one`.cwd(worktree);
+    await Bun.write(
+      join(worktree, ".claude/settings.local.json"),
+      JSON.stringify({
+        permissions: { allow: ["Bash(bun test:*)", "Read"] },
+        sandbox: { filesystem: { allowWrite: ["/x/repo"] } },
+      }),
+    );
+    const launch = (path: string, name: string, prompt: string) =>
+      stub(r, "rex", [
+        "window",
+        "new",
+        "-s",
+        "s",
+        "Fix One",
+        "-c",
+        path,
+        "--json",
+        "--",
+        "claude",
+        "--name",
+        name,
+        "--",
+        prompt,
+      ]);
+    launch(worktree, "one", "Fix it.\nThen test.");
+    stub(r, "rex", ["split", "-b", "b", "-c", join(r.home, "none"), "--label", "Two Words"]);
+    const bg = Bun.spawnSync(
+      [join(r.home, ".eval-stubs/bin", "claude"), "--bg", "--name", "bg", "--", "Back\nground"],
+      { cwd: worktree, env: { ...process.env, HOME: r.home } },
+    );
+    expect(bg.stdout.toString()).toBe("bg-eval-1\n");
+    expect(await calls(r)).toEqual([
+      `rex window new -s s Fix One -c ${worktree} --json -- claude --name one -- <prompt>`,
+      `launch fix-one ${worktree} place=tab title=Fix One`,
+      "allow Bash(bun test:*)",
+      "allow Read",
+      "sandbox-write /x/repo",
+      `rex split -b b -c ${join(r.home, "none")} --label Two Words`,
+      `launch unknown ${join(r.home, "none")} place=pane title=Two Words`,
+      "claude --bg --name bg -- <prompt>",
+      `launch fix-one ${worktree} place=bg`,
+      "allow Bash(bun test:*)",
+      "allow Read",
+      "sandbox-write /x/repo",
+    ]);
+    expect(await Bun.file(join(r.cwd, ".eval-briefs.md")).text()).toBe(
+      "=== prompt for one ===\nFix it.\nThen test.\n\n=== prompt for bg ===\nBack\nground\n\n",
+    );
+  });
+
+  test("newlines inside an argument word stay on one line", async () => {
+    const r = await install();
+    stub(r, "rex", ["kill", "a\nb"]);
+    expect(await calls(r)).toEqual(["rex kill a b"]);
+  });
+
+  test("rex fails anything else offline, and records the call", async () => {
+    const r = await install();
+    const res = stub(r, "rex", ["kill", "-b", "x"]);
+    expect(res.code).toBe(1);
+    expect(res.out).toBe("");
+    expect(res.err).toBe("rex stand-in: kill -b x is unavailable offline\n");
+    expect(await calls(r)).toEqual([line("rex", ["kill", "-b", "x"])]);
+  });
+
+  test("claude lists each background launch as working", async () => {
+    const r = await install();
+    stub(r, "claude", ["--bg", "--name", "a", "--", "one"]);
+    stub(r, "claude", ["--bg", "--name", "b", "--", "two"]);
+    const listed = stub(r, "claude", ["agents", "--json", "--all"]);
+    expect(JSON.parse(listed.out)).toEqual([
+      { id: "bg-eval-1", state: "working" },
+      { id: "bg-eval-2", state: "working" },
+    ]);
+    await Bun.write(
+      join(r.home, ".eval-stubs/session-status"),
+      '{"state":"blocked","kind":"permission","msg":"Bash"}',
+    );
+    const blocked: unknown = JSON.parse(stub(r, "claude", ["agents", "--json"]).out);
+    expect(blocked).toEqual([
+      { id: "bg-eval-1", state: "blocked", status: "waiting", waitingFor: "permission prompt" },
+      { id: "bg-eval-2", state: "blocked", status: "waiting", waitingFor: "permission prompt" },
+    ]);
+  });
+
+  test("claude records anything else and fails offline", async () => {
+    const r = await install();
+    const res = stub(r, "claude", ["logs", "x"]);
+    expect(res.code).toBe(1);
+    expect(res.out).toBe("");
+    expect(res.err).toBe("claude stand-in: logs x is unavailable offline\n");
+    expect(await calls(r)).toEqual([line("claude", ["logs", "x"])]);
+  });
+
+  describe("wt", () => {
+    let r: Home;
+    let root: string;
+    const switchArgs = (...target: string[]) => [
+      "-C",
+      root,
+      "switch",
+      ...target,
+      "--no-cd",
+      "--yes",
+      "--format=json",
+    ];
+
+    beforeAll(async () => {
+      r = await install();
+      root = join(r.home, "repo");
+      mkdirSync(root);
+      await $`git init -q -b main && git config user.email a@b.c && git config user.name n && git commit -q --allow-empty -m init && git branch old`.cwd(
+        root,
+      );
+    });
+
+    test("creates a branch under .worktrees, then reports it existing", async () => {
+      const args = switchArgs("--create", "feat/x", "--base", "main");
+      const first = stub(r, "wt", args);
+      const path = join(root, ".worktrees/feat/x");
+      expect(first.code).toBe(0);
+      expect(first.out).toBe(
+        `${JSON.stringify({ action: "created", branch: "feat/x", path, created_branch: true })}
+`,
+      );
+      expect((await $`git -C ${path} branch --show-current`.text()).trim()).toBe("feat/x");
+      const second = stub(r, "wt", switchArgs("feat/x"));
+      expect(second.out).toBe(
+        `${JSON.stringify({ action: "existing", branch: "feat/x", path, created_branch: false })}
+`,
+      );
+      expect((await calls(r)).at(0)).toBe(line("wt", args));
+    });
+
+    test("checks out an existing branch without creating it", () => {
+      const path = join(root, ".worktrees/old");
+      expect(stub(r, "wt", switchArgs("old")).out).toBe(
+        `${JSON.stringify({ action: "created", branch: "old", path, created_branch: false })}
+`,
+      );
+    });
+
+    test.each([["pr:12"], ["mr:3"]])("%s fails offline and is recorded", async (target) => {
+      const args = switchArgs(target);
+      const res = stub(r, "wt", args);
+      expect(res.code).toBe(1);
+      expect(res.err).toBe(`wt stand-in: ${args.join(" ")} is unavailable offline\n`);
+      expect((await calls(r)).at(-1)).toBe(line("wt", args));
+    });
+
+    test("other subcommands fail offline", () => {
+      const res = stub(r, "wt", ["list"]);
+      expect(res.code).toBe(1);
+      expect(res.err).toBe("wt stand-in: list is unavailable offline\n");
+    });
+  });
+
+  test("dispatch.ts runs end to end against the stand-ins", async () => {
+    const r = await install();
+    const repo = join(r.home, "repo");
+    mkdirSync(repo);
+    const origin = join(r.home, "origin.git");
+    await $`git init -q --bare -b main ${origin}`;
+    await $`git init -q -b main && git config user.email a@b.c && git config user.name n && git remote add origin ${origin} && git commit -q --allow-empty -m init && git push -q -u origin main`.cwd(
+      repo,
+    );
+    const prompt = join(r.home, "prompt.md");
+    await Bun.write(prompt, "Do the thing.\n");
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([k]) => !k.startsWith("HERDR_")),
+    );
+    const proc = Bun.spawnSync(
+      [
+        "bun",
+        join(import.meta.dir, "../../plugins/dispatch/skills/dispatch/scripts/dispatch.ts"),
+        "--branch",
+        "eval-x",
+        "--prompt",
+        prompt,
+      ],
+      {
+        cwd: repo,
+        env: {
+          ...env,
+          HOME: r.home,
+          PATH: `${join(r.home, ".eval-stubs/bin")}:${process.env.PATH ?? ""}`,
+          REX_BLOCK: "block:sender",
+          CLAUDE_PLUGIN_DATA: mkdtempSync(join(tmpdir(), "eval-stubs-data-")),
+        },
+      },
+    );
+    expect(proc.stderr.toString()).toBe("");
+    const printed = proc.stdout.toString().trim().split("\n").at(-1) ?? "";
+    expect(JSON.parse(printed)).toMatchObject({ status: "working", branch: "eval-x" });
+    expect(Bun.spawnSync(["test", "-d", join(repo, ".worktrees/eval-x")]).exitCode).toBe(0);
+    expect(await Bun.file(join(r.cwd, ".eval-briefs.md")).text()).toContain("Do the thing.");
+    expect(await calls(r)).toContain(
+      `launch eval-x ${join(repo, ".worktrees/eval-x")} place=tab title=Eval X`,
+    );
+    expect((await calls(r)).some((l) => l.startsWith("wt "))).toBe(true);
   });
 });

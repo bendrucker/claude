@@ -1,0 +1,10 @@
+diff --git a/docs/releasing.md b/docs/releasing.md
+new file mode 100644
+--- /dev/null
++++ b/docs/releasing.md
+@@ -0,0 +1,5 @@
++# Releasing
++
++Tag the commit on `main` with the next version and push the tag. The release workflow builds the notes from merged pull request titles.
++
++A release needs a green `main`.

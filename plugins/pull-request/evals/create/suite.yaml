@@ -17,5 +17,8 @@ graders:
   limit-contrast-phrases: "!quiet-*"
   limit-hidden-words: "!quiet-*"
   limit-list-items: "!quiet-*"
+  limit-wall-lists: "!quiet-*"
   create-quiet: "quiet-*"
   no-test-tally: [manual-verification, overturned-theory]
+  structured: "large-*"
+  no-placeholder: "template-*"

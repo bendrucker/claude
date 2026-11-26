@@ -4,6 +4,9 @@
 # contents. claude-upgrade reinstalls it after every sync, so the deployed clone
 # always carries the installed herdr's version without git tracking a vendor file.
 user/hooks/herdr-agent-state.sh
+# `rex skill setup` writes this through the ~/.claude/skills symlink and owns it.
+# claude-sync reruns setup after every sync.
+user/skills/rex/
 .prek/
 node_modules/
 .DS_Store
@@ -42,6 +45,10 @@ node_modules/
 # `install.sh` replaces them on every upgrade.
 /user/skills/plannotator*
 
+# The Moshi app writes its inline-visuals skill into ~/.claude/skills, which is
+# this repo's user/skills.
+/user/skills/moshi-visuals/
+
 # Claude Code syncs account-level skills into ~/.claude/skills, which is this
 # repo's user/skills. They belong to that install, not here.
 /user/skills/synced/
@@ -60,3 +67,6 @@ similarity.json
 # tsconfig.json extending its generated .claude-plugin/types, which ignores
 # itself. Mods keep their tsconfig in mod/ instead.
 /plugins/*/tsconfig.json
+
+# The prose lab's labels quote documents it may later read outside this repo, so the eval bucket holds them.
+/packages/prose-lab/data/

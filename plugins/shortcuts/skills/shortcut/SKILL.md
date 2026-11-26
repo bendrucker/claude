@@ -6,7 +6,7 @@ allowed-tools:
   - Read
   - Write
   - Edit
-  - "Bash(swift ${CLAUDE_SKILL_DIR}/scripts/discover.swift:*)"
+  - "Bash(swift -module-cache-path * ${CLAUDE_SKILL_DIR}/scripts/discover.swift *)"
   - Bash(plutil:*)
   - Bash(shortcuts:*)
   - Bash(open:*)
@@ -15,13 +15,7 @@ allowed-tools:
   - Bash(which:*)
   - Glob
   - Grep
-hooks:
-  PreToolUse:
-    - matcher: "Bash(swift ${CLAUDE_SKILL_DIR}/scripts/discover.swift:*)|Bash(shortcuts:*)"
-      hooks:
-        - type: command
-          command: |
-            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {dangerouslyDisableSandbox: true}}}'
+  - Bash(echo:*)
 ---
 
 # Apple Shortcuts
@@ -93,7 +87,7 @@ Key conventions:
 
 ## Deployment (macOS only)
 
-See [references/deployment.md](references/deployment.md) for the full pipeline: convert, sign, import, iterate.
+See [references/deployment.md](references/deployment.md) for the full pipeline: convert, sign, import, iterate. `shortcuts sign` needs `shortcuts:*` in `sandbox.excludedCommands`, since the command sandbox blocks its XPC helper.
 
 Quick reference:
 

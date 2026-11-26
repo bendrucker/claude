@@ -1,0 +1,9 @@
+{
+  "name": "rex",
+  "description": "Conventions for driving the Rex terminal multiplexer: tabs, panes, splits, hosts, and reading other terminals",
+  "dependencies": ["dispatch"],
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

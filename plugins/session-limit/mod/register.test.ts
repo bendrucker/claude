@@ -44,11 +44,21 @@ function worldOf(
   });
   on("session.measure", ($, e) => ({ changed: e.changed }));
   on("session.start", ($, e) => ({ cwd: e.cwd }));
+  on("command.register", () => ({ value: { command: "session-limit" } }));
   on("state.set", ($, e, next) => {
     world.announced.push(e.value);
     return next(e);
   });
   return world;
+}
+
+function sessionLimitCommand($: Engine, args: string) {
+  return $.command.run({
+    command: "session-limit",
+    args,
+    origin: { kind: "composer" },
+    presentation: { isFullscreen: false, columns: 120 },
+  });
 }
 
 function measure($: Engine, rateLimits: SessionRateLimit[], changed: UsageUnit[] = ["rateLimits"]) {
@@ -231,5 +241,57 @@ describe("register", () => {
     await measure($, []);
     expect(world.announced).toEqual([{}]);
     expect(world.events).toEqual([]);
+  });
+
+  test(
+    "the muted option records a crossing without appending it",
+    { options: { muted: true } },
+    async ($, on) => {
+      const world = worldOf(on, { append: "land" });
+      await measure($, limits(90));
+      expect(world.logs).toEqual([]);
+      expect(world.announced).toEqual([
+        {
+          five_hour: { band: 90, resetsAt: FIVE_RESETS },
+          seven_day: { band: 0, resetsAt: SEVEN_RESETS },
+        },
+      ]);
+      expect(world.events).toEqual([
+        expect.objectContaining({
+          event: "muted",
+          detail: expect.objectContaining({ source: "machine" }),
+        }),
+      ]);
+    },
+  );
+
+  test("/session-limit off mutes the session", async ($, on) => {
+    const world = worldOf(on, { append: "land" });
+    expect((await sessionLimitCommand($, "off")).text).toBe(
+      "Usage limit notices muted (this session)",
+    );
+    await measure($, limits(90));
+    expect(world.logs).toEqual([]);
+  });
+
+  test(
+    "/session-limit on overrides the muted option for the session",
+    { options: { muted: true } },
+    async ($, on) => {
+      const world = worldOf(on, { append: "land" });
+      expect((await sessionLimitCommand($, "")).text).toBe(
+        "Usage limit notices muted (machine default)",
+      );
+      expect((await sessionLimitCommand($, "on")).text).toBe(
+        "Usage limit notices on (this session)",
+      );
+      await measure($, limits(90));
+      expect(world.logs).toHaveLength(1);
+    },
+  );
+
+  test("/session-limit rejects an unknown argument", async ($, on) => {
+    worldOf(on);
+    expect((await sessionLimitCommand($, "never")).text).toBe("Usage: /session-limit [on|off]");
   });
 });

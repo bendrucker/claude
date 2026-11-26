@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { globSync } from "node:fs";
 import { join, relative } from "node:path";
+import { parse } from "yaml";
+import { z } from "zod";
 import { check } from "../../../../../packages/evals/check";
 import { generate } from "../../../../../packages/evals/generate";
 import { loadGraders, verdict } from "../../../../../packages/evals/graders";
@@ -55,10 +57,10 @@ describe("the decide family", () => {
     expect(new Set(Object.values(count((c) => `${c.trap.id}/${c.split}`)))).toEqual(
       new Set([1, 2]),
     );
-    expect(count((c) => c.split)).toEqual({ dev: 22, holdout: 11 });
+    expect(count((c) => c.split)).toEqual({ dev: 24, holdout: 12 });
     expect(count((c) => c.trap.expected)).toEqual({
       "more-runs": 9,
-      reject: 12,
+      reject: 15,
       stall: 3,
       stop: 3,
       "re-baseline": 3,
@@ -100,9 +102,10 @@ describe("the decide family", () => {
     );
     const accept = c.trap.expected === "accept";
     expect(Object.keys(generated).some((f) => f.endsWith("review-dispatched.md"))).toBe(accept);
-    expect(generated[join(c.name, "case.yaml")]?.includes("allowed_tools: [Skill, Agent]")).toBe(
-      accept,
-    );
+    const { execution } = z
+      .object({ execution: z.object({ allowed_tools: z.array(z.string()) }) })
+      .parse(parse(generated[join(c.name, "case.yaml")] ?? ""));
+    expect(execution.allowed_tools.includes("Agent")).toBe(accept);
   });
 });
 

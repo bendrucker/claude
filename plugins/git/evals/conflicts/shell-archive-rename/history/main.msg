@@ -1,0 +1,1 @@
+move scripts to bin

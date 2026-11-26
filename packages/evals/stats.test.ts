@@ -14,6 +14,16 @@ describe("pValue", () => {
     expect(pValue([1, 1, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0])).toBeLessThan(0.1);
   });
 
+  test("never reaches 0, since the observed split counts as one permutation", () => {
+    const n = Array.from({ length: 20 }, (_, i) => i);
+    expect(
+      pValue(
+        n,
+        n.map((x) => x + 100),
+      ),
+    ).toBe(1 / 10_001);
+  });
+
   test("does not separate one flip in three", () => {
     expect(pValue([1, 1, 1], [1, 1, 0])).toBeGreaterThan(0.1);
   });
@@ -31,25 +41,33 @@ describe("pFloor", () => {
 });
 
 describe("signFlipPValue", () => {
-  test("returns NaN when every pair tied", () => {
-    expect(signFlipPValue([0.5, 0.5, 0.5])).toBeNaN();
+  test("returns NaN when every difference is zero", () => {
+    expect(signFlipPValue([0, 0, 0])).toBeNaN();
   });
 
-  test("a unanimous win for b is extreme", () => {
+  test("a unanimous win is extreme", () => {
     const rng = seedrandom("test-a");
-    expect(signFlipPValue([1, 1, 1, 1, 1, 1, 1, 1], 2000, rng)).toBeLessThan(0.05);
+    expect(signFlipPValue([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], rng)).toBeLessThan(0.05);
   });
 
   test("an even split is not extreme", () => {
     const rng = seedrandom("test-b");
-    expect(signFlipPValue([1, 0, 1, 0, 1, 0], 2000, rng)).toBeGreaterThan(0.5);
+    expect(signFlipPValue([0.5, -0.5, 0.5, -0.5, 0.5, -0.5], rng)).toBeGreaterThan(0.5);
   });
 
-  test("is deterministic under a seeded rng", () => {
-    const wins = [1, 1, 0, 1, 0.5, 1, 0];
-    const a = signFlipPValue(wins, 500, seedrandom("same-seed"));
-    const b = signFlipPValue(wins, 500, seedrandom("same-seed"));
-    expect(a).toBe(b);
+  test("never reaches 0, since the observed signs count as one permutation", () => {
+    expect(signFlipPValue(Array.from({ length: 40 }, () => 1))).toBe(1 / 10_001);
+  });
+
+  test("zeros neither move the p-value nor draw from the rng", () => {
+    const diffs = [0.4, -0.2, 0.6, 0.2];
+    const padded = [0, ...diffs.flatMap((d) => [d, 0])];
+    expect(signFlipPValue(padded, seedrandom("s"))).toBe(signFlipPValue(diffs, seedrandom("s")));
+  });
+
+  test("reprints the same p-value by default", () => {
+    const diffs = [0.5, 0.5, -0.5, 0.5, 0, 0.5, -0.5];
+    expect(signFlipPValue(diffs)).toBe(signFlipPValue(diffs));
   });
 });
 

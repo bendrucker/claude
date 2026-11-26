@@ -1,6 +1,6 @@
 {
   "name": "github",
-  "description": "GitHub workflow, Actions monitoring, and rulesets management",
+  "description": "GitHub Actions monitoring and pull request tooling",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
@@ -13,10 +13,22 @@
       "description": "Comma-separated logins that --bots treats as review bots, beyond the structural bot detection. Empty adds none.",
       "default": ""
     },
+    "ignore": {
+      "type": "string",
+      "title": "Ignored commenters",
+      "description": "Comma-separated logins whose pull request comments the watcher never sends to the session. Reviews still reach it. Empty ignores none.",
+      "default": ""
+    },
+    "ignoreBody": {
+      "type": "string",
+      "title": "Ignored bot comments",
+      "description": "A regular expression. A bot's pull request comment whose body matches it is not sent to the session, beyond the built-in chatter rules. Empty adds none.",
+      "default": ""
+    },
     "watch": {
       "type": "boolean",
       "title": "Watch the pull request",
-      "description": "Watch the current branch's pull request in interactive sessions and show its state in the prompt footer.",
+      "description": "Watch the current branch's pull request, and those the session opens or tracks with /pr track, in interactive sessions and show their state in the prompt footer.",
       "default": true
     }
   }

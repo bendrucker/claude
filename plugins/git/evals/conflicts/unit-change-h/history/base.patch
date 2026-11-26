@@ -1,0 +1,99 @@
+diff --git a/lib/backup.sh b/lib/backup.sh
+new file mode 100644
+index 0000000..c66b306
+--- /dev/null
++++ b/lib/backup.sh
+@@ -0,0 +1,7 @@
++#!/usr/bin/env bash
++. "$(dirname "${BASH_SOURCE[0]}")/size.sh"
++
++backup_size() {
++  local total_kb=$1
++  printf 'backup: %s\n' "$(human_size "$total_kb")"
++}
+diff --git a/lib/cleanup.sh b/lib/cleanup.sh
+new file mode 100644
+index 0000000..d56a101
+--- /dev/null
++++ b/lib/cleanup.sh
+@@ -0,0 +1,7 @@
++#!/usr/bin/env bash
++. "$(dirname "${BASH_SOURCE[0]}")/size.sh"
++
++cleanup_freed() {
++  local freed_kb=$1
++  printf 'freed: %s\n' "$(human_size "$freed_kb")"
++}
+diff --git a/lib/report.sh b/lib/report.sh
+new file mode 100644
+index 0000000..aeaec49
+--- /dev/null
++++ b/lib/report.sh
+@@ -0,0 +1,7 @@
++#!/usr/bin/env bash
++. "$(dirname "${BASH_SOURCE[0]}")/size.sh"
++
++report_disk() {
++  local used_kb=$1
++  printf 'disk: %s\n' "$(human_size "$used_kb")"
++}
+diff --git a/lib/size.sh b/lib/size.sh
+new file mode 100644
+index 0000000..8e4f97d
+--- /dev/null
++++ b/lib/size.sh
+@@ -0,0 +1,13 @@
++#!/usr/bin/env bash
++
++# human_size <kilobytes>: prints a size such as 1.5 MB.
++human_size() {
++  local kb=$1
++  if [ "$kb" -ge 1048576 ]; then
++    printf '%d.%d GB\n' $((kb / 1048576)) $((kb * 10 / 1048576 % 10))
++  elif [ "$kb" -ge 1024 ]; then
++    printf '%d.%d MB\n' $((kb / 1024)) $((kb * 10 / 1024 % 10))
++  else
++    printf '%d KB\n' "$kb"
++  fi
++}
+diff --git a/lib/status.sh b/lib/status.sh
+new file mode 100644
+index 0000000..ffe549c
+--- /dev/null
++++ b/lib/status.sh
+@@ -0,0 +1,7 @@
++#!/usr/bin/env bash
++. "$(dirname "${BASH_SOURCE[0]}")/size.sh"
++
++status_cache() {
++  local cache_kb=$1
++  printf 'cache: %s\n' "$(human_size "$cache_kb")"
++}
+diff --git a/test/run.sh b/test/run.sh
+new file mode 100644
+index 0000000..a644535
+--- /dev/null
++++ b/test/run.sh
+@@ -0,0 +1,22 @@
++#!/usr/bin/env bash
++set -u
++here=$(cd "$(dirname "$0")/.." && pwd)
++for lib in size report backup cleanup status; do
++  . "$here/lib/$lib.sh"
++done
++
++fail=0
++check() {
++  if [ "$1" != "$2" ]; then
++    echo "want '$1', got '$2'" >&2
++    fail=1
++  fi
++}
++
++check "512 KB" "$(human_size 512)"
++check "1.5 MB" "$(human_size 1536)"
++check "disk: 2.0 MB" "$(report_disk 2048)"
++check "backup: 3.0 GB" "$(backup_size 3145728)"
++check "freed: 700 KB" "$(cleanup_freed 700)"
++check "cache: 1.0 MB" "$(status_cache 1024)"
++exit "$fail"

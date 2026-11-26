@@ -38,8 +38,8 @@ test("scoreResults writes ranking and off-CPU runs that compare.ts loads", async
     ["logship", { with: [1, 0.5], without: [0] }],
   ]);
 
-  const out = join(results, "scored.json");
-  await Bun.write(out, JSON.stringify(scored));
+  const out = join(results, "scored", "aggregate-result.json");
+  expect(await Bun.file(out).exists()).toBe(true);
   const column = await loadColumn([out]);
   expect(column.get("kvload/with")?.graders.get("lead@1")).toEqual([true]);
   expect(column.get("logship/with")?.graders.get("cited-all")).toEqual([true, false]);

@@ -1,0 +1,103 @@
+diff --git a/tally/__init__.py b/tally/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/tally/audit.py b/tally/audit.py
+new file mode 100644
+index 0000000..8ebd267
+--- /dev/null
++++ b/tally/audit.py
+@@ -0,0 +1,6 @@
++from tally.seq import split_chunks
++
++
++def group_sums(ids, group_size=10):
++    """Sums ids in consecutive groups for spot checks."""
++    return [sum(group) for group in split_chunks(ids, group_size)]
+diff --git a/tally/ingest.py b/tally/ingest.py
+new file mode 100644
+index 0000000..e1ee12a
+--- /dev/null
++++ b/tally/ingest.py
+@@ -0,0 +1,12 @@
++from tally.seq import split_chunks
++
++BATCH = 100
++
++
++def load(rows, sink):
++    """Sends rows to sink in batches and returns how many batches went out."""
++    sent = 0
++    for batch in split_chunks(rows, BATCH):
++        sink(batch)
++        sent += 1
++    return sent
+diff --git a/tally/render.py b/tally/render.py
+new file mode 100644
+index 0000000..fa9ec8c
+--- /dev/null
++++ b/tally/render.py
+@@ -0,0 +1,6 @@
++from tally.seq import split_chunks
++
++
++def pages(lines, per_page):
++    """Joins lines into text pages of at most per_page lines."""
++    return ["\n".join(chunk) for chunk in split_chunks(lines, per_page)]
+diff --git a/tally/seq.py b/tally/seq.py
+new file mode 100644
+index 0000000..a0c07d9
+--- /dev/null
++++ b/tally/seq.py
+@@ -0,0 +1,4 @@
++def split_chunks(items, size):
++    """Yields consecutive slices of items, each at most size long."""
++    for start in range(0, len(items), size):
++        yield items[start : start + size]
+diff --git a/tally/upload.py b/tally/upload.py
+new file mode 100644
+index 0000000..df9d032
+--- /dev/null
++++ b/tally/upload.py
+@@ -0,0 +1,6 @@
++from tally.seq import split_chunks
++
++
++def parts(blob, size):
++    """Cuts a blob into upload parts of at most size bytes."""
++    return list(split_chunks(blob, size))
+diff --git a/tests/__init__.py b/tests/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/tests/test_ingest.py b/tests/test_ingest.py
+new file mode 100644
+index 0000000..7732ce9
+--- /dev/null
++++ b/tests/test_ingest.py
+@@ -0,0 +1,10 @@
++import unittest
++
++from tally.ingest import load
++
++
++class LoadTest(unittest.TestCase):
++    def test_batches_of_one_hundred(self):
++        seen = []
++        self.assertEqual(load(list(range(1, 251)), seen.append), 3)
++        self.assertEqual([len(batch) for batch in seen], [100, 100, 50])
+diff --git a/tests/test_seq.py b/tests/test_seq.py
+new file mode 100644
+index 0000000..48df467
+--- /dev/null
++++ b/tests/test_seq.py
+@@ -0,0 +1,11 @@
++import unittest
++
++from tally.seq import split_chunks
++
++
++class SplitChunksTest(unittest.TestCase):
++    def test_last_chunk_is_short(self):
++        self.assertEqual(list(split_chunks([1, 2, 3, 4, 5], 2)), [[1, 2], [3, 4], [5]])
++
++    def test_empty_input_yields_nothing(self):
++        self.assertEqual(list(split_chunks([], 3)), [])

@@ -231,7 +231,7 @@ interface FileContent {
   newline: boolean;
 }
 
-const fileContent: gs.Generator<FileContent> = gs.record({
+const fileContent: gs.PrintableGenerator<FileContent> = gs.record({
   body: gs.text({ minSize: 1 }),
   newline: gs.booleans(),
 });

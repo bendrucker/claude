@@ -6,3 +6,4 @@ fail:
   - limit-contrast-phrases
   - limit-hidden-words
   - limit-list-items
+  - limit-wall-lists

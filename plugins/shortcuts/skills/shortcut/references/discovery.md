@@ -7,7 +7,7 @@ The `discover.swift` CLI provides access to macOS-native Shortcuts APIs, outputt
 ## Commands
 
 ```bash
-swift @scripts/discover.swift <actions|apps>
+swift -module-cache-path "$TMPDIR/swift-module-cache" @scripts/discover.swift <actions|apps>
 ```
 
 ### `actions` — Dump all built-in actions
@@ -15,13 +15,13 @@ swift @scripts/discover.swift <actions|apps>
 Outputs a JSON array of all built-in Shortcuts actions with identifier, name, description, category, and parameters. Takes ~3s due to runtime introspection of 387+ actions.
 
 ```bash
-swift @scripts/discover.swift actions
+swift -module-cache-path "$TMPDIR/swift-module-cache" @scripts/discover.swift actions
 ```
 
 **Cache on first use.** The output is stable within a session. Write it to a temp file and query from there.
 
 ```bash
-swift @scripts/discover.swift actions > /tmp/shortcut-actions.json
+swift -module-cache-path "$TMPDIR/swift-module-cache" @scripts/discover.swift actions > /tmp/shortcut-actions.json
 
 # Search by identifier
 jq '[.[] | select(.identifier | test("calendar"))]' /tmp/shortcut-actions.json
@@ -47,12 +47,12 @@ jq '.[].identifier' /tmp/shortcut-actions.json
 Outputs a JSON array of installed apps that provide App Intents metadata.
 
 ```bash
-swift @scripts/discover.swift apps
+swift -module-cache-path "$TMPDIR/swift-module-cache" @scripts/discover.swift apps
 ```
 
 ```bash
 # Find a specific app
-swift @scripts/discover.swift apps | jq '.[] | select(.name | test("Things"; "i"))'
+swift -module-cache-path "$TMPDIR/swift-module-cache" @scripts/discover.swift apps | jq '.[] | select(.name | test("Things"; "i"))'
 ```
 
 ## Third-Party App Actions

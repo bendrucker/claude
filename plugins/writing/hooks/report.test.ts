@@ -1,97 +1,121 @@
 import { describe, expect, test } from "bun:test";
-import { type HookFinding, MAX_REPORTED, report } from "./report";
+import type { HookEvent } from "./io";
+import { decisionOf, type HookAlert, MAX_REPORTED, report, type Severity } from "./report";
 
-function makeFinding(overrides: Partial<HookFinding> = {}): HookFinding {
-  return { category: "filler", tier: "context", message: "Cut the filler.", ...overrides };
+function makeAlert(overrides: Partial<HookAlert> = {}): HookAlert {
+  return {
+    check: "Writing.FillerWords",
+    decision: "context",
+    severity: "warning",
+    message: "Cut the filler.",
+    at: "1:1",
+    ...overrides,
+  };
 }
 
+test.each<{ severity: Severity; event: HookEvent; decision: "deny" | "context" }>([
+  { severity: "error", event: "PreToolUse", decision: "deny" },
+  { severity: "warning", event: "PreToolUse", decision: "context" },
+  { severity: "suggestion", event: "PreToolUse", decision: "context" },
+  { severity: "error", event: "PostToolUse", decision: "context" },
+  { severity: "warning", event: "PostToolUse", decision: "context" },
+  { severity: "suggestion", event: "PostToolUse", decision: "context" },
+])("a $severity on $event is $decision", ({ severity, event, decision }) => {
+  expect(decisionOf(severity, event)).toBe(decision);
+});
+
 describe("report", () => {
-  test("is null without findings", () => {
-    expect(report([], { toolName: "Write" })).toBeNull();
+  test("is null without alerts", () => {
+    expect(report([], { event: "PreToolUse" })).toBeNull();
   });
 
-  test("renders a lone finding as its bare message", () => {
-    expect(report([makeFinding()], { toolName: "Bash" })?.output).toMatchInlineSnapshot(`
-      {
-        "hookSpecificOutput": {
-          "additionalContext": "Cut the filler.",
-          "hookEventName": "PreToolUse",
-        },
-      }
-    `);
-  });
-
-  test("frames a lone introduced finding as a targeted fix", () => {
-    const result = report([makeFinding({ introduced: true })], {
-      toolName: "Edit",
-      filePath: "docs/a.md",
-    });
+  test("lists a file's alerts as PostToolUse context", () => {
+    const result = report([makeAlert()], { event: "PostToolUse", filePath: "docs/a.md" });
     expect(result?.output).toMatchInlineSnapshot(`
       {
         "hookSpecificOutput": {
-          "additionalContext": "Cut the filler. You introduced this in your edit to \`docs/a.md\`. Issue a follow-up Edit that targets only the text you just changed. Do not modify unrelated parts of the file, including other pre-existing tropes.",
-          "hookEventName": "PreToolUse",
+          "additionalContext": 
+      "Vale found 1 alert in \`docs/a.md\`.
+
+      Warnings are likely problems. Fix each one unless it is wrong for this text:
+      - 1:1 Writing.FillerWords: Cut the filler."
+      ,
+          "hookEventName": "PostToolUse",
         },
       }
     `);
   });
 
-  test("lists every finding at the strictest tier, deny first", () => {
+  test("denies a message when any alert denies, listing the deny first", () => {
     const result = report(
       [
-        makeFinding(),
-        makeFinding({ category: "no-negation", tier: "deny", message: "Negate the verb." }),
-        makeFinding({ category: "sentence heading", message: "Cut the heading." }),
+        makeAlert(),
+        makeAlert({
+          check: "Writing.NoNegation",
+          decision: "deny",
+          severity: "error",
+          message: "Negate the verb.",
+          at: "2:5",
+        }),
       ],
-      { toolName: "Bash" },
+      { event: "PreToolUse" },
     );
-    expect(result?.tier).toBe("deny");
+    expect(result?.decision).toBe("deny");
     expect(result?.output).toMatchInlineSnapshot(`
       {
         "hookSpecificOutput": {
           "hookEventName": "PreToolUse",
           "permissionDecision": "deny",
           "permissionDecisionReason": 
-      "Writing checks found 3 issues in this text. Fix them in one pass.
+      "Vale found 2 alerts in this text.
 
-      - no-negation: Negate the verb.
-      - filler: Cut the filler.
-      - sentence heading: Cut the heading."
+      Errors are high-confidence. Fix each one:
+      - 2:5 Writing.NoNegation: Negate the verb.
+
+      Warnings are likely problems. Fix each one unless it is wrong for this text:
+      - 1:1 Writing.FillerWords: Cut the filler."
       ,
         },
       }
     `);
   });
 
-  test("states the introduced-fix instruction once for several findings", () => {
+  test("groups alerts by severity, each under what it expects", () => {
     const result = report(
       [
-        makeFinding({ category: "spaced em dash", message: "Split it.", introduced: true }),
-        makeFinding(),
+        makeAlert({ check: "Writing.Hedge", severity: "suggestion", at: "3:1" }),
+        makeAlert({ check: "Writing.Splice", severity: "error", at: "1:1" }),
+        makeAlert({ check: "Writing.Filler", severity: "warning", at: "2:1" }),
       ],
-      { toolName: "Write", filePath: "docs/a.md" },
+      { event: "PostToolUse", filePath: "docs/a.md" },
     );
+    expect(result?.decision).toBe("context");
     expect(result?.output).toMatchInlineSnapshot(`
       {
         "hookSpecificOutput": {
           "additionalContext": 
-      "Writing checks found 2 issues in this text. Fix them in one pass.
-      You wrote \`docs/a.md\` introducing the findings marked (introduced). Issue a follow-up Edit that fixes only those tropes. Do not modify unrelated parts of the file.
+      "Vale found 3 alerts in \`docs/a.md\`.
 
-      - spaced em dash (introduced): Split it.
-      - filler: Cut the filler."
+      Errors are high-confidence. Fix each one:
+      - 1:1 Writing.Splice: Cut the filler.
+
+      Warnings are likely problems. Fix each one unless it is wrong for this text:
+      - 2:1 Writing.Filler: Cut the filler.
+
+      Suggestions are low-confidence. Apply one only where it makes the text better, and leave the rest as written:
+      - 3:1 Writing.Hedge: Cut the filler."
       ,
-          "hookEventName": "PreToolUse",
+          "hookEventName": "PostToolUse",
         },
       }
     `);
   });
 
   test("caps the list and counts the rest", () => {
-    const findings = Array.from({ length: MAX_REPORTED + 3 }, (_, i) =>
-      makeFinding({ category: `rule ${i}` }),
+    const alerts = Array.from({ length: MAX_REPORTED + 3 }, (_, i) =>
+      makeAlert({ check: `Writing.Rule${i}` }),
     );
-    const result = report(findings, { toolName: "Bash" });
+    const result = report(alerts, { event: "PreToolUse" });
     expect(result?.shown).toHaveLength(MAX_REPORTED);
     expect(result?.output).toMatchSnapshot();
   });

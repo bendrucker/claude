@@ -1,51 +1,25 @@
 import type { ProcessRunResult } from "claude-code";
 import { describe, expect, test } from "claude-code/testing";
-import { DEFAULTS, fallback, parse, probed, resolve } from "./shell";
+import { fallback, parse, probed, resolve } from "./shell";
 
 function ran(stdout: string, exitCode = 0): ProcessRunResult {
   return { exitCode, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false };
 }
 
-const ZSH_DEFAULTS = "5.9.2\non\noff\noff\non\n";
-
 describe("parse", () => {
-  const cases: [string, string, Partial<ReturnType<typeof parse>>, Record<string, boolean>][] = [
-    [
-      "zsh defaults",
-      ZSH_DEFAULTS,
-      { version: "5.9.2", active: true },
-      { glob: true, equals: true },
-    ],
-    ["nullglob on", "5.9.2\non\non\noff\non\n", { active: true }, { glob: false, equals: true }],
-    ["cshnullglob on", "5.9.2\non\noff\non\non\n", { active: true }, { glob: false, equals: true }],
-    ["nomatch off", "5.9.2\noff\noff\noff\non\n", { active: true }, { glob: false, equals: true }],
-    ["noequals", "5.9.2\non\noff\noff\noff\n", { active: true }, { glob: true, equals: false }],
-    [
-      "bash prints blanks",
-      "\n\n\n\n\n",
-      { version: null, active: false },
-      { glob: true, equals: true },
-    ],
-    ["empty output", "", { version: null, active: false }, { glob: true, equals: true }],
-  ];
-
-  test("reads the version and gates", () => {
-    for (const [name, stdout, expected, gates] of cases) {
+  test("reads the version, and treats a blank one as not zsh", () => {
+    const cases: [string, string, Partial<ReturnType<typeof parse>>][] = [
+      ["zsh", "5.9.2\n", { version: "5.9.2", active: true }],
+      ["bash prints a blank", "\n", { version: null, active: false }],
+      ["empty output", "", { version: null, active: false }],
+    ];
+    for (const [name, stdout, expected] of cases) {
       const shell = parse("/bin/sh", stdout);
       expect({ name, shell }).toMatchObject({
         name,
-        shell: { path: "/bin/sh", error: null, gates, ...expected },
+        shell: { path: "/bin/sh", error: null, ...expected },
       });
     }
-  });
-
-  test("reads each option from its own line", () => {
-    expect(parse("/bin/zsh", "5.9.2\noff\non\noff\noff\n").options).toEqual({
-      nomatch: false,
-      nullglob: true,
-      cshnullglob: false,
-      equals: false,
-    });
   });
 });
 
@@ -66,21 +40,20 @@ describe("resolve", () => {
 
 describe("probed", () => {
   test("parses a zsh probe and leaves a non-zsh shell inert", () => {
-    expect(probed("/opt/bin/zsh", ran("5.9.2\non\non\noff\non\n"))).toMatchObject({
+    expect(probed("/opt/bin/zsh", ran("5.9.2\n"))).toMatchObject({
       path: "/opt/bin/zsh",
       version: "5.9.2",
       active: true,
-      gates: { glob: false, equals: true },
       error: null,
     });
-    expect(probed("/bin/bash", ran("\n\n\n\n\n"))).toMatchObject({
+    expect(probed("/bin/bash", ran("\n"))).toMatchObject({
       path: "/bin/bash",
       active: false,
       error: null,
     });
   });
 
-  test("falls back to defaults when the probe fails", () => {
+  test("falls back on the path's name when the probe fails", () => {
     const cases: [string, ReturnType<typeof fallback>, string, boolean, string][] = [
       [
         "zsh exits nonzero",
@@ -95,14 +68,7 @@ describe("probed", () => {
     for (const [name, shell, path, active, error] of cases) {
       expect({ name, shell }).toMatchObject({
         name,
-        shell: {
-          path,
-          active,
-          version: null,
-          options: DEFAULTS,
-          gates: { glob: true, equals: true },
-          error,
-        },
+        shell: { path, active, version: null, error },
       });
     }
   });

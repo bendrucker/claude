@@ -1,0 +1,20 @@
+diff --git a/src/retry.ts b/src/retry.ts
+index f4646ef..e3cb553 100644
+--- a/src/retry.ts
++++ b/src/retry.ts
+@@ -1,6 +1,7 @@
+ export interface RetryOptions {
+   attempts: number;
+   delayMs: number;
++  shouldRetry?: (error: unknown) => boolean;
+ }
+ 
+ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+@@ -12,6 +13,7 @@ export async function retry<T>(fn: () => Promise<T>, options: RetryOptions): Pro
+       return await fn();
+     } catch (error) {
+       last = error;
++      if (options.shouldRetry && !options.shouldRetry(error)) throw error;
+       await sleep(options.delayMs);
+     }
+   }

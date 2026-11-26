@@ -6,5 +6,8 @@
     "@commander-js/extra-typings": "~15.0.0",
     "commander": "~15.0.0",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "yaml": "^2.7.1"
   }
 }

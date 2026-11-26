@@ -186,7 +186,7 @@ interface Band {
 }
 
 /**
- * Reuses the ship skill's Bot Review Gate spend list, so one set of criteria decides both.
+ * Reuses the review spend criteria in pull-request:follow-up's `local.md`, so one set decides both.
  * Costs are measured at the median PR (96 changed lines across 3 files) through p90 (381 lines).
  */
 const BANDS: Band[] = [

@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { z } from "zod";
+import { artifactsPath } from "../../../../../packages/evals/layout";
 import { readResult, type Run, score } from "../../../../../packages/evals/result";
 import { GRADERS, stubEnv } from "./check";
 
@@ -49,7 +50,7 @@ const cases = await Promise.all(
           runs.map(async (run, i): Promise<Run> => {
             const framework = c.name.split("-")[0] ?? c.name;
             const verdicts = await serial(() =>
-              grade(join(output, "artifacts", `${c.name}-${arm}-${i}`), framework),
+              grade(artifactsPath(output, c.name, arm, i), framework),
             );
             const kept = run.graders.filter((g) => !GRADERS.some((name) => name === g.name));
             const added = Object.entries(verdicts).map(([name, { passed, explanation }]) => ({

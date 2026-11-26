@@ -1,0 +1,1 @@
+Separate from what we're doing on `feature-x`: dispatch a session to design a config file for the service covering timeouts, endpoints, and retry limits. I'll want to go back and forth on the schema with it before it implements anything and opens a PR.

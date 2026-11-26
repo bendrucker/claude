@@ -1,0 +1,47 @@
+{
+  "path": "docs/metrics.rst",
+  "findings": [
+    {
+      "severity": "error",
+      "check": "Writing.SemicolonSplice",
+      "phrase": "nightly;",
+      "message": "Split the clauses into two sentences."
+    },
+    {
+      "severity": "warning",
+      "check": "ai-tells.StrategyBuzzwords",
+      "phrase": "leverage",
+      "message": "'leverage' is a buzzword. Name the action."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.FillerPhrases",
+      "phrase": "It's important to note that",
+      "message": "'It's important to note that' is filler. State the fact."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.FillerIntensifier",
+      "phrase": "very",
+      "message": "'very' adds nothing. Cut it."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.PassiveVoice",
+      "phrase": "are partitioned",
+      "message": "'are partitioned' is passive. Name who partitions the rows."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.Jargon",
+      "phrase": "idempotent",
+      "message": "'idempotent' is jargon. Say it in plain words."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.OverusedVocabulary",
+      "phrase": "robust",
+      "message": "'robust' is overused. Name the property."
+    }
+  ]
+}

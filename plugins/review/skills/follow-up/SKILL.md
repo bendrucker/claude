@@ -13,6 +13,7 @@ allowed-tools:
   - Bash(glab:*)
   - Bash(git:*)
   - Agent
+  - Bash(echo:*)
 ---
 
 # Review Follow-Up
@@ -39,7 +40,7 @@ If `$ARGUMENTS` carries a URL or identifier, use it. If it's empty, detect the c
 
 Both resolve the current branch with no positional argument. Ask me for a URL only if detection comes up empty. A closed or merged PR still resolves, so surface the `state` for me to confirm before proceeding.
 
-For GitLab, load the `gitlab:api` and `gitlab:merge-request` skills for API patterns and MR tooling.
+For GitLab, load the `gitlab:merge-request` skill for MR tooling and API patterns.
 
 ### Sync to the Latest Pushed State
 
@@ -137,7 +138,7 @@ After I decide on next steps, use platform-appropriate commands:
 
 - Approve: `gh pr review --approve`
 - Comment: `gh pr comment`, with `--attach ./shot.png` for a screenshot the comment references (load `github:attach`)
-- Resolve thread: `gh api graphql` with `resolveReviewThread` mutation
+- Resolve thread: `review-threads.ts resolve <thread-id>` from `github:pr-comments`, or `reply --resolve` to resolve with a reply
 
 ##### Draft a Pending Review
 

@@ -27,6 +27,12 @@ describe("parseReviewers", () => {
   });
 });
 
+describe("parseReviewers @ prefix", () => {
+  test("strips a leading @", () => {
+    expect(parseReviewers("@CodeRabbitAI, @jacob")).toEqual(new Set(["coderabbitai", "jacob"]));
+  });
+});
+
 describe("isReviewTarget", () => {
   test("includes structural bot accounts", () => {
     expect(isReviewTarget("group_9_bot")).toBe(true);

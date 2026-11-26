@@ -1,0 +1,10 @@
+diff --git a/billing/summary.py b/billing/summary.py
+index 3c79768..0d6bd30 100644
+--- a/billing/summary.py
++++ b/billing/summary.py
+@@ -7,4 +7,5 @@ def summarize(invoices, tax_rate=0.08):
+         "count": len(totals),
+         "total": round(sum(totals.values()), 2),
+         "largest": max(totals, key=totals.get) if totals else None,
++        "refunded": sum(1 for inv in invoices for line in inv["lines"] if line.get("refunded")),
+     }

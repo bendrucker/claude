@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { extractMermaidBlocks, validateContent, validateFile } from "./validate";
+import { extractMermaidBlocks, validateFile } from "./validate";
 
 const fixturesDir = join(import.meta.dirname, "fixtures");
 
@@ -60,38 +60,6 @@ flowchart LR
       expect(blocks[index]?.content).toContain(substring);
     }
     if (line !== undefined) expect(blocks[0]?.line).toBe(line);
-  });
-});
-
-describe("validateContent", () => {
-  test.each<{ name: string; content: string; errorCount: number; messageContains?: string }>([
-    {
-      name: "validates valid flowchart",
-      content: `\`\`\`mermaid
-flowchart LR
-    A --> B
-\`\`\``,
-      errorCount: 0,
-    },
-    {
-      name: "reports empty block error",
-      content: `\`\`\`mermaid
-\`\`\``,
-      errorCount: 1,
-      messageContains: "Empty",
-    },
-    {
-      name: "reports syntax errors",
-      content: `\`\`\`mermaid
-flowchart XY
-    A --> B
-\`\`\``,
-      errorCount: 1,
-    },
-  ])("$name", async ({ content, errorCount, messageContains }) => {
-    const errors = await validateContent(content);
-    expect(errors).toHaveLength(errorCount);
-    if (messageContains !== undefined) expect(errors[0]?.message).toContain(messageContains);
   });
 });
 

@@ -98,10 +98,6 @@ export async function validateBlocks(blocks: MermaidBlock[]): Promise<Validation
   return errors;
 }
 
-export async function validateContent(content: string): Promise<ValidationError[]> {
-  return validateBlocks(extractMermaidBlocks(content));
-}
-
 export async function validateFile(file: string): Promise<ValidationResult> {
   const content = await Bun.file(file).text();
   const blocks = extractMermaidBlocks(content);

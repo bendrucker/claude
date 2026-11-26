@@ -21,11 +21,6 @@ import type { LineRange } from "../../../detection/types";
 
 const root = join(import.meta.dirname, "..");
 
-export interface CommitLabelRef {
-  repo: string;
-  sha: string;
-}
-
 export interface CommitScoreRow {
   repo: string;
   sha: string;

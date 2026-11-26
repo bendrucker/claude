@@ -10,6 +10,8 @@ allowed-tools:
   - Grep
   - Glob
   - Agent
+  - Bash(rg:*)
+  - Bash(echo:*)
 ---
 
 # Type Ignore Fixer

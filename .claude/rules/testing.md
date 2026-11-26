@@ -46,4 +46,4 @@ New plugin tests join the existing matrix in `.github/workflows/test.yml` instea
 
 A pull request runs only the plugins its changed files name. A plugin whose tests cover something outside its own directory, such as a checked copy of another plugin's file, declares those paths in `plugins/<name>/.ci.json` under `paths` so a change there selects it too.
 
-A plugin whose tests drive an external CLI pins it in `plugins/<name>/mise.toml`, which the job installs through `mise-action` and Renovate keeps current. Exercise the real binary from a `*.integration.ts`. `runner` in `.ci.json` accepts a list for per-platform behavior.
+A plugin whose tests drive an external CLI pins it in `plugins/<name>/mise.toml`, which the job installs through `mise-action` and Renovate keeps current. Exercise the real binary from a `*.integration.ts`. `runner` in `.ci.json` accepts a list for per-platform behavior. A plugin whose tests need state a session would provide lists the commands that build it under `setup`, which the job runs in the plugin directory.

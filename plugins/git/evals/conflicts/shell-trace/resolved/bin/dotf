@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Install and update dotfiles dependencies; run periodically.
+export ZSH="$HOME/.dotfiles"
+
+. "$ZSH/scripts/shell/spin.sh"
+. "$ZSH/scripts/shell/trace.sh"
+
+trace_begin homebrew.sh
+"$ZSH/scripts/homebrew.sh"
+trace_end
+if [ -n "$CI" ]; then
+  echo "› skipping brew update (CI)"
+else
+  trace_begin "brew update"
+  spin --show-output --show-error --title "brew update" -- brew update
+  trace_end
+fi
+
+echo "› $ZSH/scripts/install"
+trace_begin install
+"$ZSH/scripts/install"
+trace_end

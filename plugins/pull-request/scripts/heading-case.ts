@@ -41,7 +41,7 @@ const STOPWORD_SET = new Set(AP_STOPWORDS);
 // AP casing runs. It carries no whitespace, so it reads as one word and keeps
 // the code span's position (first/last-word rules stay correct), and it is never
 // a stopword, so casing leaves it untouched.
-const PLACEHOLDER = String.fromCharCode(0xe000);
+const PLACEHOLDER = String.fromCodePoint(0xe000);
 
 export interface Heading {
   children: PhrasingContent[];

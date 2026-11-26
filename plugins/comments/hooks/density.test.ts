@@ -62,7 +62,7 @@ async function writeTranscript(content: string): Promise<string> {
 }
 
 async function runHook(input: Record<string, unknown>): Promise<string> {
-  const proc = Bun.spawn(["bun", HOOK], { stdin: "pipe", stdout: "pipe" });
+  const proc = Bun.spawn(["bun", HOOK], { env: process.env, stdin: "pipe", stdout: "pipe" });
   await proc.stdin.write(JSON.stringify({ cwd: repo, ...input }));
   await proc.stdin.end();
   const out = await new Response(proc.stdout).text();

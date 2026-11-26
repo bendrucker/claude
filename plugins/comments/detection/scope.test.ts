@@ -19,7 +19,7 @@ function range(start: number, end: number): LineRange {
   return { start, end };
 }
 
-const commentGen: gs.Generator<Comment> = gs
+const commentGen: gs.PrintableGenerator<Comment> = gs
   .record({
     startLine: gs.integers({ minValue: 1, maxValue: 30 }),
     span: gs.integers({ minValue: 0, maxValue: 8 }),
@@ -34,7 +34,7 @@ const commentGen: gs.Generator<Comment> = gs
     endColumn: text.length,
   }));
 
-const rangeGen: gs.Generator<LineRange> = gs
+const rangeGen: gs.PrintableGenerator<LineRange> = gs
   .record({
     start: gs.integers({ minValue: 1, maxValue: 30 }),
     span: gs.integers({ minValue: 0, maxValue: 8 }),

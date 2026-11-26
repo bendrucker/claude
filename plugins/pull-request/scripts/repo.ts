@@ -7,6 +7,7 @@ async function commitExists(cwd: string, sha: string): Promise<boolean> {
   try {
     const proc = Bun.spawn(["git", "rev-parse", "--verify", "--quiet", `${sha}^{commit}`], {
       cwd,
+      env: process.env,
       stdout: "ignore",
       stderr: "ignore",
     });

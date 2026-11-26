@@ -1,3 +1,0 @@
-# Marketing/promotional verbs, weighted by intensity. Format: <word> <weight>
-# Stemmed; fires when weighted hits reach the threshold in tropes.ts.
-empower 2.5

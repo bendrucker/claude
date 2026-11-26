@@ -1,0 +1,233 @@
+diff --git a/bin/dotf b/bin/dotf
+new file mode 100755
+index 0000000..da18ec8
+--- /dev/null
++++ b/bin/dotf
+@@ -0,0 +1,19 @@
++#!/bin/sh
++#
++# Install and update dotfiles dependencies; run periodically.
++export ZSH="$HOME/.dotfiles"
++
++. "$ZSH/scripts/shell/spin.sh"
++
++"$ZSH/scripts/homebrew.sh"
++if [ -n "$CI" ]; then
++  echo "› skipping brew update (CI)"
++else
++  spin --show-output --show-error --title "brew update" -- brew update
++fi
++
++echo "› building default packages"
++"$ZSH/bin/build-default-packages"
++
++echo "› $ZSH/scripts/install"
++"$ZSH/scripts/install"
+diff --git a/scripts/bootstrap b/scripts/bootstrap
+new file mode 100755
+index 0000000..7440796
+--- /dev/null
++++ b/scripts/bootstrap
+@@ -0,0 +1,57 @@
++#!/usr/bin/env bash
++#
++# bootstrap does the first-run-only setup (gitconfig, submodules), then hands
++# off to dotf for the shared reconcile: Homebrew packages, default package
++# lists, config symlinks, and every topic installer.
++
++cd "$(dirname "$0")/.." || exit 1
++DOTFILES_ROOT=$(pwd -P)
++
++NO_PROMPT=false
++for arg in "$@"; do
++  case $arg in
++    --no-prompt) NO_PROMPT=true ;;
++  esac
++done
++
++# Install Homebrew and gum up front; setup_gitconfig prompts via gum.
++"$DOTFILES_ROOT/scripts/homebrew.sh"
++
++setup_gitconfig () {
++  [ -f git/config.local ] && return
++
++  if [ "$NO_PROMPT" == "true" ]; then
++    gum log --level info 'skipping gitconfig setup (no-prompt mode)'
++    return
++  fi
++
++  gum log --level info 'setup gitconfig'
++
++  git_credential='cache'
++  if [ "$(uname -s)" == "Darwin" ]; then
++    git_credential='osxkeychain'
++  fi
++
++  git_authorname=$(gum input --header "GitHub author name" --placeholder "Jane Doe")
++  git_authoremail=$(gum input --header "GitHub author email" --placeholder "jane@example.com")
++
++  sed -e "s/AUTHORNAME/$git_authorname/g" -e "s/AUTHOREMAIL/$git_authoremail/g" -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" git/config.local.example > git/config.local
++}
++
++init_submodules () {
++  gum log --level info 'initializing submodules'
++  git -C "$DOTFILES_ROOT" submodule update --init --recursive
++}
++
++setup_gitconfig
++init_submodules
++
++# dotf installs Homebrew packages, builds the default package lists, links
++# configs, and runs every topic installer.
++# shellcheck disable=SC1091
++if ! source ./bin/dotf; then
++  gum log --level error 'error installing dependencies'
++  exit 1
++fi
++
++gum log --level info 'all installed'
+diff --git a/scripts/install b/scripts/install
+new file mode 100755
+index 0000000..1257cd7
+--- /dev/null
++++ b/scripts/install
+@@ -0,0 +1,72 @@
++#!/usr/bin/env zsh
++#
++# Run all dotfiles installers.
++
++set -e
++
++cd "$(dirname "$0")"/..
++
++# Detect non-interactive mode (explicit setting or non-tty stdin)
++if [[ -z "${NONINTERACTIVE-}" ]] && [[ ! -t 0 ]]; then
++  export NONINTERACTIVE=1
++fi
++
++# Trust declared taps before bundle evaluates their formulae
++./scripts/install-trust
++
++# Retire cask variants the Brewfile stopped declaring, which bundle can't
++# install over (see the script for why)
++./scripts/install-cask-variants
++
++# Leave the casks that update themselves to whatever else manages this machine.
++# Homebrew cannot move a root-owned app aside without sudo, and 3am has no
++# terminal. An `if` condition is exempt from `set -e`.
++if ./scripts/brew-managed-machine; then
++  export HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS=1
++fi
++
++brew bundle
++
++# Expose brew configuration to installers
++eval "$(brew shellenv)"
++
++source mise/install.sh
++
++# herdr's plugin config directory became a link into this repo, and
++# install-symlinks refuses to replace a real directory with one. This has to run
++# ahead of that rather than from herdr/install.sh, which runs after. It moves the
++# old directory aside rather than into the repo, so a config that was never
++# committed can't land as an untracked file that a later sync refuses to
++# overwrite.
++# EXPIRES: 2027-02-02 every machine has the linked herdr plugin config tree
++herdr_plugin_config="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/plugins/config"
++if [[ -d $herdr_plugin_config && ! -L $herdr_plugin_config ]]; then
++  rm -rf $herdr_plugin_config.pre-link
++  mv $herdr_plugin_config $herdr_plugin_config.pre-link
++  gum log --level warn "moved $herdr_plugin_config to .pre-link; anything you configured by hand is in there"
++fi
++
++# One-time cleanups older machines have left to do, which convergence cannot
++# express: it describes the state every machine should be in, and a machine
++# installed after a removal has nothing to remove. Here rather than later
++# because a fresh machine is told apart from an existing one by whether this
++# repo's symlinks are already in place, and because a migration clearing the way
++# for a link has to run before the links are laid. A failure is a warning: the
++# convergence around it has succeeded, and a cleanup that could not finish
++# tonight is retried tomorrow.
++./bin/dotfiles-migrate || gum log --level warn "some migrations did not finish"
++
++./scripts/install-symlinks
++
++./scripts/install-topics
++
++# Reconcile theme-managed configs to the active flavor. Runs after every
++# installer so each config exists; failures here shouldn't abort an otherwise
++# successful install.
++./theme/bin/theme-sync || gum log --level warn "theme-sync had issues"
++
++# Hand the new config to whatever is already running with the old one, after
++# theme-sync has settled the flavor those configs carry. Reloads are in place
++# and never restart anything, so this is safe from the nightly job. A failure
++# here shouldn't abort an otherwise successful install.
++./bin/dotfiles-reload || gum log --level warn "some config reloads had issues"
+diff --git a/scripts/install-topics b/scripts/install-topics
+new file mode 100755
+index 0000000..fece34f
+--- /dev/null
++++ b/scripts/install-topics
+@@ -0,0 +1,61 @@
++#!/usr/bin/env sh
++# Usage: install-topics [dotfiles-root]
++#
++# Run every topic installer.
++#
++# A topic is a directory at the repository root, so an installer is
++# <root>/<topic>/install.sh and never anything deeper. That one level of depth
++# is the whole bound. A git worktree under .worktrees/ holds a full second copy
++# of the tree, and a recursive walk found the installers in it and ran them.
++# That fails rather than merely repeating work, because an installer operates
++# on $ZSH, the installed tree. A copy from another branch sources a path this
++# repo has since renamed, and the nightly job dies on a file that does not
++# exist. The same bound keeps .git, node_modules, tmp's contents, and a
++# submodule's own tree out without naming any of them.
++set -e
++
++DOTFILES_ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd -P)}"
++cd "$DOTFILES_ROOT"
++
++# A submodule is another project's repo and its installer is not ours to run.
++# .gitmodules is what this repo declares, so reading it answers for a submodule
++# nobody has initialized. `git submodule foreach` reports only the initialized
++# ones and recurses into each, and a checkout broken in there would report no
++# submodules at all and let their installers run.
++declares_submodule() {
++  [ -f .gitmodules ] || return 1
++
++  # --fixed-value compares the value literally, so a path holding a space or a
++  # regex metacharacter matches as itself. A section name may hold a space too,
++  # which is why the match is git's to make rather than something to cut apart.
++  git config -f .gitmodules --get-regexp --fixed-value \
++    '^submodule\..*\.path$' "$1" >/dev/null
++  status=$?
++
++  # 1 is "no section matched", the answer for an ordinary topic. Anything else
++  # is a .gitmodules this run could not read, and reading that as "not a
++  # submodule" runs an installer that is not ours. A condition context turns
++  # off set -e, so the abort has to be spelled out here.
++  case $status in
++    0 | 1) return $status ;;
++  esac
++  echo "install-topics: cannot read .gitmodules (git config exited $status)" >&2
++  exit $status
++}
++
++for installer in */install.sh; do
++  # A glob that matches nothing stays literal in sh. -e rather than -f so that
++  # an install.sh which is somehow a directory fails loudly on the exec below
++  # instead of reading as a topic that has no installer.
++  [ -e "$installer" ] || continue
++
++  topic=${installer%/install.sh}
++  # scripts/install sources mise/install.sh ahead of this, so the runtimes it
++  # installs are on $PATH for every topic that follows.
++  case $topic in
++    mise) continue ;;
++  esac
++  if declares_submodule "$topic"; then continue; fi
++
++  "./$installer"
++done

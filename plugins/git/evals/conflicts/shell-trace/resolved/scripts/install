@@ -1,0 +1,80 @@
+#!/usr/bin/env zsh
+#
+# Run all dotfiles installers.
+
+set -e
+
+cd "$(dirname "$0")"/..
+
+source scripts/shell/trace.sh
+
+# Detect non-interactive mode (explicit setting or non-tty stdin)
+if [[ -z "${NONINTERACTIVE-}" ]] && [[ ! -t 0 ]]; then
+  export NONINTERACTIVE=1
+fi
+
+# brew bundle, from the pre-packages hook in homebrew/mise.toml. Run from the
+# topic so mise finds the hook before install-symlinks has linked conf.d.
+(cd homebrew && mise trust --yes --quiet mise.toml && mise bootstrap --only packages --yes)
+
+# Expose brew configuration to installers
+eval "$(brew shellenv)"
+
+trace_begin mise
+source mise/install.sh
+trace_end
+
+# herdr's plugin config directory became a link into this repo, and
+# install-symlinks refuses to replace a real directory with one. This has to run
+# ahead of that rather than from herdr/install.sh, which runs after. It moves the
+# old directory aside rather than into the repo, so a config that was never
+# committed can't land as an untracked file that a later sync refuses to
+# overwrite.
+# EXPIRES: 2027-02-02 every machine has the linked herdr plugin config tree
+herdr_plugin_config="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/plugins/config"
+if [[ -d $herdr_plugin_config && ! -L $herdr_plugin_config ]]; then
+  rm -rf $herdr_plugin_config.pre-link
+  mv $herdr_plugin_config $herdr_plugin_config.pre-link
+  gum log --level warn "moved $herdr_plugin_config to .pre-link; anything you configured by hand is in there"
+fi
+
+# One-time cleanups older machines have left to do, which convergence cannot
+# express: it describes the state every machine should be in, and a machine
+# installed after a removal has nothing to remove. Here rather than later
+# because a fresh machine is told apart from an existing one by whether this
+# repo's symlinks are already in place, and because a migration clearing the way
+# for a link has to run before the links are laid. A failure is a warning: the
+# convergence around it has succeeded, and a cleanup that could not finish
+# tonight is retried tomorrow.
+trace_begin dotfiles-migrate
+./bin/dotfiles-migrate || gum log --level warn "some migrations did not finish"
+trace_end
+
+trace_begin install-symlinks
+./scripts/install-symlinks
+trace_end
+
+# The rest of the mise config: macOS defaults, LaunchAgents, then the bootstrap
+# task, which runs each topic's install task. Packages, links, and tools ran
+# above, ahead of the migrations that depend on them. One job keeps the
+# installers in name order, and raw hands them the terminal, which
+# github/install.sh prompts on. A repo with local changes is skipped rather than
+# failing the run, since ~/.claude-repo routinely carries some.
+trace_begin mise-bootstrap
+MISE_JOBS=1 MISE_RAW=1 mise bootstrap --yes --skip-dirty --skip packages,dotfiles,tools
+trace_end
+
+# Reconcile theme-managed configs to the active flavor. Runs after every
+# installer so each config exists; failures here shouldn't abort an otherwise
+# successful install.
+trace_begin theme-sync
+mise run theme:sync || gum log --level warn "theme-sync had issues"
+trace_end
+
+# Hand the new config to whatever is already running with the old one, after
+# theme-sync has settled the flavor those configs carry. Reloads are in place
+# and never restart anything, so this is safe from the nightly job. A failure
+# here shouldn't abort an otherwise successful install.
+trace_begin dotfiles-reload
+./bin/dotfiles-reload || gum log --level warn "some config reloads had issues"
+trace_end

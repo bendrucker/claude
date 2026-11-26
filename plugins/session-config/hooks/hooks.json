@@ -1,0 +1,4 @@
+{
+  "description": "Replaces the static key help in the prompt hint with the session's model family, and its effort level when that differs from the default (function hooks)",
+  "modules": ["../mod/register.ts"]
+}

@@ -1,5 +1,6 @@
 // How much a PR body asks of its reader. Only what a reader sees without
 // expanding anything counts: not fenced code, not tables, not <details>.
+// Visible words, prose and list items together, are capped.
 
 import type { List, ListItem, Nodes, RootContent } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
@@ -8,7 +9,12 @@ import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 
 export interface Structure {
+  /** Words in visible paragraphs, headings, and list items. */
   visibleWords: number;
+  /** Words in visible paragraphs and headings. */
+  proseWords: number;
+  /** Words in visible list items. */
+  listWords: number;
   /** Words in the longest visible paragraph or list item. */
   maxBlockWords: number;
   /** Inline code spans in visible paragraphs and list items. */
@@ -31,7 +37,7 @@ type LimitKey =
 // One-sided limits fitted against hand-written PRs: a body fails only by
 // exceeding them, so terseness is never penalized.
 export const LIMITS = {
-  visibleWords: 120,
+  visibleWords: 150,
   maxBlockWords: 40,
   proseCodeSpans: 6,
   pathSpans: 1,
@@ -88,7 +94,8 @@ function detailsDelta(html: string): number {
 }
 
 interface Tally {
-  visibleWords: number;
+  proseWords: number;
+  listWords: number;
   blockWords: number[];
   proseCodeSpans: number;
   hiddenWords: number;
@@ -105,7 +112,7 @@ function tallyList(list: List, tally: Tally): void {
     const children = ownChildren(item);
     const text = children.map((child) => toString(child)).join(" ");
     const words = countWords(text);
-    tally.visibleWords += words;
+    tally.listWords += words;
     tally.blockWords.push(words);
     tally.proseCodeSpans += children.reduce((n, child) => n + countInlineCode(child), 0);
     tally.pathSpans += children.reduce((n, child) => n + countInlineCode(child, true), 0);
@@ -129,11 +136,11 @@ function tallyBlocks(nodes: RootContent[], tally: Tally): void {
       continue;
     }
     if (node.type === "heading") {
-      tally.visibleWords += countWords(toString(node));
+      tally.proseWords += countWords(toString(node));
     } else if (node.type === "paragraph") {
       const text = toString(node);
       const words = countWords(text);
-      tally.visibleWords += words;
+      tally.proseWords += words;
       tally.blockWords.push(words);
       tally.proseCodeSpans += countInlineCode(node);
       tally.pathSpans += countInlineCode(node, true);
@@ -154,7 +161,8 @@ function tallyBlocks(nodes: RootContent[], tally: Tally): void {
 export function measureStructure(body: string): Structure {
   const root = fromMarkdown(body, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
   const tally: Tally = {
-    visibleWords: 0,
+    proseWords: 0,
+    listWords: 0,
     blockWords: [],
     proseCodeSpans: 0,
     hiddenWords: 0,
@@ -163,7 +171,9 @@ export function measureStructure(body: string): Structure {
   };
   tallyBlocks(root.children, tally);
   return {
-    visibleWords: tally.visibleWords,
+    visibleWords: tally.proseWords + tally.listWords,
+    proseWords: tally.proseWords,
+    listWords: tally.listWords,
     maxBlockWords: Math.max(0, ...tally.blockWords),
     proseCodeSpans: tally.proseCodeSpans,
     hiddenWords: tally.hiddenWords,
@@ -184,4 +194,11 @@ export function exceededLimits(structure: Pick<Structure, LimitKey>): ExceededLi
       ? [{ label: LIMIT_LABELS[key], measured: structure[key], limit: LIMITS[key] }]
       : [],
   );
+}
+
+export function limitsReason(exceeded: ExceededLimit[]): string {
+  const detail = exceeded
+    .map(({ label, measured, limit }) => `${label} ${measured} > ${limit}, cut ${measured - limit}`)
+    .join("; ");
+  return `The body is over its structure limits (${detail}). Tables, fenced output, and \`<details>\` don't count. Make every cut in one rewrite.`;
 }

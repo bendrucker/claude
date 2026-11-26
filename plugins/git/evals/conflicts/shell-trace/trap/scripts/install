@@ -1,0 +1,94 @@
+#!/usr/bin/env zsh
+#
+# Run all dotfiles installers.
+
+set -e
+
+cd "$(dirname "$0")"/..
+
+source scripts/shell/trace.sh
+
+# Detect non-interactive mode (explicit setting or non-tty stdin)
+if [[ -z "${NONINTERACTIVE-}" ]] && [[ ! -t 0 ]]; then
+  export NONINTERACTIVE=1
+fi
+
+# Trust declared taps before bundle evaluates their formulae
+trace_begin install-trust
+./scripts/install-trust
+trace_end
+
+# Retire cask variants the Brewfile stopped declaring, which bundle can't
+# install over (see the script for why)
+trace_begin install-cask-variants
+./scripts/install-cask-variants
+trace_end
+
+# Leave the casks that update themselves to whatever else manages this machine.
+# Homebrew cannot move a root-owned app aside without sudo, and 3am has no
+# terminal. An `if` condition is exempt from `set -e`.
+trace_begin brew-managed-machine
+if ./scripts/brew-managed-machine; then
+  export HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS=1
+fi
+trace_end
+
+trace_begin "brew bundle"
+brew bundle
+trace_end
+
+# Expose brew configuration to installers
+eval "$(brew shellenv)"
+
+trace_begin mise
+source mise/install.sh
+trace_end
+
+# herdr's plugin config directory became a link into this repo, and
+# install-symlinks refuses to replace a real directory with one. This has to run
+# ahead of that rather than from herdr/install.sh, which runs after. It moves the
+# old directory aside rather than into the repo, so a config that was never
+# committed can't land as an untracked file that a later sync refuses to
+# overwrite.
+# EXPIRES: 2027-02-02 every machine has the linked herdr plugin config tree
+herdr_plugin_config="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/plugins/config"
+if [[ -d $herdr_plugin_config && ! -L $herdr_plugin_config ]]; then
+  rm -rf $herdr_plugin_config.pre-link
+  mv $herdr_plugin_config $herdr_plugin_config.pre-link
+  gum log --level warn "moved $herdr_plugin_config to .pre-link; anything you configured by hand is in there"
+fi
+
+# One-time cleanups older machines have left to do, which convergence cannot
+# express: it describes the state every machine should be in, and a machine
+# installed after a removal has nothing to remove. Here rather than later
+# because a fresh machine is told apart from an existing one by whether this
+# repo's symlinks are already in place, and because a migration clearing the way
+# for a link has to run before the links are laid. A failure is a warning: the
+# convergence around it has succeeded, and a cleanup that could not finish
+# tonight is retried tomorrow.
+trace_begin dotfiles-migrate
+./bin/dotfiles-migrate || gum log --level warn "some migrations did not finish"
+trace_end
+
+trace_begin install-symlinks
+./scripts/install-symlinks
+trace_end
+
+trace_begin install-topics
+./scripts/install-topics
+trace_end
+
+# Reconcile theme-managed configs to the active flavor. Runs after every
+# installer so each config exists; failures here shouldn't abort an otherwise
+# successful install.
+trace_begin theme-sync
+./theme/bin/theme-sync || gum log --level warn "theme-sync had issues"
+trace_end
+
+# Hand the new config to whatever is already running with the old one, after
+# theme-sync has settled the flavor those configs carry. Reloads are in place
+# and never restart anything, so this is safe from the nightly job. A failure
+# here shouldn't abort an otherwise successful install.
+trace_begin dotfiles-reload
+./bin/dotfiles-reload || gum log --level warn "some config reloads had issues"
+trace_end

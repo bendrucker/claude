@@ -21,7 +21,10 @@ let repo: string;
 const files: Record<string, string> = {
   "plugins/p/.claude-plugin/plugin.json": '{"name":"p"}',
   "plugins/p/skills/s/SKILL.md": "committed skill",
-  "plugins/q/.claude-plugin/plugin.json": '{"name":"q","dependencies":["r"]}',
+  "plugins/q/.claude-plugin/plugin.json":
+    '{"name":"q","dependencies":["r"],"userConfig":{"stack":{"default":""},"auto":{"default":true},"token":{}}}',
+  "plugins/q/skills/t/SKILL.md":
+    '!`ctx --stack "${user_config.stack}"`\nauto: ${user_config.auto}, token: ${user_config.token}',
   "plugins/r/.claude-plugin/plugin.json": '{"name":"r","dependencies":["s","q"]}',
   "plugins/s/.claude-plugin/plugin.json": '{"name":"s"}',
   "plugins/bad/.claude-plugin/plugin.json": '{"name":"bad","dependencies":["missing"]}',
@@ -37,6 +40,8 @@ const files: Record<string, string> = {
   "evals/user/tdd/suite.yaml":
     'wrap:\n  skills: [user/skills/tdd]\n  context: [user/rules/ts.md]\ncollect: [out.ts, "it\'s/nested", never.ts]\n',
   "evals/user/tdd/one/case.yaml": "plugins: [../..]\n",
+  "plugins/p/evals/ctx/suite.yaml": "context: [user/rules/ts.md]\n",
+  "plugins/p/evals/ctx/one/case.yaml": "plugins: [../../..]\n",
 };
 
 beforeAll(async () => {
@@ -52,6 +57,7 @@ beforeAll(async () => {
     Bun.write(join(repo, "plugins/p/evals/suite/one/prompt.md"), "working prompt"),
     Bun.write(join(repo, "user/skills/tdd/SKILL.md"), "working user skill"),
     Bun.write(join(repo, "packages/stubs/install.sh"), "working stub"),
+    Bun.write(join(repo, "user/rules/ts.md"), "working rule"),
   ]);
 });
 
@@ -89,6 +95,44 @@ describe("prepare", () => {
     expect(await read(join(target, "../packages/stubs/install.sh"))).toBe("working stub");
   });
 
+  test("removes a staged path and keeps the rest of the plugin", async () => {
+    const { target } = await prepare(repo, "plugins/p/evals/suite", undefined, [
+      "plugins/p/skills/s",
+      "plugins/q/.claude-plugin/plugin.json",
+    ]);
+    expect(await Bun.file(join(target, "p/skills/s/SKILL.md")).exists()).toBe(false);
+    expect(await Bun.file(join(target, "q/.claude-plugin/plugin.json")).exists()).toBe(false);
+    expect(await Bun.file(join(target, "q/skills/t/SKILL.md")).exists()).toBe(true);
+    expect(await Bun.file(join(target, "p/.claude-plugin/plugin.json")).exists()).toBe(true);
+  });
+
+  test.each<{ name: string; remove: string; message: string }>([
+    { name: "a missing path", remove: "plugins/p/skills/nope", message: "does not exist" },
+    { name: "a path inside the suite", remove: "plugins/p/evals/suite/one", message: "outside" },
+    { name: "a path in an unstaged plugin", remove: "plugins/bad", message: "outside" },
+    { name: "a path outside every plugin", remove: "packages/stubs", message: "outside" },
+    { name: "a path that climbs out", remove: "plugins/p/../x", message: "outside" },
+  ])("rejects $name", async ({ remove, message }) => {
+    const failure = await prepare(repo, "plugins/p/evals/suite", undefined, [remove]).catch(
+      (error: unknown) => error,
+    );
+    expect(String(failure)).toContain(message);
+  });
+
+  test("rejects --remove on a wrapped suite", async () => {
+    const failure = await prepare(repo, "evals/user/tdd", undefined, ["user/skills/tdd"]).catch(
+      (error: unknown) => error,
+    );
+    expect(String(failure)).toContain("wrapped");
+  });
+
+  test("fills userConfig placeholders that have a default", async () => {
+    const { target } = await prepare(repo, "plugins/p/evals/suite", undefined);
+    expect(await read(join(target, "q/skills/t/SKILL.md"))).toBe(
+      '!`ctx --stack ""`\nauto: true, token: ${user_config.token}',
+    );
+  });
+
   test("wraps skills and context that are not a plugin", async () => {
     const { target, evalDir } = await prepare(repo, "evals/user/tdd", "HEAD");
     expect(evalDir).toBe("evals");
@@ -100,6 +144,37 @@ describe("prepare", () => {
     expect(await read(join(target, "context/ts.md"))).toBe("committed rule");
     expect(await read(join(target, "hooks/hooks.json"))).toContain("SessionStart");
     expect(await Bun.file(join(target, "evals/one/case.yaml")).exists()).toBe(true);
+  });
+
+  test("adds a context plugin whose hook injects the working-tree context files", async () => {
+    const { target, evalDir } = await prepare(repo, "plugins/p/evals/ctx", "HEAD");
+    const caseDir = join(target, evalDir, "one");
+    expect(await read(join(caseDir, "case.yaml"))).toBe("plugins: [ ../../.., ./context ]\n");
+    const Hooks = z.object({
+      hooks: z.object({
+        SessionStart: z.tuple([z.object({ hooks: z.tuple([z.object({ command: z.string() })]) })]),
+      }),
+    });
+    const hooks = Hooks.parse(await Bun.file(join(caseDir, "context/hooks/hooks.json")).json());
+    const command = hooks.hooks.SessionStart[0].hooks[0].command;
+    const stdout = await $`bash -c ${command}`
+      .env({ ...process.env, CLAUDE_PLUGIN_ROOT: join(caseDir, "context") })
+      .text();
+    expect(z.unknown().parse(JSON.parse(stdout))).toEqual({
+      hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "working rule" },
+    });
+  });
+
+  test("rejects top-level context on a wrapped suite", async () => {
+    await Bun.write(
+      join(repo, "evals/user/both/suite.yaml"),
+      "wrap: {}\ncontext: [user/rules/ts.md]\n",
+    );
+    await Bun.write(join(repo, "evals/user/both/one/case.yaml"), "plugins: [../..]\n");
+    const failure = await prepare(repo, "evals/user/both", undefined).catch(
+      (error: unknown) => error,
+    );
+    expect(String(failure)).toContain("wrap.context");
   });
 
   test("adds a collector whose hook copies the collect paths into the config dir", async () => {

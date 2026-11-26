@@ -13,6 +13,7 @@ const ROOT = join(import.meta.dirname, "..", "..", "..");
 const SessionStartInput = z.looseObject({
   hook_event_name: z.literal("SessionStart"),
   session_id: z.string().optional(),
+  cwd: z.string().optional(),
 });
 
 export type Spawn = (cmd: string[]) => Promise<number>;
@@ -23,10 +24,10 @@ export interface Deps {
   missingTypes: () => Promise<string[]>;
 }
 
-const defaults: Deps = {
-  spawn: async (cmd) => Bun.spawn(cmd, { cwd: ROOT, stdout: "ignore", stderr: "inherit" }).exited,
+const depsFor = (root: string): Deps => ({
+  spawn: async (cmd) => Bun.spawn(cmd, { cwd: root, stdout: "ignore", stderr: "inherit" }).exited,
   // `bun run check` needs oxlint, so its binary stands in for a complete install.
-  hasNodeModules: () => Bun.file(join(ROOT, "node_modules", ".bin", "oxlint")).exists(),
+  hasNodeModules: () => Bun.file(join(root, "node_modules", ".bin", "oxlint")).exists(),
   missingTypes: async () => {
     const { mods } = modPlugins(await loadPlugins());
     const present = await Promise.all(
@@ -36,45 +37,72 @@ const defaults: Deps = {
     );
     return mods.filter((_, index) => !present[index]).map((plugin) => plugin.name);
   },
-};
+});
 
-function failed(step: string): SyncHookJSONOutput {
+const defaults = depsFor(ROOT);
+
+function failed(step: string, consequence: string): SyncHookJSONOutput {
   return {
-    systemMessage: `mod-types: \`${step}\` failed at session start, so lint and type checks will flag mods that import \`claude-code\`. Run \`bun install && bun run mod-types\` before checking.`,
+    systemMessage: `mod-types: \`${step}\` failed at session start, so ${consequence}. Run \`bun install && bun run mod-types\` before checking.`,
   };
 }
 
+// Reported as context so hook metrics separate a working run from a no-op.
+function context(text: string): SyncHookJSONOutput {
+  return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } };
+}
+
+const INSTALLED = "Installed dependencies with `bun install --frozen-lockfile`.";
+
 /**
- * A fresh cloud checkout has no node_modules and no engine types, so `bun run check`
- * resolves `claude-code` to an error type in every mod. Local checkouts keep the
- * types from earlier plugin loads, and CI generates them in its own step.
+ * Installs dependencies into a checkout that has none, then generates engine types in a cloud session.
  */
 export async function processSessionStart(
   env: Record<string, string | undefined> = process.env,
   deps: Deps = defaults,
+  setStage?: (stage: string) => void,
 ): Promise<SyncHookJSONOutput | null> {
-  if (env.CLAUDE_CODE_REMOTE !== "true") return null;
+  let installed = false;
+  if (!(await deps.hasNodeModules())) {
+    if ((await deps.spawn(["bun", "install", "--frozen-lockfile"])) !== 0) {
+      setStage?.("install-failed");
+      return failed("bun install", "every script that imports a dependency will fail");
+    }
+    setStage?.("installed");
+    installed = true;
+  }
 
-  if (
-    !(await deps.hasNodeModules()) &&
-    (await deps.spawn(["bun", "install", "--frozen-lockfile"])) !== 0
-  )
-    return failed("bun install");
+  // Local checkouts keep engine types from earlier plugin loads, and CI generates its own.
+  if (env.CLAUDE_CODE_REMOTE !== "true") return installed ? context(INSTALLED) : null;
   const missing = await deps.missingTypes();
-  if (missing.length === 0) return null;
-  if ((await deps.spawn(["bun", "scripts/mod-types.ts"])) !== 0) return failed("bun run mod-types");
-  // Reported as context so hook metrics separate a generating run from a no-op.
-  return {
-    hookSpecificOutput: {
-      hookEventName: "SessionStart",
-      additionalContext: `Generated mod engine types for ${missing.join(", ")}.`,
-    },
-  };
+  if (missing.length === 0) return installed ? context(INSTALLED) : null;
+  if ((await deps.spawn(["bun", "scripts/mod-types.ts"])) !== 0)
+    return failed(
+      "bun run mod-types",
+      "lint and type checks will flag mods that import `claude-code`",
+    );
+  return context(`Generated mod engine types for ${missing.join(", ")}.`);
+}
+
+// Desktop runs project hooks from the main checkout even in a `.claude/worktrees/<name>`
+// session, so the session's own checkout comes from the input's `cwd`.
+async function checkoutRoot(cwd: string | undefined): Promise<string> {
+  if (cwd === undefined) return ROOT;
+  const git = Bun.spawn(["git", "rev-parse", "--show-toplevel"], {
+    cwd,
+    stdout: "pipe",
+    stderr: "ignore",
+  });
+  const [stdout, code] = await Promise.all([new Response(git.stdout).text(), git.exited]);
+  return code === 0 && stdout.trim() !== "" ? stdout.trim() : ROOT;
 }
 
 async function main(): Promise<void> {
   const input = await decodeStdin(SessionStartInput, "mod-types hook input");
-  const output = await timeHook("mod-types", input, () => processSessionStart());
+  const deps = depsFor(await checkoutRoot(input.cwd));
+  const output = await timeHook("mod-types", input, (setStage) =>
+    processSessionStart(process.env, deps, setStage),
+  );
   if (output) process.stdout.write(`${JSON.stringify(output)}\n`);
 }
 

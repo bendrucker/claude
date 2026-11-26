@@ -26,11 +26,11 @@ gh run view <run-id> --json jobs --jq '[.jobs[] | select(.conclusion == "failure
 
 Run `gh run view <run-id> --log-failed` once to capture every failing step across the run.
 
-Write the raw output to `$TMPDIR/$CLAUDE_SESSION_ID/github/<run-id>.log`. Create parent directories with `mkdir -p` first.
+Write the raw output to `$TMPDIR/$CLAUDE_CODE_SESSION_ID/github/<run-id>.log`. Create parent directories with `mkdir -p` first.
 
 ### Identify relevant lines
 
-Follow the strategy in `plugins/github/skills/actions-monitor/references/log-parsing.md`. Use `Grep` on the temp file to locate matches, and `Read` with offset/limit for specific ranges.
+Each line is prefixed with its job and step name. `Grep` the file for the failing step, and `Read` the tail of that step's output, where most tools print their error summary.
 
 ### Return JSON
 
@@ -38,7 +38,7 @@ Respond with a single JSON object on stdout:
 
 ```json
 {
-  "log_file": "/tmp/<session>/github/<run-id>.log",
+  "log_file": "<tmpdir>/<session>/github/<run-id>.log",
   "failing_jobs": [
     { "name": "lint", "step": "Run eslint", "lines": "..." }
   ],

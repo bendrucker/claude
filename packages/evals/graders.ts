@@ -1,8 +1,9 @@
 import { globSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import { $ } from "bun";
 import { parse } from "yaml";
 import { z } from "zod";
+import { listCases } from "./layout";
 import { readSuite } from "./suite";
 
 export const RegexGrader = z.object({
@@ -101,7 +102,7 @@ export async function caseGraders(suite: string, name: string): Promise<Graders>
  * a case.
  */
 export async function shareGraders(suite: string, shared: SharedGraders): Promise<void> {
-  const cases = globSync("*/case.yaml", { cwd: suite }).map(dirname);
+  const cases = await listCases(suite);
   const copies = cases.flatMap((name) =>
     sharedFor(shared, name).map(async (grader) => {
       const dest = Bun.file(join(suite, name, "graders", `${grader}.md`));

@@ -140,6 +140,7 @@ describe("stdio server", () => {
         "update_todos",
         "capture_inbox",
         "reorder_todos",
+        "delete_todos",
       ]
     `);
   });

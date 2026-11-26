@@ -1,6 +1,7 @@
 {
   "name": "review",
   "description": "Code review workflows for pull requests and the working diff",
+  "dependencies": ["hunk", "plannotator@plannotator"],
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

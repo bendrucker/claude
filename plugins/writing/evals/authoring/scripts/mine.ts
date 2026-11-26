@@ -117,17 +117,6 @@ export function fitsDiffBudget(
   );
 }
 
-export function countWordsAdded(patch: string): number {
-  let words = 0;
-  for (const line of patch.split("\n")) {
-    if (line.startsWith("+++") || !line.startsWith("+")) continue;
-    const text = line.slice(1).trim();
-    if (text === "") continue;
-    words += text.split(/\s+/).filter(Boolean).length;
-  }
-  return words;
-}
-
 const TABLE_ROW = /^\s*\|.*\|\s*$/;
 
 type Range = [number, number];

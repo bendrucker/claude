@@ -1,0 +1,5 @@
+import { waitFor, type Wait } from "./wait";
+
+export function drainQueue(empty: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
+  return wait(empty, { timeout: 30_000 });
+}

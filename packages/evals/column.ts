@@ -10,6 +10,11 @@ export interface Cell extends Record<Measure, number[]> {
   scores: number[];
   /** Runs left out of the pool because they errored. */
   errored: number;
+  /** The runner's `costUsd` and `turns` per run, which a trace may not carry. */
+  runCost: number[];
+  runTurns: number[];
+  /** Runs without a `costUsd`, left out of `runCost`. */
+  missingCost: number;
 }
 
 export type Column = Map<string, Cell>;
@@ -36,6 +41,9 @@ function merge(column: Column, result: Result, measured: Loaded["measured"]) {
         graders: new Map(),
         scores: [],
         errored: 0,
+        runCost: [],
+        runTurns: [],
+        missingCost: 0,
         words: [],
         turns: [],
         seconds: [],
@@ -48,6 +56,9 @@ function merge(column: Column, result: Result, measured: Loaded["measured"]) {
           continue;
         }
         if (run.score !== null) cell.scores.push(run.score);
+        if (run.costUsd == null) cell.missingCost += 1;
+        else cell.runCost.push(run.costUsd);
+        if (run.turns != null) cell.runTurns.push(run.turns);
         pool(cell, measured.get(key)?.[i] ?? {});
         // Under ablation the with-only graders are unscored indicators, such as a skill firing.
         for (const grader of run.graders) {

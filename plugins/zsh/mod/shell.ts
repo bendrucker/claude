@@ -1,49 +1,17 @@
 import type { ProcessRunResult } from "claude-code";
 
-export type Option = "nomatch" | "nullglob" | "cshnullglob" | "equals";
-
 export interface Shell {
   path: string;
   version: string | null;
   active: boolean;
-  options: Record<Option, boolean>;
-  gates: { glob: boolean; equals: boolean };
   error: string | null;
 }
 
-export const DEFAULTS: Record<Option, boolean> = {
-  nomatch: true,
-  nullglob: false,
-  cshnullglob: false,
-  equals: true,
-};
-
-const OPTIONS: Option[] = ["nomatch", "nullglob", "cshnullglob", "equals"];
-
-export const PROBE = `printf '%s\\n' "$ZSH_VERSION" ${OPTIONS.map((o) => `"\${options[${o}]}"`).join(" ")}`;
-
-function gatesOf(options: Record<Option, boolean>): Shell["gates"] {
-  return {
-    glob: options.nomatch && !options.nullglob && !options.cshnullglob,
-    equals: options.equals,
-  };
-}
+export const PROBE = `printf '%s\\n' "$ZSH_VERSION"`;
 
 export function parse(path: string, stdout: string): Shell {
-  const [version = "", ...flags] = stdout.split("\n");
-  const options = { ...DEFAULTS };
-  for (const [i, option] of OPTIONS.entries()) {
-    const flag = flags[i]?.trim();
-    if (flag === "on" || flag === "off") options[option] = flag === "on";
-  }
-  return {
-    path,
-    version: version.trim() || null,
-    active: version.trim() !== "",
-    options,
-    gates: gatesOf(options),
-    error: null,
-  };
+  const version = stdout.split("\n")[0]?.trim() ?? "";
+  return { path, version: version || null, active: version !== "", error: null };
 }
 
 function isZsh(path: string): boolean {
@@ -51,14 +19,7 @@ function isZsh(path: string): boolean {
 }
 
 export function fallback(path: string, error: string): Shell {
-  return {
-    path,
-    version: null,
-    active: isZsh(path),
-    options: { ...DEFAULTS },
-    gates: gatesOf(DEFAULTS),
-    error,
-  };
+  return { path, version: null, active: isZsh(path), error };
 }
 
 // CLAUDE_CODE_SHELL, then $SHELL, each only when it names bash or zsh,

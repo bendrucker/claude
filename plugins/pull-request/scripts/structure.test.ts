@@ -30,6 +30,8 @@ describe("measureStructure", () => {
     const evalMeasure = measureForEval(body);
     expect(measureStructure(body)).toEqual({
       visibleWords: evalMeasure.visibleWords,
+      proseWords: evalMeasure.proseWords,
+      listWords: evalMeasure.listWords,
       maxBlockWords: evalMeasure.maxBlockWords,
       proseCodeSpans: evalMeasure.proseCodeSpans,
       hiddenWords: evalMeasure.hiddenWords,
@@ -44,6 +46,8 @@ describe("measureStructure", () => {
       BODIES.table ?? "",
       {
         visibleWords: 3,
+        proseWords: 3,
+        listWords: 0,
         maxBlockWords: 3,
         proseCodeSpans: 0,
         hiddenWords: 8,
@@ -56,6 +60,8 @@ describe("measureStructure", () => {
       BODIES["details block"] ?? "",
       {
         visibleWords: 2,
+        proseWords: 2,
+        listWords: 0,
         maxBlockWords: 1,
         proseCodeSpans: 0,
         hiddenWords: 4,
@@ -68,6 +74,8 @@ describe("measureStructure", () => {
       BODIES["fenced output"] ?? "",
       {
         visibleWords: 2,
+        proseWords: 2,
+        listWords: 0,
         maxBlockWords: 1,
         proseCodeSpans: 0,
         hiddenWords: 7,
@@ -80,6 +88,8 @@ describe("measureStructure", () => {
       BODIES["nested list"] ?? "",
       {
         visibleWords: 9,
+        proseWords: 0,
+        listWords: 9,
         maxBlockWords: 3,
         proseCodeSpans: 1,
         hiddenWords: 0,
@@ -92,6 +102,8 @@ describe("measureStructure", () => {
       BODIES["paths and contrast"] ?? "",
       {
         visibleWords: 20,
+        proseWords: 16,
+        listWords: 4,
         maxBlockWords: 12,
         proseCodeSpans: 6,
         hiddenWords: 0,
@@ -108,17 +120,35 @@ describe("exceededLimits", () => {
   test.each<[string, Parameters<typeof exceededLimits>[0], string[]]>([
     [
       "at every limit",
-      { visibleWords: 120, maxBlockWords: 40, proseCodeSpans: 6, pathSpans: 1, contrastPhrases: 1 },
+      {
+        visibleWords: 150,
+        maxBlockWords: 40,
+        proseCodeSpans: 6,
+        pathSpans: 1,
+        contrastPhrases: 1,
+      },
       [],
     ],
     [
-      "words only",
-      { visibleWords: 121, maxBlockWords: 40, proseCodeSpans: 6, pathSpans: 1, contrastPhrases: 1 },
+      "visible words only",
+      {
+        visibleWords: 151,
+        maxBlockWords: 40,
+        proseCodeSpans: 6,
+        pathSpans: 1,
+        contrastPhrases: 1,
+      },
       ["visible words"],
     ],
     [
       "every limit",
-      { visibleWords: 240, maxBlockWords: 52, proseCodeSpans: 9, pathSpans: 2, contrastPhrases: 3 },
+      {
+        visibleWords: 300,
+        maxBlockWords: 52,
+        proseCodeSpans: 9,
+        pathSpans: 2,
+        contrastPhrases: 3,
+      },
       [
         "visible words",
         "longest paragraph or bullet words",
@@ -129,5 +159,13 @@ describe("exceededLimits", () => {
     ],
   ])("%s", (_name, structure, labels) => {
     expect(exceededLimits(structure).map((limit) => limit.label)).toEqual(labels);
+  });
+
+  test("list words count toward visible words", () => {
+    const prose = Array.from({ length: 3 }, () => "word ".repeat(30).trim()).join("\n\n");
+    const list = Array.from({ length: 12 }, () => `- ${"item ".repeat(30).trim()}`).join("\n");
+    expect(exceededLimits(measureStructure(`${prose}\n\n${list}`)).map((l) => l.label)).toEqual([
+      "visible words",
+    ]);
   });
 });

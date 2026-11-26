@@ -1,8 +1,0 @@
-# Single-word AI vocabulary deny list, one entry per line.
-# Stemmed, so inflected forms (e.g., "meticulously", "leveraged") are caught.
-delve
-tapestry
-meticulous
-leverage
-robust
-nuance

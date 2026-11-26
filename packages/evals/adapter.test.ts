@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveAdapter } from "./adapter";
 import { native } from "./adapters/native";
+import { resultPath, scoredDir } from "./layout";
+import { writeResult } from "./result";
 
 const cli = (name: string) => join(import.meta.dir, "../../evals/native", `${name}.ts`);
 
@@ -93,4 +95,14 @@ describe("the CLIs through a user module", () => {
     expect(r.code).not.toBe(0);
     expect(r.err).toContain(path);
   });
+});
+
+test("a scored/ result reads the source trace each of its runs carries", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "scored-"));
+  const source = join(dir, "source.jsonl");
+  await Bun.write(source, JSON.stringify({ type: "result", result: "run two" }));
+  await writeResult(scoredDir(dir), { c: { with: [{ score: 0.5, graders: [], trace: source }] } });
+  const scored = resultPath(scoredDir(dir));
+  expect((await native.traces(scored)).get("c/with")?.map((t) => t.reply)).toEqual(["run two"]);
+  expect((await native.read(scored)).measured.get("c/with")).toHaveLength(1);
 });

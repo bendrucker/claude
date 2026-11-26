@@ -19,10 +19,39 @@ function fake(overrides: Partial<Deps> & { exits?: Record<string, number> } = {}
 }
 
 describe("processSessionStart", () => {
-  test("does nothing outside a cloud session", async () => {
+  test("does nothing in an installed local checkout", async () => {
     const { deps, calls } = fake();
     expect(await processSessionStart({}, deps)).toBeNull();
     expect(calls).toEqual([]);
+  });
+
+  test("installs dependencies in a local checkout without generating types", async () => {
+    const { deps, calls } = fake({ hasNodeModules: () => Promise.resolve(false) });
+    const stages: string[] = [];
+    const record = (stage: string) => {
+      stages.push(stage);
+    };
+    expect(await processSessionStart({}, deps, record)).toEqual({
+      hookSpecificOutput: {
+        hookEventName: "SessionStart",
+        additionalContext: "Installed dependencies with `bun install --frozen-lockfile`.",
+      },
+    });
+    expect(calls).toEqual(["bun install --frozen-lockfile"]);
+    expect(stages).toEqual(["installed"]);
+  });
+
+  test("records a failed local install", async () => {
+    const { deps } = fake({
+      hasNodeModules: () => Promise.resolve(false),
+      exits: { "bun install --frozen-lockfile": 1 },
+    });
+    const stages: string[] = [];
+    const output = await processSessionStart({}, deps, (stage) => {
+      stages.push(stage);
+    });
+    expect(output?.systemMessage).toContain("`bun install` failed");
+    expect(stages).toEqual(["install-failed"]);
   });
 
   test("skips generation when every mod has types", async () => {

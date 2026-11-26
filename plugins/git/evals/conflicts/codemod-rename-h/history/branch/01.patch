@@ -1,0 +1,16 @@
+diff --git a/tally/ingest.py b/tally/ingest.py
+index e1ee12a..6521723 100644
+--- a/tally/ingest.py
++++ b/tally/ingest.py
+@@ -4,9 +4,9 @@ BATCH = 100
+ 
+ 
+ def load(rows, sink):
+-    """Sends rows to sink in batches and returns how many batches went out."""
++    """Sends non-empty rows to sink in batches and returns how many batches went out."""
+     sent = 0
+-    for batch in split_chunks(rows, BATCH):
++    for batch in split_chunks([row for row in rows if row], BATCH):
+         sink(batch)
+         sent += 1
+     return sent

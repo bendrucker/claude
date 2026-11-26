@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+#
+# bootstrap does the first-run-only setup (gitconfig, submodules), then hands
+# off to dotf for the shared reconcile: Homebrew packages, default package
+# lists, config symlinks, and every topic installer.
+
+cd "$(dirname "$0")/.." || exit 1
+DOTFILES_ROOT=$(pwd -P)
+
+# shellcheck source=scripts/shell/trace.sh
+. "$DOTFILES_ROOT/scripts/shell/trace.sh"
+trace_begin bootstrap
+
+NO_PROMPT=false
+for arg in "$@"; do
+  case $arg in
+    --no-prompt) NO_PROMPT=true ;;
+  esac
+done
+
+# Install Homebrew and gum up front; setup_gitconfig prompts via gum.
+trace_begin homebrew.sh
+"$DOTFILES_ROOT/scripts/homebrew.sh"
+trace_end
+
+setup_gitconfig () {
+  [ -f git/config.local ] && return
+
+  if [ "$NO_PROMPT" == "true" ]; then
+    gum log --level info 'skipping gitconfig setup (no-prompt mode)'
+    return
+  fi
+
+  gum log --level info 'setup gitconfig'
+
+  git_credential='cache'
+  if [ "$(uname -s)" == "Darwin" ]; then
+    git_credential='osxkeychain'
+  fi
+
+  git_authorname=$(gum input --header "GitHub author name" --placeholder "Jane Doe")
+  git_authoremail=$(gum input --header "GitHub author email" --placeholder "jane@example.com")
+
+  sed -e "s/AUTHORNAME/$git_authorname/g" -e "s/AUTHOREMAIL/$git_authoremail/g" -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" git/config.local.example > git/config.local
+}
+
+init_submodules () {
+  gum log --level info 'initializing submodules'
+  git -C "$DOTFILES_ROOT" submodule update --init --recursive
+}
+
+trace_begin gitconfig
+setup_gitconfig
+trace_end
+trace_begin submodules
+init_submodules
+trace_end
+
+# dotf installs Homebrew packages, builds the default package lists, links
+# configs, and runs every topic installer.
+trace_begin dotf
+# shellcheck disable=SC1091
+if ! source ./bin/dotf; then
+  gum log --level error 'error installing dependencies'
+  exit 1
+fi
+trace_end
+
+gum log --level info 'all installed'
+trace_end

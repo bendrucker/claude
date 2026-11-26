@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
+import { listTraces } from "../../../../../packages/evals/layout";
 import { bodyOf } from "./limits";
 
 // Pairs two eval columns' PR bodies case by case for blind A/B labeling in label/ab-server.ts.
@@ -60,25 +60,19 @@ function lastWrittenBody(trace: string): string | undefined {
 
 async function bodies(dirs: string): Promise<Map<string, string[]>> {
   const casePattern = new RegExp(opts.cases);
-  const paths = (
-    await Promise.all(
-      dirs.split(",").map(async (dir) => {
-        const traces = join(dir, "traces");
-        return (await readdir(traces))
-          .toSorted()
-          .map((name) => ({ name, path: join(traces, name) }));
-      }),
-    )
-  ).flat();
+  const refs = dirs.split(",").flatMap((dir) => {
+    const found = listTraces(dir);
+    if (found.length === 0) throw new Error(`No traces/*.jsonl in ${dir}`);
+    return found.filter((ref) => ref.arm === "with");
+  });
   const read = await Promise.all(
-    paths.flatMap(({ name, path }) => {
-      const caseName = /^(.*)-with-\d+\.jsonl$/.exec(name)?.[1];
-      if (caseName === undefined || !casePattern.test(caseName)) return [];
+    refs.flatMap((ref) => {
+      if (!casePattern.test(ref.case)) return [];
       return [
-        Bun.file(path)
+        Bun.file(ref.path)
           .text()
           .then((trace) => ({
-            name: caseName,
+            name: ref.case,
             body: lastWrittenBody(trace) ?? bodyOf(trace)?.text,
           })),
       ];

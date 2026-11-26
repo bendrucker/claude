@@ -41,14 +41,14 @@ describe("appendRunLog", () => {
     const dir = mkdtempSync(join(tmpdir(), "run-log-"));
     const path = join(dir, "nested", "log.jsonl");
 
-    appendRunLog(entry({ outcome: "context", category: "numbering" }), path);
-    appendRunLog(entry({ outcome: "silent", suppressed: true, category: "numbering" }), path);
+    appendRunLog(entry({ outcome: "context", check: "numbering" }), path);
+    appendRunLog(entry({ outcome: "silent", suppressed: true, check: "numbering" }), path);
 
     const lines = (await Bun.file(path).text()).trim().split("\n");
     expect(lines).toHaveLength(2);
     expect(JSON.parse(lines[0] ?? "")).toMatchObject({
       outcome: "context",
-      category: "numbering",
+      check: "numbering",
       tool: "Write",
     });
     expect(JSON.parse(lines[1] ?? "")).toMatchObject({ suppressed: true });

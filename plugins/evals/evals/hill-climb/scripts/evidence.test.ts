@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { ARMS } from "./block";
-import { all, type Compared, compared, comparedScores, type Evidence } from "./evidence";
+import { ARMS, average, scores } from "./block";
+import {
+  all,
+  type Compared,
+  compared,
+  comparedScores,
+  type Evidence,
+  holdoutReplicates,
+} from "./evidence";
 import { renderBlock } from "./renderers";
 import { prompt } from "./prompt";
 
@@ -25,6 +32,7 @@ const expectedStars: Record<string, (e: Evidence) => string[]> = {
   "off-target": (e) => [ref(e.domain.other, "with")],
   "guard-drop": (e) => [target(e), ref(e.domain.guards[0] ?? e.domain.other, "with")],
   "holdout-fell": (e) => [target(e)],
+  "holdout-unstarred-fall": (e) => [target(e)],
   "quota-void": (e) => [target(e)],
   "second-null": () => [],
   saturated: () => [],
@@ -67,7 +75,41 @@ describe("the planted stars", () => {
       const down =
         e.holdout === undefined ? [] : starred(compared(e.holdout)).filter((r) => r.cand < r.base);
       expect(down.length > 0).toBe(e.trap.id === "holdout-fell");
-      expect(e.holdout !== undefined).toBe(["holdout-fell", "clean-accept"].includes(e.trap.id));
+      expect(e.holdout !== undefined).toBe(
+        ["holdout-fell", "holdout-unstarred-fall", "clean-accept"].includes(e.trap.id),
+      );
+    }
+  });
+
+  test("an unstarred holdout fall stars nowhere and exceeds a base spread of zero", () => {
+    for (const e of cases.filter((c) => c.trap.id === "holdout-unstarred-fall")) {
+      if (e.holdout === undefined) throw new Error("no holdout");
+      expect(starred([...compared(e.holdout), ...comparedScores(e.holdout)])).toEqual([]);
+      const { replicates, pooled } = holdoutReplicates(e.holdout);
+      expect(replicates[0]).toBe(replicates[1]);
+      const final = average(e.holdout.cases.map((c) => average(scores(c, c.cand.with))));
+      expect(final).toBeLessThan(pooled);
+    }
+  });
+
+  test("the base replicate scores average to the pooled holdout score and the prompt prints them", () => {
+    for (const e of cases.filter((c) => c.holdout !== undefined)) {
+      if (e.holdout === undefined) throw new Error("no holdout");
+      const { replicates, pooled } = holdoutReplicates(e.holdout);
+      expect((replicates[0] + replicates[1]) / 2).toBeCloseTo(pooled, 10);
+      const text = prompt(e);
+      expect(text).toContain(`\`holdout-base-1\` ${replicates[0].toFixed(2)}`);
+      expect(text).toContain(`\`holdout-base-2\` ${replicates[1].toFixed(2)}`);
+    }
+  });
+
+  test("a holdout fall past the base spread is unique to the two holdout-fall traps", () => {
+    for (const e of cases) {
+      if (e.holdout === undefined) continue;
+      const { replicates, pooled } = holdoutReplicates(e.holdout);
+      const final = average(e.holdout.cases.map((c) => average(scores(c, c.cand.with))));
+      const failed = final < pooled - Math.abs(replicates[0] - replicates[1]) - 1e-9;
+      expect(failed).toBe(["holdout-fell", "holdout-unstarred-fall"].includes(e.trap.id));
     }
   });
 
@@ -102,7 +144,7 @@ describe("every harness presents the same evidence", () => {
     for (const r of compared(e.dev)) {
       const [caseId, arm, name] = r.key.split("/");
       expect(csv).toContain(`${caseId},${arm},${name},${r.p.toFixed(3)}\n`);
-      if (r.mark === "*") expect(native).toContain(`(p=${r.p.toFixed(3)})*`);
+      if (r.mark === "*") expect(native).toContain(String.raw`(p=${r.p.toFixed(3)})\*`);
     }
     expect(pydantic).toContain("Evaluation Diff: base → candidate");
     for (const r of compared(e.dev).filter(

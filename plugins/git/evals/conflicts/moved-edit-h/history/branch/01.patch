@@ -1,0 +1,25 @@
+diff --git a/money.go b/money.go
+index aa49d80..449e617 100644
+--- a/money.go
++++ b/money.go
+@@ -8,7 +8,7 @@ import (
+ 
+ // ParseCents converts a decimal string such as "12.50" to cents.
+ func ParseCents(s string) (int, error) {
+-	whole, frac, found := strings.Cut(s, ".")
++	whole, frac, found := strings.Cut(strings.TrimSpace(s), ".")
+ 	if !found {
+ 		frac = "00"
+ 	}
+diff --git a/money_test.go b/money_test.go
+index 8bf27e4..3317ff1 100644
+--- a/money_test.go
++++ b/money_test.go
+@@ -10,6 +10,7 @@ func TestParseCents(t *testing.T) {
+ 		{"12.50", 1250},
+ 		{"7", 700},
+ 		{"-0.50", -50},
++		{" 12.50\n", 1250},
+ 	}
+ 	for _, c := range cases {
+ 		got, err := ParseCents(c.in)

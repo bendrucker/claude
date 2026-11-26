@@ -16,7 +16,7 @@ function comment(over: Partial<Comment> = {}): Comment {
   };
 }
 
-const commentGen: gs.Generator<Comment> = gs
+const commentGen: gs.PrintableGenerator<Comment> = gs
   .record({
     text: gs.text({ maxSize: 40 }),
     startLine: gs.integers({ minValue: 1, maxValue: 100 }),

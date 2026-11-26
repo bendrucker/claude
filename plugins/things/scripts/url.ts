@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: hands off to open/xcall for Things URL schemes and osascript via ensure-running, which the command sandbox blocks
-
 import { join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";

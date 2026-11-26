@@ -1,0 +1,27 @@
+# An issue number sends the model to a tracker it cannot read, and the prose around it goes stale when the issue closes. A link keeps its context.
+# evidence: a hand audit of every hit across the repo. The rule-precision labels barely exercise it.
+# retire when: a hand audit finds most hits are not issue references.
+extends: existence
+message: '"%s" points at a tracker the model cannot read. State the rule instead.'
+level: warning
+nonword: true
+scope: ~link
+tokens:
+  - '(?<=^|[\s(])#\d{2,}\b'
+tests:
+  - name: flags a bare issue number
+    input: |
+      Treat the rates as uncalibrated until #791 lands.
+    contains: [Prompting.TicketRef]
+  - name: flags an issue number in parentheses
+    input: |
+      The cache is cold (#4120).
+    contains: [Prompting.TicketRef]
+  - name: allows a linked issue
+    input: |
+      Teammates may idle ([#23415](https://example.com/23415)).
+    absent: Prompting.TicketRef
+  - name: allows a heading anchor
+    input: |
+      See the [section](#12-steps) and color a1#123.
+    absent: Prompting.TicketRef

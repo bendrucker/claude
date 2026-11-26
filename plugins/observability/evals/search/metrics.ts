@@ -26,30 +26,3 @@ export function score(ranked: string[], relevant: string[]): Scored {
     rr: first === -1 ? 0 : 1 / (first + 1),
   };
 }
-
-export function mean(xs: number[]): number {
-  return xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length;
-}
-
-export function median(xs: number[]): number {
-  const s = xs.toSorted((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  if (s.length % 2 === 1) return s[m] ?? 0;
-  return s.length === 0 ? 0 : ((s[m - 1] ?? 0) + (s[m] ?? 0)) / 2;
-}
-
-/** Paired sign-flip permutation test on per-query differences, two-sided. */
-export function pairedP(a: number[], b: number[], rounds = 10_000, seed = 1): number {
-  const d = a.map((x, i) => x - (b[i] ?? 0));
-  const observed = Math.abs(mean(d));
-  let state = seed;
-  const rand = () => {
-    state = (state * 1_103_515_245 + 12_345) % 2_147_483_648;
-    return state / 2_147_483_648;
-  };
-  let extreme = 0;
-  for (let r = 0; r < rounds; r++) {
-    if (Math.abs(mean(d.map((x) => (rand() < 0.5 ? -x : x)))) >= observed - 1e-12) extreme++;
-  }
-  return (extreme + 1) / (rounds + 1);
-}

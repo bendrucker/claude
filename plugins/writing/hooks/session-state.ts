@@ -30,18 +30,18 @@ async function readState(sessionId: string): Promise<SessionState> {
 
 export async function recentlyFired(
   sessionId: string,
-  category: string,
+  check: string,
   now: number,
 ): Promise<boolean> {
   const state = await readState(sessionId);
-  const last = state[category];
+  const last = state[check];
   return typeof last === "number" && now - last < SUPPRESS_WINDOW_MS;
 }
 
-export async function recordFired(sessionId: string, category: string, now: number): Promise<void> {
+export async function recordFired(sessionId: string, check: string, now: number): Promise<void> {
   try {
     const state = await readState(sessionId);
-    state[category] = now;
+    state[check] = now;
     await Bun.write(statePath(sessionId), JSON.stringify(state));
   } catch {
     // State is an optimization. A failed write must not break the hook.

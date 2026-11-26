@@ -1,0 +1,13 @@
+package ledger
+
+import "fmt"
+
+// FormatCents renders cents as a decimal string such as "12.50".
+func FormatCents(c int) string {
+	sign := ""
+	if c < 0 {
+		sign = "-"
+		c = -c
+	}
+	return fmt.Sprintf("%s%d.%02d", sign, c/100, c%100)
+}

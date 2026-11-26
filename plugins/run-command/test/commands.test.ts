@@ -10,13 +10,15 @@ type Segment =
 const word = gs.text({ alphabet: "abcxyz019-_./=", minSize: 1, maxSize: 6 });
 
 const commandText = gs
-  .arrays(gs.oneOf(word, gs.sampledFrom(["!", "|", "&&", "2>&1", "'a b'", "$X", "\\"])), {
-    minSize: 1,
-    maxSize: 5,
+  .record({
+    head: gs.text({ alphabet: "abcxyz019_./=", minSize: 1, maxSize: 6 }),
+    rest: gs.arrays(gs.oneOf(word, gs.sampledFrom(["!", "|", "&&", "2>&1", "'a b'", "$X", "\\"])), {
+      maxSize: 4,
+    }),
   })
-  .map((parts) => parts.join(" "));
+  .map(({ head, rest }) => [head, ...rest].join(" "));
 
-const commandSegment: gs.Generator<Segment> = gs
+const commandSegment: gs.PrintableGenerator<Segment> = gs
   .record({
     command: commandText,
     indent: gs.sampledFrom(["", " ", "  ", "\t"]),
@@ -34,7 +36,7 @@ const commandSegment: gs.Generator<Segment> = gs
     };
   });
 
-const segment: gs.Generator<Segment> = gs.oneOf(
+const segment: gs.PrintableGenerator<Segment> = gs.oneOf(
   commandSegment,
   gs.sampledFrom(["", " ", "\t"]).map((line) => ({ kind: "blank", line })),
   gs.sampledFrom(["```", "```sh", "  ```bash"]).map((line) => ({ kind: "fence", line })),
@@ -71,8 +73,38 @@ describe("blocks", () => {
       text: "!echo nospace\n* ! ls -la  \n`! wt list `",
       expected: [["ls -la", "wt list"]],
     },
-    { name: "an inline command is prose", text: "or run ! pwd inline", expected: [] },
+    { name: "a bare inline bang is prose", text: "or run ! pwd inline", expected: [] },
     { name: "a bang with only whitespace is no command", text: "!  \n` !  `", expected: [] },
+    {
+      name: "each inline code span is a block of its own",
+      text: "! ls\nRun `! git clean -n` to list them, then `! git clean -f`.\n! pwd",
+      expected: [["ls"], ["git clean -n"], ["git clean -f"], ["pwd"]],
+    },
+    {
+      name: "an inline span inside a fence is literal",
+      text: "```\nif `! true` fails\n```\nRun `! wt list`.",
+      expected: [["wt list"]],
+    },
+    {
+      name: "a bang after a closing backtick opens no span",
+      text: "It works with `npm`! no flags needed with `bun`.",
+      expected: [],
+    },
+    {
+      name: "negation and placeholders are not commands",
+      text: "Unreachable behind `[[ ! -t 0 ]]` and `find . ! -path x`.\nEach `! <command>` line.",
+      expected: [],
+    },
+    {
+      name: "a capitalized command without a closing period is a command",
+      text: "! Rscript build.R\n! VBoxManage list vms",
+      expected: [["Rscript build.R", "VBoxManage list vms"]],
+    },
+    {
+      name: "prose and options after a bang are not commands",
+      text: "```\n  ! This variable is unused.\n```\nUse `! -path ./mise/*`.",
+      expected: [],
+    },
   ])("$name", ({ text, expected }) => {
     expect(blocks(text)).toEqual(expected);
   });

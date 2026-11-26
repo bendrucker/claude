@@ -14,7 +14,7 @@
 > Parsed with `Number()` in d5bf26e.
 
 **`src/webhooks/retry.ts:32`**
-> Good call. I'll add full jitter to `backoff` so retries after an outage spread across the window.
+> I'll add full jitter to `backoff` so retries after an outage spread across the window.
 
 **README**
 > Added a row for `WEBHOOK_MAX_ATTEMPTS` (default 8) to the configuration table.

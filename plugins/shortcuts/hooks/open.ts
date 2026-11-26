@@ -2,12 +2,19 @@
 
 import { extname } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
 
-const BashInput = z.looseObject({ command: z.string() });
+export interface HookInput {
+  tool_input?: unknown;
+}
 
-export const HookInput = z.looseObject({ tool_input: z.unknown() });
-export type HookInput = z.infer<typeof HookInput>;
+function hasCommand(value: unknown): value is { command: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "command" in value &&
+    typeof value.command === "string"
+  );
+}
 
 // Characters that end a simple command, splice another one into it, or hide a
 // word from it. A command carrying any of them outside quotes is not a lone
@@ -90,8 +97,8 @@ function tokenize(command: string): string[] | null {
 // The `Bash(open:*)` rule only narrows which calls spawn this hook. It fails
 // open on shell metacharacters, so `open notes.txt && echo done.shortcut`
 // reaches here, and the extension of the last word would describe the `echo`
-// rather than what `open` receives. Since this hook can hand back a sandbox
-// bypass, it decides on its own parse: a compound yields no target, and the call
+// rather than what `open` receives. Since this hook can hand back an allow,
+// it decides on its own parse: a compound yields no target, and the call
 // falls through to normal permissions.
 function extractTarget(command: string): string | null {
   const tokens = tokenize(command) ?? [];
@@ -102,7 +109,7 @@ function extractTarget(command: string): string | null {
 }
 
 export function processInput(input: HookInput): SyncHookJSONOutput | null {
-  const command = BashInput.safeParse(input.tool_input).data?.command;
+  const command = hasCommand(input.tool_input) ? input.tool_input.command : undefined;
   const target = command === undefined ? null : extractTarget(command);
 
   if (target == null || target === "") {
@@ -115,7 +122,6 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
         permissionDecisionReason: "Opening a .shortcut file for import",
-        updatedInput: { dangerouslyDisableSandbox: true },
       },
     };
   }
@@ -130,14 +136,34 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
   };
 }
 
+function deny(reason: string): void {
+  const output = {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: reason,
+    },
+  } satisfies SyncHookJSONOutput;
+  process.stdout.write(`${JSON.stringify(output)}\n`);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+// `open` runs auto-approved and outside the sandbox, so this hook is the only
+// thing holding it to .shortcut files: every failure denies rather than
+// leaving the call ungated.
 async function main(): Promise<void> {
   let input: HookInput;
   try {
-    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
+    const parsed: unknown = JSON.parse(await Bun.stdin.text());
+    if (!isObject(parsed)) throw new Error("hook input is not an object");
+    input = parsed;
   } catch (error) {
-    console.error(
-      `[shortcuts/open] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[shortcuts/open] Failed to parse hook input: ${message}`);
+    deny(`shortcuts/open hook failed to parse input: ${message}`);
     return;
   }
 
@@ -148,5 +174,9 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch(console.error);
+  main().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[shortcuts/open] Unexpected error: ${message}`);
+    deny(`shortcuts/open hook encountered an error: ${message}`);
+  });
 }

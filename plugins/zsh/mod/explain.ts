@@ -1,4 +1,4 @@
-import { URL } from "./rewrite";
+const URL = /^[A-Za-z][\w+.-]*:\/\//;
 
 export type Class = "glob" | "equals" | "reserved" | "split" | "bash-syntax";
 

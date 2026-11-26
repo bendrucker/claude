@@ -10,10 +10,15 @@ runs:
   using: composite
   steps:
     # Claude Code confines each agent's shell tools with bubblewrap, and
-    # Ubuntu 24.04's AppArmor policy blocks the unprivileged user namespaces
-    # it needs. The sandbox also makes ~/.bashrc unreadable, and bash reads it
-    # on every command because Node's piped stdin is a socket, so each output
-    # would open with a permission error. zsh -c skips rc files.
+    # Ubuntu's AppArmor policy blocks the unprivileged user namespaces it
+    # needs. The sysctl lifts the general restriction. From 25.04, Ubuntu also
+    # loads a bwrap-userns-restrict profile that strips capabilities inside
+    # bwrap, so the nested namespace Claude Code's seccomp helper creates
+    # cannot write /proc/self/setgroups and every Bash call fails. The probe
+    # repeats that nesting so a regression fails here, not in the graders.
+    # The sandbox also makes ~/.bashrc unreadable, and bash reads it on every
+    # command because Node's piped stdin is a socket, so each output would
+    # open with a permission error. zsh -c skips rc files.
     - name: Install sandbox dependencies
       if: inputs.sandbox == 'true'
       shell: bash
@@ -22,6 +27,11 @@ runs:
         sudo apt-get update -q
         sudo apt-get install -y -q bubblewrap socat zsh
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        profile=/etc/apparmor.d/bwrap-userns-restrict
+        if [ -f "$profile" ]; then
+          sudo apparmor_parser -R "$profile"
+        fi
+        bwrap --dev-bind / / --unshare-user -- unshare --user --map-root-user true
         echo "SHELL=$(command -v zsh)" >> "$GITHUB_ENV"
 
     # install.sh holds the version pin, so its hash keys the cache.

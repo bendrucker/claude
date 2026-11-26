@@ -4,8 +4,7 @@ context: [user/rules/testing.md]
 graders:
   skill-fired: "port-*"
   split-fired: "split-*"
-  consolidate-fired: "consolidate-*"
   compared-both: "port-*"
   old-kept: "port-*"
   quiet: "quiet-*"
-  ran-tests: ["split-*", "consolidate-*", "port-upstream-*"]
+  ran-tests: ["split-*", "port-dedupe-*", "port-upstream-*"]

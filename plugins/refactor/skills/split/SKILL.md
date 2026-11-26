@@ -14,8 +14,15 @@ Group code by the state and data it shares and by who calls it. Code that reads 
 
 - In a class, shared mutable state is the cut line. When two halves both write the same field, either the split is wrong or that state is a module of its own.
 - In a function, cut at points where the live variables are few. A stretch that reads ten locals and writes five is not a unit.
-- Give each new module a name for what it contains. A module named `utils`, `helpers`, or `common` means the cut is not settled.
 - Split into files before splitting across directories.
+
+## Placement
+
+These rules also place a shared version that replaces duplicate copies.
+
+- Give each new module a name for what it contains. A module named `utils`, `helpers`, or `common` means the cut is not settled.
+- Put it where every caller can depend on it without an import cycle or a new dependency direction.
+- When the callers live in separate packages or repositories, the shared code becomes a package that each one depends on.
 
 Propose the cut to the user as a list of new modules, each with a one-line purpose and the names it takes, before moving code when the split creates more than three modules or changes any import path outside the file. With nobody present to answer, take the cut and lead the report with it.
 

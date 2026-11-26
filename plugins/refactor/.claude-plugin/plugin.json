@@ -1,6 +1,6 @@
 {
   "name": "refactor",
-  "description": "Behavior-preserving refactors: port to a new implementation, split a monolith, consolidate duplicates",
+  "description": "Behavior-preserving refactors: port to a new implementation, library, or deduplicated version, or split a monolith",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

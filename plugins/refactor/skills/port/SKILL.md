@@ -1,6 +1,6 @@
 ---
 name: port
-description: Move code to a new implementation that must behave the same, such as a rewrite in another language, a handwritten class ported to a framework's interface, a library or engine swapped out, homegrown code replaced with the standard library or a maintained package, or a script converted to TypeScript. Use when porting, converting, reimplementing, or migrating code (not a database schema) where existing callers must not see a difference, or when looking for hand-rolled code a library should replace.
+description: Move code to a new implementation that must behave the same, such as a rewrite in another language, a handwritten class ported to a framework's interface, a library or engine swapped out, homegrown code replaced with the standard library or a maintained package, duplicate copies merged into one, or a script converted to TypeScript. Use when porting, converting, reimplementing, migrating, or deduplicating code (not a database schema) where existing callers must not see a difference, and when looking for hand-rolled code a library should replace.
 argument-hint: "[<what is being ported>]"
 ---
 
@@ -66,6 +66,8 @@ The port is done when:
 Report those numbers and the exemption list in the PR body. Keep the old implementation and the harness until the user approves cutover, then delete both in the cutover change.
 
 When the new implementation is a library replacing code the project wrote itself, or when asked to find such code, read [references/upstream.md](references/upstream.md).
+
+When several copies of the same logic become one shared version, read [references/dedupe.md](references/dedupe.md).
 
 When the port repeats across many units, such as scripts, call sites, or modules, read [references/scale.md](references/scale.md) before the second unit.
 

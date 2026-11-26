@@ -8,7 +8,7 @@ Procedures for listing, importing, re-syncing, and forgetting another machine's 
 bun <skill-dir>/scripts/hosts.ts
 ```
 
-Shows each host with its import time, egress policy, last index, rsync source, and a ready-to-run re-sync command.
+Shows each host with its import time, egress policy, last index, newest upload, rsync source, and a ready-to-run re-sync command. For an `s3://` host it lists the bucket through the `aws` CLI, and when the newest object is older than `--stale-days` (default 3) or the listing fails, it prints a `stale: <host> ...` line to stderr and exits 1, so a scheduled check can key on either. This catches an uploader that stopped, which `index-health`'s `host-staleness` cannot tell apart from a host nobody pulled.
 
 ## Importing a Machine
 
@@ -44,12 +44,14 @@ Deletes the host's rows from the index and removes its synced files. `local` can
 
 ## Cloud Sessions
 
-Cloud sessions (claude.ai/code, project threads) run in containers the Mac never sees. The plugin's `SessionEnd` hook, and its `Stop` hook at most every 15 minutes, copy each cloud session's transcript and its subagents' transcripts to `CLAUDE_SESSION_UPLOAD_URL` (`s3://bucket/prefix`), one object per file at `<prefix>/<remote-session-id>/...`, overwritten as it grows. A VM reclaimed without `SessionEnd` loses at most the last interval, unless the session is reopened, since its first upload in the new container carries the restored history. The hooks do nothing unless that variable is set in the cloud environment and `CLAUDE_CODE_REMOTE` is `true`. Register the prefix as a host once, then pull:
+Cloud sessions (claude.ai/code, project threads) run in containers the Mac never sees. The plugin's `SessionEnd` hook, and its `Stop` hook at most every 15 minutes, copy each cloud session's transcript, its subagents' transcripts, and its mod events to `CLAUDE_SESSION_UPLOAD_URL` (`s3://bucket/prefix`), one object per file at `<prefix>/<remote-session-id>/...` (mod events under `mod-events/`), overwritten as it grows. `pull.ts` puts the mod events in the host's `mod-events/<remote-session-id>/`, so the refresh indexes them into `mod_events` under the host, with `claude_code.surface` `cloud`. A VM reclaimed without `SessionEnd` loses at most the last interval, unless the session is reopened, since its first upload in the new container carries the restored history. The hooks do nothing unless that variable is set in the cloud environment and `CLAUDE_CODE_REMOTE` is `true`. Register the prefix as a host once, then pull:
 
 ```bash
 mkdir -p ~/.claude/session-imports/cloud/projects
 bun <skill-dir>/scripts/import.ts --host cloud --source 's3://<bucket>/<prefix>/' --egress
-bun <skill-dir>/scripts/pull.ts --host cloud
+session-index-pull --host cloud
 ```
 
 `--egress` fits because these rows came from the cloud in the first place. The bucket keeps every session. `pull.ts` keeps the local copy to the sessions uploaded within `--days` (default 90, matching `cleanupPeriodDays`), fetching any whose objects grew and deleting the rest, so the next refresh imports the new ones and reaps the rows of the old, the way `cleanupPeriodDays` works for `local`. It shells out to the `aws` CLI with whatever credentials the environment provides.
+
+A run whose PUTs fail, on an HTTP error status or a thrown fetch, appends a `session-upload.upload` event at WARN to the session's `mod-events/`, once per session for each `kind`: `unsigned` (a 403 on every file, meaning the environment has no SigV4 network secret for the bucket), `http`, or `network`. The event carries the kind, a `message` stating it, the hook, the `attempted` and `failed` counts, the distinct `statuses`, and each failed file's session-relative name with its status or error code. The hook still exits 0. The event reaches the bucket with the first upload that succeeds, so the `mods` query shows it as a `failed` row for mod `session-upload`, and the cloud session's own index shows it immediately.

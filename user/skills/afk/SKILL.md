@@ -8,6 +8,12 @@ description: >
   on battery, or lid-closed. Use via /afk or /afk <duration>.
 argument-hint: "[duration]"
 disable-model-invocation: true
+allowed-tools:
+  - Bash(date:*)
+  - Bash(pmset -g ps)
+  - Bash(ioreg -r -k AppleClamshellState)
+  - Bash(ifconfig)
+  - Bash(grep *inet*)
 ---
 
 # AFK

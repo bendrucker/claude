@@ -111,7 +111,7 @@ ${DYNAMIC}
 
 // Built from a char code because a literal escape byte in a regex trips the
 // control-character lint.
-const STRIP_ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+const STRIP_ANSI = new RegExp(`${String.fromCodePoint(27)}\\[[0-9;]*m`, "g");
 
 function plain(text: string): string {
   return text.replace(STRIP_ANSI, "");

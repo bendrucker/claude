@@ -1,7 +1,5 @@
 # Things 3 AppleScript/JXA Reference
 
-Object model for Things 3 automation via JXA.
-
 Source: Things3.sdef (AppleScript dictionary from Things.app). Regenerate with:
 
 ```bash
@@ -13,6 +11,7 @@ Typed version: `src/Things3.d.ts` (see [setup.md](setup.md)).
 ## Syntax Facts
 
 - Read properties by calling them: `todo.name()`. Write by assignment: `todo.name = "New title"`.
+- Read many properties in one call with `todo.properties()`.
 - Look up by ID: `app.lists.byId("TMTodayListSource")`, `app.toDos.byId("ABC-123")`.
 - Filter with `whose` on the specifier (not the array): `app.toDos.whose({name: "Buy milk"})[0]`. Returns an array. Index `[0]` and check for undefined.
 - `status()` returns an enum. Convert with `.toString()` before comparing to `"open"` etc.
@@ -35,8 +34,6 @@ Properties: `id` (read-only), `name`
 Elements: `toDos`
 
 Methods: `show()` shows the list in the Things UI
-
-Built-in list IDs are listed in [SKILL.md](SKILL.md).
 
 ## To Do Object
 
@@ -91,7 +88,3 @@ Inherits from List. Element `toDos` holds to-dos assigned to the contact.
 ## Status Enumeration
 
 `open`, `completed`, `canceled`. Readable and writable: `todo.status = "completed"`.
-
-## Repeating Tasks
-
-Things does not expose repeating-task configuration through JXA. Detection heuristics and runnable scripts: [troubleshooting.md](troubleshooting.md#filtering-repeating-tasks).

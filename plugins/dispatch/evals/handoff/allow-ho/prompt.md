@@ -1,0 +1,1 @@
+Hand off a fix for the delay overflow in `connect`: after about 1,000 attempts `2 ** attempt` becomes `Infinity`. The new session needs to run `bun test` as it works, so let it do that freely. I want a PR with a regression test.

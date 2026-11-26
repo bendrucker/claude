@@ -1,0 +1,25 @@
+diff --git a/src/report.test.ts b/src/report.test.ts
+new file mode 100644
+index 0000000..3a06b8a
+--- /dev/null
++++ b/src/report.test.ts
+@@ -0,0 +1,6 @@
++import { expect, test } from "bun:test";
++import { report } from "./report";
++
++test("counts watched files", () => {
++  expect(report(["docs/a.md", "src/b.ts"], ["docs/"])).toBe("1/2 under watched paths");
++});
+diff --git a/src/report.ts b/src/report.ts
+new file mode 100644
+index 0000000..62bb2ac
+--- /dev/null
++++ b/src/report.ts
+@@ -0,0 +1,7 @@
++import { underAny } from "./paths";
++
++/** Summarizes how many changed files sit under the watched prefixes. */
++export function report(files: string[], watched: string[]): string {
++  const hits = files.filter((file) => underAny([file], watched));
++  return `${hits.length}/${files.length} under watched paths`;
++}

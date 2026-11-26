@@ -8,6 +8,8 @@ Case graders cover only what a regex decides: the skill fired, the draft kept ea
 
 Briefs come from [`scripts/mine.ts`](scripts/mine.ts). A brief qualifies when its original predates Claude Code (before 2025-02-24) and comes from a public repo. Skill cases are the exception. Their originals were AI-assisted. They replay as briefs and never serve as anchors. `dev` holds 16 cases and `holdout` 8, each split carrying every surface. `pr-002` and `pr-014` are balance cases, where the right body is short.
 
+Sessions start with [`context.md`](context.md), the `user/CLAUDE.md` line that loads `writing:writing` in real sessions. Without it the skill's description alone never triggered it.
+
 Every reply carries its deliverable inside `<out>` tags. Doc and skill cases also write the file. The trope hook then sees the edit.
 
 ## Running
@@ -18,6 +20,6 @@ Scoring a candidate against a base column:
 
 - `bun plugins/writing/evals/authoring/scripts/metrics.ts <results>...`: tokens per deliverable, hook denies, and trope density.
 - `bun plugins/writing/evals/authoring/scripts/pairwise.ts pairs|judge|score`: blind pairs, judge picks, and the win rate with per-case permutation p-values. Pass `--before data/before` so doc and skill drafts are judged on their changed region. Each file there is the case's deliverable as its fixture leaves it. The judge call, blinding, swap, and cache keys come from [`packages/eval-judge`](../../../../packages/eval-judge/index.ts), on subscription auth.
-- `bun plugins/writing/evals/authoring/scripts/span-gate.ts`: an offline gate for trope rule and wordlist changes against Ben's span labels.
+- `bun plugins/writing/evals/authoring/scripts/sweep.ts`: proposes a level for each Vale check from its lift on model drafts over the voice baseline.
 
-Ben labels pairs and spans in [`label/server.ts`](label/server.ts). Labels and judgments land in the gitignored `feedback/`, and originals in `data/`.
+Ben labels pairs in [`label/server.ts`](label/server.ts). Labels and judgments land in the gitignored `feedback/`, and originals in `data/`.

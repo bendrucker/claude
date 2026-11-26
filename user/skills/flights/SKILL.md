@@ -9,6 +9,7 @@ argument-hint: "[<the trip, in plain language>]"
 disable-model-invocation: true
 allowed-tools:
   - AskUserQuestion
+  - Read(~/.config/claude-flights/**)
   - Bash(cat ~/.config/claude-flights/*)
   - Bash(agent-browser:*)
   - Bash(bun ~/.claude/skills/flights/scripts/:*)
@@ -17,6 +18,7 @@ allowed-tools:
   - Bash(sed:*)
   - Read
   - Write
+  - Bash(echo:*)
 ---
 
 # Flights

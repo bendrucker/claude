@@ -1,0 +1,35 @@
+import type { FileCoverage } from "./lcov";
+
+export function parseLcov(text: string): FileCoverage[] {
+  const records: FileCoverage[] = [];
+  let current: FileCoverage | null = null;
+
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/\r$/, "");
+    if (line === "") continue;
+
+    if (line.startsWith("SF:")) {
+      current = {
+        file: line.slice(3),
+        lineHits: new Map(),
+        functionsFound: 0,
+        functionsHit: 0,
+      };
+      continue;
+    }
+    if (!current) continue;
+
+    if (line.startsWith("DA:")) {
+      const [lineNo, count] = line.slice(3).split(",");
+      current.lineHits.set(Number(lineNo), Number(count));
+    } else if (line.startsWith("FNF:")) {
+      current.functionsFound = Number(line.slice(4));
+    } else if (line.startsWith("FNH:")) {
+      current.functionsHit = Number(line.slice(4));
+    } else if (line === "end_of_record") {
+      records.push(current);
+      current = null;
+    }
+  }
+  return records;
+}

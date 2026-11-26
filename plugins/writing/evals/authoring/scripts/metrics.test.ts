@@ -8,7 +8,6 @@ import {
   loadRuns,
   render,
   type Runs,
-  tokenUsage,
   tropeDensity,
   WRITING_DENY_MARKERS,
 } from "./metrics";
@@ -31,71 +30,10 @@ const resultLine = (extra: Record<string, unknown> = {}) => ({
 
 const trace = (...lines: object[]): string => lines.map(line).join("\n");
 
-describe("tokenUsage", () => {
-  test("prefers modelUsage, summed across models", () => {
-    const usage = tokenUsage(
-      trace(
-        resultLine({
-          usage: {
-            input_tokens: 1,
-            output_tokens: 1,
-            cache_creation_input_tokens: 0,
-            cache_read_input_tokens: 0,
-          },
-          modelUsage: {
-            "claude-opus-5-5": {
-              inputTokens: 10,
-              outputTokens: 20,
-              cacheReadInputTokens: 5,
-              cacheCreationInputTokens: 3,
-            },
-            "claude-haiku-5": { inputTokens: 1, outputTokens: 2 },
-          },
-        }),
-      ),
-    );
-    expect(usage).toEqual({ total: 10 + 20 + 5 + 3 + 1 + 2, output: 22 });
-  });
-
-  test("falls back to usage when modelUsage is absent", () => {
-    const usage = tokenUsage(
-      trace(
-        resultLine({
-          usage: {
-            input_tokens: 100,
-            output_tokens: 50,
-            cache_creation_input_tokens: 10,
-            cache_read_input_tokens: 5,
-          },
-        }),
-      ),
-    );
-    expect(usage).toEqual({ total: 165, output: 50 });
-  });
-
-  test("reads the last result line, since usage is cumulative", () => {
-    const usage = tokenUsage(
-      trace(
-        resultLine({ usage: { input_tokens: 1, output_tokens: 1 } }),
-        resultLine({ usage: { input_tokens: 9, output_tokens: 9 } }),
-      ),
-    );
-    expect(usage).toEqual({ total: 18, output: 9 });
-  });
-
-  test("is undefined when neither field is present", () => {
-    expect(tokenUsage(trace(resultLine()))).toBeUndefined();
-  });
-});
-
 describe("hookDenies", () => {
   test.each([
     ["spaced em dash", "Spaced em dashes ( — ) are an AI writing tell. Split the clauses."],
-    ["salutation", '"Dana," opens the comment with a salutation. Delete the address.'],
-    [
-      "numbering",
-      "Detected step or phase numbering that creates tight coupling.\nUse descriptive names.",
-    ],
+    ["multi-finding", "Writing checks found 2 issues in this text. Fix them in one pass."],
   ])("counts a %s deny", (_name, text) => {
     expect(hookDenies(trace(toolUseResult("t1", text)))).toBe(1);
   });
@@ -143,7 +81,7 @@ describe("hookDenies", () => {
         trace(
           toolUseResult("t1", "Spaced em dashes ( — ) are an AI writing tell."),
           toolUseResult("t2", "unrelated failure"),
-          toolUseResult("t3", "Detected step or phase numbering that creates tight coupling."),
+          toolUseResult("t3", "Writing checks found 3 issues in this text."),
         ),
       ),
     ).toBe(2);
@@ -153,7 +91,7 @@ describe("hookDenies", () => {
 describe("tropeDensity", () => {
   test("is zero for clean prose and positive for flagged vocabulary", async () => {
     expect(await tropeDensity("Plain text with no flagged words at all here today.")).toBe(0);
-    expect(await tropeDensity("Let's delve into the details of this change.")).toBeGreaterThan(0);
+    expect(await tropeDensity("This change reaches for a new helper.")).toBeGreaterThan(0);
   });
 
   test("is zero for empty text", async () => {
@@ -204,6 +142,17 @@ describe("loadRuns and render", () => {
     const cell = runs.get("brief/with");
     expect(cell).toHaveLength(1);
     expect(cell?.[0]).toEqual({ tokens: { total: 100, output: 0 }, denies: 1, density: 0 });
+  });
+
+  test("orders a case's runs numerically, run 2 before run 10", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "metrics-"));
+    await Promise.all(
+      [10, 2].map((n) =>
+        Bun.write(join(dir, "traces", `brief-with-${n}.jsonl`), traceWith(n, undefined, "x")),
+      ),
+    );
+    const cell = (await loadRuns([dir])).get("brief/with");
+    expect(cell?.map((m) => m.tokens?.total)).toEqual([2, 10]);
   });
 
   test("renders a table with a starred cost guard and a JSON report", async () => {

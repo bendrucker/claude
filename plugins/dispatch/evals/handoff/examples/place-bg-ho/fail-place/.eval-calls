@@ -1,0 +1,2 @@
+rex split -b block:sender --split=right -c /tmp/eval/cwd/.worktrees/rename-delay --label Rename Delay --focus=false --json -- claude --name rename-delay -- <prompt>
+launch rename-delay /tmp/eval/cwd/.worktrees/rename-delay place=pane title=Rename Delay

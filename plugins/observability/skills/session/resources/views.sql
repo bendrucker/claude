@@ -398,7 +398,8 @@ WHERE type = 'tool_use'
 -- sees only the Skill tool, while a typed command, an agent's preloaded skill, and the
 -- re-injection after compaction also load a body. The body opens with the directory it was
 -- read from, and a plugin cache directory names the plugin version, so `plugin_version`
--- says which revision of the skill a session ran.
+-- says which revision of the skill a session ran. `body_bytes` is the injected body's size,
+-- the per-load context cost.
 CREATE OR REPLACE VIEW skill_loads AS
 WITH bodies AS (
   SELECT
@@ -446,6 +447,7 @@ SELECT
   trigger,
   tool_use_id,
   dir,
+  octet_length(encode(body)) AS body_bytes,
   host,
   session_id,
   subagent_id(source_file) AS agent_id,
@@ -727,6 +729,64 @@ SELECT
 FROM raw
 WHERE type = 'system';
 
+-- One row per compaction, classified by what triggered it. The boundary's own
+-- `compactMetadata.trigger` is only `manual` or `auto`: idle compaction (CLI ~2.1.290+, a
+-- large session compacted shortly before its 1h prompt cache expires) writes `auto`, the
+-- same as the context-threshold compaction. What tells them apart is the notice the harness
+-- appends right after the boundary, an informational system row reading "Compacted while
+-- idle, before the prompt cache expired" or, when a summary precomputed while the user was
+-- away is applied on their return, "Compacted using a summary written while you were away".
+-- A notice belongs to the latest boundary before it in the same transcript.
+--
+-- `kind`: `idle`, `away`, `precomputed` (a background summary swapped in at the threshold,
+-- `compactMetadata.precomputed`), else the raw trigger (`manual`, `auto`).
+CREATE OR REPLACE VIEW compactions AS
+WITH boundaries AS (
+  SELECT
+    host, session_id, project_path, timestamp, source_file, source_line, uuid,
+    compact_trigger,
+    compact_pre_tokens,
+    TRY_CAST(data->>'$.compactMetadata.postTokens' AS BIGINT) AS compact_post_tokens,
+    compact_duration_ms,
+    coalesce(TRY_CAST(data->>'$.compactMetadata.precomputed' AS BOOLEAN), false) AS precomputed,
+    LEAD(source_line) OVER (PARTITION BY host, source_file ORDER BY source_line) AS next_line
+  FROM system_events
+  WHERE subtype = 'compact_boundary'
+), notices AS (
+  SELECT host, source_file, source_line,
+         CASE
+           WHEN starts_with(content, 'Compacted while idle') THEN 'idle'
+           WHEN starts_with(content, 'Compacted using a summary written while you were away') THEN 'away'
+         END AS notice_kind
+  FROM system_events
+  WHERE subtype = 'informational'
+    AND (starts_with(content, 'Compacted while idle')
+      OR starts_with(content, 'Compacted using a summary written while you were away'))
+), classified AS (
+  SELECT b.*,
+         (SELECT min(n.notice_kind) FROM notices n
+           WHERE n.host = b.host AND n.source_file = b.source_file
+             AND n.source_line > b.source_line
+             AND (b.next_line IS NULL OR n.source_line < b.next_line)) AS notice_kind
+  FROM boundaries b
+)
+SELECT
+  coalesce(notice_kind, CASE WHEN precomputed THEN 'precomputed' END, compact_trigger, 'unknown') AS kind,
+  compact_trigger,
+  compact_pre_tokens,
+  compact_post_tokens,
+  compact_duration_ms,
+  precomputed,
+  host,
+  session_id,
+  subagent_id(source_file) AS agent_id,
+  project_path,
+  timestamp,
+  uuid,
+  source_file,
+  source_line
+FROM classified;
+
 -- One row per Stop hook execution, from the `hookInfos` roster the harness writes into
 -- every `stop_hook_summary`. This is the complete ledger: `hook_events` is built from
 -- attachment records, which a hook producing no output never writes, so a silent hook is
@@ -904,6 +964,7 @@ WITH patterns(hook_name, pattern) AS (
     ('git:block-default-branch-commit', 'Cannot commit directly to %'),
     ('user:worktree',                   'Use the worktrunk skill%'),
     ('writing:check-tropes',            'Spaced em dashes%'),
+    ('writing:lint',                    'Vale found %'),
     ('gitlab:lint',                     'This repository''s origin remote is GitLab%'),
     ('pull-request:validate-body',      'Fix the PR body before retrying%'),
     ('linear:cli-create',               '`linear issue create` without%')
@@ -1105,32 +1166,6 @@ SELECT
   MAX(timestamp)                                         AS last_plan_ts
 FROM plan_calls
 GROUP BY host, session_id;
-
--- One row per tool call the auto-mode mod recorded, from its `tool.verdict` events.
--- `duration_ms` spans the decider and the tool. `interactive` marks a tool that waits
--- on the person, whose wall time is the person's.
-CREATE OR REPLACE VIEW classifier_verdicts AS
-SELECT
-  host,
-  session_id,
-  attributes->>'tool_use_id'                              AS tool_use_id,
-  attributes->>'agent_id'                                 AS agent_id,
-  attributes->>'tool'                                     AS tool,
-  TRY_CAST(attributes->>'interactive' AS BOOLEAN)         AS interactive,
-  attributes->>'decision'                                 AS decision,
-  attributes->>'rule'                                     AS rule,
-  attributes->>'hook'                                     AS hook,
-  attributes->>'setting'                                  AS setting,
-  attributes->>'decider'                                  AS decider,
-  attributes->>'ceiling'                                  AS ceiling,
-  attributes->>'reason'                                   AS reason,
-  TRY_CAST(attributes->>'read_only' AS BOOLEAN)           AS read_only,
-  epoch_ms(TRY_CAST(attributes->>'started_at' AS BIGINT)) AS started_at,
-  TRY_CAST(attributes->>'check_ms' AS BIGINT)             AS check_ms,
-  duration_ms,
-  attributes->>'outcome'                                  AS outcome
-FROM mod_events
-WHERE event_name = 'auto-mode.tool.verdict';
 
 -- The field registry: which JSON paths each record type carries, when they were first and
 -- last written, and by which harness version. Paths stop two levels down (`$.key`, and

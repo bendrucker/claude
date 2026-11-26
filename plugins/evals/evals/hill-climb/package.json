@@ -10,5 +10,8 @@
     "commander": "~15.0.0",
     "table": "^6.9.0",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "yaml": "^2.7.1"
   }
 }

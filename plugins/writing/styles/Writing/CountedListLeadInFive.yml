@@ -1,0 +1,73 @@
+# evidence: a count in a list lead-in restates what the list shows and goes stale when an item changes. Counts of three and up run 37/M in assistant text against 4.7/M in the user's pre-AI writing.
+# retire when: the assistant rate for counts of three and up falls to the voice baseline, or a labeling pass shows most hits are not list lead-ins.
+extends: existence
+message: "A count in the lead-in repeats what the list shows. Drop the number: 'keeps:' rather than 'keeps five:'."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/CountedListLeadInFive.yml
+level: warning
+# A paragraph followed by a list of exactly 5 items.
+scope: 'doc(p:has(+ ul:has(> li:nth-child(5):last-child)), p:has(+ ol:has(> li:nth-child(5):last-child)))'
+ignorecase: true
+tokens:
+  # The count, unless it is the denominator of a fraction, when the paragraph ends in a colon after it.
+  - '(?<!\bof )\b(?:five|5)\b(?=[^.!?]*:\s*$)'
+tests:
+  - name: "flags a word count before 5 bullets"
+    input: |
+      The list keeps five:
+
+      - item 1
+      - item 2
+      - item 3
+      - item 4
+      - item 5
+    contains: [Writing.CountedListLeadInFive]
+  - name: "flags a digit count before 5 numbered items"
+    input: |
+      It makes 5 changes:
+
+      1. item 1
+      2. item 2
+      3. item 3
+      4. item 4
+      5. item 5
+    contains: [Writing.CountedListLeadInFive]
+  - name: "allows a count that does not match the list"
+    input: |
+      The list keeps five:
+
+      - item 1
+      - item 2
+      - item 3
+      - item 4
+    absent: Writing.CountedListLeadInFive
+  - name: "allows a fraction"
+    input: |
+      It passed all 0 of 5:
+
+      - item 1
+      - item 2
+      - item 3
+      - item 4
+      - item 5
+    absent: Writing.CountedListLeadInFive
+  - name: "allows a count in an earlier sentence"
+    input: |
+      Five reviewers approved. It found these:
+
+      - item 1
+      - item 2
+      - item 3
+      - item 4
+      - item 5
+    absent: Writing.CountedListLeadInFive
+  - name: "allows a lead-in inside a fenced block"
+    input: |
+      ```text
+      The list keeps five:
+      - item 1
+      - item 2
+      - item 3
+      - item 4
+      - item 5
+      ```
+    absent: Writing.CountedListLeadInFive

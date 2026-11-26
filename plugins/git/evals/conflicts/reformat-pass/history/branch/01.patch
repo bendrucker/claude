@@ -1,0 +1,38 @@
+diff --git a/src/tags.test.ts b/src/tags.test.ts
+index e576d14..2d24f09 100644
+--- a/src/tags.test.ts
++++ b/src/tags.test.ts
+@@ -8,6 +8,11 @@ describe("parseTags", () => {
+     { name: "single tag", input: "claude-code", expected: ["claude-code"] },
+     { name: "comma-separated tags", input: "claude-code,work", expected: ["claude-code", "work"] },
+     { name: "trims whitespace", input: " claude-code , work ", expected: ["claude-code", "work"] },
++    {
++      name: "drops repeated tags within one value",
++      input: "claude-code,work,claude-code",
++      expected: ["claude-code", "work"],
++    },
+     {
+       name: "filters empty segments",
+       input: "claude-code,,work",
+diff --git a/src/tags.ts b/src/tags.ts
+index 6a2fbde..17ca3bd 100644
+--- a/src/tags.ts
++++ b/src/tags.ts
+@@ -1,9 +1,13 @@
+ export function parseTags(value: string | undefined): string[] {
+   if (value == null || value === "") return [];
+-  return value
+-    .split(",")
+-    .map((t) => t.trim())
+-    .filter(Boolean);
++  return [
++    ...new Set(
++      value
++        .split(",")
++        .map((t) => t.trim())
++        .filter(Boolean),
++    ),
++  ];
+ }
+ 
+ export function mergeTags(...sources: string[][]): string[] {

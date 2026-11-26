@@ -1,0 +1,86 @@
+diff --git a/lib/backup.sh b/lib/backup.sh
+index c66b306..35363a2 100644
+--- a/lib/backup.sh
++++ b/lib/backup.sh
+@@ -3,5 +3,5 @@
+ 
+ backup_size() {
+   local total_kb=$1
+-  printf 'backup: %s\n' "$(human_size "$total_kb")"
++  printf 'backup: %s\n' "$(human_size $((total_kb * 1024)))"
+ }
+diff --git a/lib/cleanup.sh b/lib/cleanup.sh
+index d56a101..bdbd16c 100644
+--- a/lib/cleanup.sh
++++ b/lib/cleanup.sh
+@@ -3,5 +3,5 @@
+ 
+ cleanup_freed() {
+   local freed_kb=$1
+-  printf 'freed: %s\n' "$(human_size "$freed_kb")"
++  printf 'freed: %s\n' "$(human_size $((freed_kb * 1024)))"
+ }
+diff --git a/lib/report.sh b/lib/report.sh
+index aeaec49..785d96b 100644
+--- a/lib/report.sh
++++ b/lib/report.sh
+@@ -3,5 +3,5 @@
+ 
+ report_disk() {
+   local used_kb=$1
+-  printf 'disk: %s\n' "$(human_size "$used_kb")"
++  printf 'disk: %s\n' "$(human_size $((used_kb * 1024)))"
+ }
+diff --git a/lib/size.sh b/lib/size.sh
+index 8e4f97d..f130aa3 100644
+--- a/lib/size.sh
++++ b/lib/size.sh
+@@ -1,13 +1,15 @@
+ #!/usr/bin/env bash
+ 
+-# human_size <kilobytes>: prints a size such as 1.5 MB.
++# human_size <bytes>: prints a size such as 1.5 MB.
+ human_size() {
+-  local kb=$1
+-  if [ "$kb" -ge 1048576 ]; then
+-    printf '%d.%d GB\n' $((kb / 1048576)) $((kb * 10 / 1048576 % 10))
+-  elif [ "$kb" -ge 1024 ]; then
+-    printf '%d.%d MB\n' $((kb / 1024)) $((kb * 10 / 1024 % 10))
++  local bytes=$1
++  if [ "$bytes" -ge 1073741824 ]; then
++    printf '%d.%d GB\n' $((bytes / 1073741824)) $((bytes * 10 / 1073741824 % 10))
++  elif [ "$bytes" -ge 1048576 ]; then
++    printf '%d.%d MB\n' $((bytes / 1048576)) $((bytes * 10 / 1048576 % 10))
++  elif [ "$bytes" -ge 1024 ]; then
++    printf '%d KB\n' $((bytes / 1024))
+   else
+-    printf '%d KB\n' "$kb"
++    printf '%d B\n' "$bytes"
+   fi
+ }
+diff --git a/lib/status.sh b/lib/status.sh
+index ffe549c..4ada861 100644
+--- a/lib/status.sh
++++ b/lib/status.sh
+@@ -3,5 +3,5 @@
+ 
+ status_cache() {
+   local cache_kb=$1
+-  printf 'cache: %s\n' "$(human_size "$cache_kb")"
++  printf 'cache: %s\n' "$(human_size $((cache_kb * 1024)))"
+ }
+diff --git a/test/run.sh b/test/run.sh
+index a644535..91ef1aa 100644
+--- a/test/run.sh
++++ b/test/run.sh
+@@ -13,8 +13,8 @@ check() {
+   fi
+ }
+ 
+-check "512 KB" "$(human_size 512)"
+-check "1.5 MB" "$(human_size 1536)"
++check "512 KB" "$(human_size 524288)"
++check "1.5 MB" "$(human_size 1572864)"
+ check "disk: 2.0 MB" "$(report_disk 2048)"
+ check "backup: 3.0 GB" "$(backup_size 3145728)"
+ check "freed: 700 KB" "$(cleanup_freed 700)"

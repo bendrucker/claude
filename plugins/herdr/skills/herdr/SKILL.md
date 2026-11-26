@@ -1,12 +1,11 @@
 ---
 name: herdr
 description: >-
-  Drive the herdr terminal workspace manager: inspect workspaces, tabs, and panes, hand work to sibling coding agents in other panes (distinct from in-session `Agent` subagents), split panes for collaborative file viewing or long-running processes, and correlate panes to Claude sessions. Load this when the decision to hand a task to another pane's agent arrives mid-task, and when opening a file alongside the user, starting a dev server or log tail the user should watch, capturing another pane's output, or asking what else is running. Pane, tab, workspace, and split are herdr's terms. A request naming one is a herdr request even when it never says herdr.
+  Drive the herdr terminal workspace manager, as the herdr TUI or the Herdr app and its herdr-core (`hc`) server: inspect workspaces, tabs, and panes, hand work to sibling coding agents in other panes (distinct from in-session `Agent` subagents), split panes for collaborative file viewing or long-running processes, and correlate panes to Claude sessions. Load this when the decision to hand a task to another pane's agent arrives mid-task, and when opening a file alongside the user, starting a dev server or log tail the user should watch, capturing another pane's output, or asking what else is running. Pane, tab, workspace, and split are herdr's terms. In a session herdr hosts, a request naming one is a herdr request even when it never says herdr.
 argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts)
-  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh)
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
+  - 'Bash(bun "${CLAUDE_SKILL_DIR}/scripts/orient.ts")'
+  - 'Bash(bash "${CLAUDE_SKILL_DIR}/scripts/commands.sh")'
   - Bash(herdr api snapshot:*)
   - Bash(herdr --help:*)
   - Bash(herdr agent --help:*)
@@ -36,25 +35,40 @@ allowed-tools:
   - Bash(herdr plugin log list:*)
   - Bash(herdr plugin config-dir:*)
   - Bash(herdr machine list:*)
+  - Bash(hc --skill)
+  - Bash(hc --help:*)
+  - Bash(hc ls:*)
+  - Bash(hc get:*)
+  - Bash(hc read:*)
+  - Bash(hc wait:*)
+  - Bash(herdr-app --skill)
+  - Bash(herdr-app commands:*)
 ---
 
 # Herdr
 
-herdr manages the terminal workspace this session runs in, including every pane, tab, and sibling coding agent.
-
 Under `HERDR_ENV=1`, a request naming a pane, tab, workspace, or split is about this session's herdr layout.
+
+## Herdr App
+
+`HC_TERMINAL_ID` set means this session runs in a herdr-core terminal, usually under the Herdr app. The `herdr` CLI and everything below drive the TUI's server, a separate process that can't see the app's terminals. Take commands from the manuals the installed binaries print:
+
+- `hc --skill`: terminals and agents, including starting, reading, sending to, and waiting on them. `$HC_TERMINAL_ID` is this session's address.
+- `herdr-app --skill`: the window, including spaces, tabs, layouts, and splits. `herdr-app commands` lists every command.
+
+Dispatch a sibling agent by creating its worktree with `wt switch --create <branch> --no-cd`, then `hc run --bg --name <branch> --cwd <worktree> claude "<prompt>"`. Claude Code reports its own status to herdr-core. Leave the herdr-core server running, since `hc server stop` ends every terminal.
 
 ## Command Surface
 
-!`bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh`
+!`bash "${CLAUDE_SKILL_DIR}/scripts/commands.sh"`
 
-For flags not shown above, `herdr <group> <command> --help` is complete: defaults, valid values for every enum flag, preconditions. Where the CLI and this file disagree, the CLI is right and this file is stale.
+For flags not shown above, `herdr <group> <command> --help` is complete: defaults, enum values, preconditions. Where the CLI and this file disagree, follow the CLI.
 
 Bare `herdr` launches or attaches the TUI in this pane. A mutating command in bare form runs on its defaults instead of printing usage, so `herdr workspace create` creates a workspace.
 
 ## Current Workspace
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts`
+!`bun "${CLAUDE_SKILL_DIR}/scripts/orient.ts"`
 
 Columns are workspace, then `pane  agent/status  session  cwd  title`, with `cwd` shown only when it differs from the workspace checkout. That view projects `herdr api snapshot`, which returns this machine's workspaces, tabs, panes, layouts, and agents in one call. Prefer it to a sequence of `list` calls, and read it raw when the projection is wrong: `herdr api snapshot | jq .`
 
@@ -78,11 +92,11 @@ A pane exists whether or not an agent runs in it. `pane` commands drive the raw 
 
 An agent target is a live agent name or the pane ID hosting it, and nothing else. `agent list` prints a `terminal_id` and an `agent` kind beside those, and either one passed as a target yields `agent_not_found`, indistinguishable from a missing agent.
 
-Your own identity comes from the environment, never from inference: `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`. `HERDR_ENV=1` marks a pane herdr launched.
+Take your own identity from the environment: `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`. `HERDR_ENV=1` marks a pane herdr launched.
 
 Name a target on every command that takes one. Use `--current` for the calling pane, an explicit ID otherwise. A pane command with no target may resolve to the UI-focused pane, which can belong to the user or another client.
 
-IDs are opaque handles shaped `w1` for a workspace, `w1:t1` for a tab, and `w1:p1` for a pane. Read them out of responses rather than composing them: `pane split` returns `.result.pane`, `tab create` returns `.result.tab` and `.result.root_pane`, `workspace create` returns all three. Closed IDs are never reused. `pane move` mints a new workspace-qualified pane ID, so take the pane forward as `.result.move_result.pane.pane_id` and drop `.result.move_result.previous_pane_id`. The moved process keeps the stale ID in its inherited `HERDR_PANE_ID`, so never take a target from there.
+IDs are opaque handles shaped `w1` for a workspace, `w1:t1` for a tab, and `w1:p1` for a pane. Read them out of responses rather than composing them: `pane split` returns `.result.pane`, `tab create` returns `.result.tab` and `.result.root_pane`, `workspace create` returns all three. Closed IDs are never reused. `pane move` mints a new workspace-qualified pane ID, so take the pane forward as `.result.move_result.pane.pane_id` and drop `.result.move_result.previous_pane_id`. The moved process keeps the stale ID in its inherited `HERDR_PANE_ID`, so target it by the ID the move returned.
 
 ## Machines
 
@@ -110,9 +124,9 @@ Leave lifecycle reporting to herdr's own integration. This plugin's mod reports 
 
 Each agent pane carries `agent_session.value`, its Claude session UUID.
 
-Work bound for its own pull request always goes through [Dispatch](#dispatch), whatever an existing pane shows. Otherwise hand off only to a pane whose `title` or `cwd` names work in flight there. A `primary` workspace is the repo's main checkout, so no pane under one is a hand-off target whatever `cwd` it prints.
+Work bound for its own pull request goes through [Dispatch](#dispatch), whatever an existing pane shows. Otherwise hand off only to a pane whose `title` or `cwd` names work in flight there. A `primary` workspace is the repo's main checkout, so no pane under one is a hand-off target whatever `cwd` it prints.
 
-Hand off with `agent prompt --wait`, which blocks until the agent settles at `idle`, `done`, or `blocked`, then collect with `agent read`:
+For a Claude peer, confirm its name in `ListAgents`, then talk to it with `SendMessage`. For other agents, hand off with `agent prompt --wait`, which blocks until the agent settles at `idle`, `done`, or `blocked`, then collect with `agent read`:
 
 ```bash
 herdr agent prompt <target> "the request" --wait --timeout 900000
@@ -133,13 +147,7 @@ An agent sitting in its own interactive UI takes logical key names: `herdr agent
 
 ### Dispatch
 
-New work needing its own worktree and agent gets both in one call:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
-```
-
-It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Before reporting the hand-off, read the result fields in [`references/agents.md`](references/agents.md#dispatch-result).
+Hand new work bound for its own pull request to `dispatch:dispatch`, which opens it in a herdr workspace when run under herdr.
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 
@@ -156,7 +164,7 @@ pane=$(herdr pane split --current --direction right --ratio 0.4 --cwd "$PWD" --n
 herdr pane run "$pane" markless --watch path/to/file.md
 ```
 
-Use `markless --watch` for markdown and `$EDITOR` for everything else.
+Use `$EDITOR` for anything other than markdown.
 
 `pane run` hands the command string to the pane's own interactive shell, which parses it a second time. Send one command with ordinary quoting. Write anything longer to a file and run `bash <path>`, since a multi-statement string fails with a bare `parse error` inside the pane where your tool result never shows it.
 
@@ -177,7 +185,7 @@ pane=$(herdr pane split --current --direction down --ratio 0.3 --no-focus --cwd 
 herdr pane run "$pane" "bun run dev"
 ```
 
-The same single-command limit applies. Reserve `run_in_background` for work the user has no reason to see.
+The same single-command limit applies.
 
 To block until the process reaches a known point, match on its output rather than sleeping:
 
@@ -191,7 +199,7 @@ The search covers output already on screen. A line from an earlier run matches i
 
 `herdr pane read <pane_id>` replaces a terminal scrape. The default `--source recent` reads accumulated output history and returns nothing for a pane created moments ago, so use `--source visible` on a pane you just made. On an established pane the sources agree. `recent-unwrapped` is that history with soft wraps joined into whole lines. Use it for logs and transcripts. `--source detection` returns the slice the status scraper matches against, which is what to compare when a pane's status is wrong.
 
-Add `--format ansi` when color is the evidence, as in a diff or a test summary. Otherwise take the text.
+Add `--format ansi` when color is the evidence, as in a diff or a test summary.
 
 The `❯` line at the bottom of a Claude pane carries Claude Code's own prompt suggestion, ghost text the harness wrote rather than input the user typed. Take a pane's content from above that line and leave the line itself out of what you report. When the user asks what is sitting in that prompt, `--format ansi` tells the two apart: a suggestion arrives wrapped in `ESC[2m`, and typed text is unstyled.
 

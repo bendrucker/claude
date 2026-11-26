@@ -298,7 +298,7 @@ function documentedCommand(snippet: string): string {
 // has to resolve to the body it names.
 describe("command forms the skills document", () => {
   it("finds the documented forms", () => {
-    expect(DOCUMENTED_FORMS.length).toBeGreaterThanOrEqual(6);
+    expect(DOCUMENTED_FORMS.length).toBeGreaterThanOrEqual(5);
   });
 
   test.each(DOCUMENTED_FORMS)("%s: %s reaches the body", async (_doc, snippet) => {

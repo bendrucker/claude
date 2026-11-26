@@ -1,0 +1,7 @@
+export const limits = {
+  retries: 3,
+  timeoutMs: 5000,
+  readTimeoutMs: 2000,
+  connectTimeoutMs: 1000,
+  maxBodyBytes: 1_000_000,
+};

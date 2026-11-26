@@ -1,0 +1,56 @@
+# evidence: a list item keyed by a bolded path or identifier (`- **`src/foo.ts`**: ...`) reads as a file manifest. Calibrated 2026-10-29: 0.026/1k across 1.1M session words, 0/1k in 1.1M words of the voice baseline, and every sampled hit keyed on a code span or path. Writing.BoldLabel reads only a colon inside the bold. Capitalized labels, enum values, and data rows are left out because most of their hits were legitimate definition lists.
+# retire when: the model stops writing identifier manifests, or judged precision on a fresh sample falls under 0.7.
+extends: existence
+message: "'%s' bolds a path or identifier as a list label. Describe the change in prose, or drop the bold."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/PathBullet.yml
+level: warning
+scope: raw
+nonword: true
+tokens:
+  # The key is a code span, a path, a file name, or a snake_case, call, or flag identifier.
+  - '(?m)^[ \t]*[-*+][ \t]+\*\*(?:`[^*\n]*|[~.]?/[^*\s]*|[^*\s]*/[^*\s]*/[^*\s]*|[^*\s]+/|[^*\s]*\w\.(?:[a-z]{1,5})\b[^*\s]*|[^*\s]*(?:[a-z0-9]_[a-z0-9]|\(\)|::)[^*\s]*|--?[a-z][^*\s]*)\*\*[ \t]*:'
+tests:
+  - name: "flags a code-span key"
+    input: |
+      - **`linear` CLI**: hits the API.
+    contains: [Writing.PathBullet]
+  - name: "flags a code-span path"
+    input: |
+      - **`src/agents/`**: agent definitions and history.
+    contains: [Writing.PathBullet]
+  - name: "flags a bare file name"
+    input: |
+      - **foo.ts**: refactors the helper
+    contains: [Writing.PathBullet]
+  - name: "flags a bare nested path"
+    input: |
+      * **plugins/writing/README.md**: documents the rule
+    contains: [Writing.PathBullet]
+  - name: "flags a snake_case identifier"
+    input: |
+      - **scan_filenames**: caps each string
+    contains: [Writing.PathBullet]
+  - name: "allows a capitalized label"
+    input: |
+      - **Fix scope**: bounded projection for every listing.
+    absent: Writing.PathBullet
+  - name: "allows a camelCase proper noun"
+    input: |
+      - **GitLab**: load the merge-request skill.
+    absent: Writing.PathBullet
+  - name: "allows a slash between two label words"
+    input: |
+      - **Token/session**: stateless OIDC per request.
+    absent: Writing.PathBullet
+  - name: "allows a lowercase enum definition"
+    input: |
+      - **keep**: every sentence carries a fact.
+    absent: Writing.PathBullet
+  - name: "allows a data row"
+    input: |
+      - **k=60, thr=50**: 12.3ms
+    absent: Writing.PathBullet
+  - name: "allows a plain bullet"
+    input: |
+      - Added retry logic to the HTTP client
+    absent: Writing.PathBullet

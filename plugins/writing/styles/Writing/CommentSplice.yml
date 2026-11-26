@@ -1,0 +1,26 @@
+# evidence: owns splices in code comments, where ai-tells.SemicolonUsage is off. In a 2026-11 re-sample it co-flagged 7 of SemicolonUsage's 8 comment hits, every real one among them, and the eighth was a semicolon inside a quoted attribute.
+# retire when: a judged sample of its hits mostly reads fine as written.
+extends: existence
+message: "'%s' joins two clauses with a semicolon. Split the comment into two sentences."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/CommentSplice.yml
+level: warning
+scope: comment
+nonword: true
+tokens:
+  - '[a-z]+; [a-z]+'
+tests:
+  - name: positives
+    about: a spliced comment with no closing period
+    format: .ts
+    input: |
+      // keep sorted; callers rely on order
+      const x = 1;
+    want: |
+      1:9:Writing.CommentSplice:'sorted; callers' joins two clauses with a semicolon. Split the comment into two sentences.
+  - name: negatives
+    about: commented-out code and a semicolon in a string
+    format: .ts
+    input: |
+      // foo(); bar()
+      const label = "cold start; warm later";
+    want: ""

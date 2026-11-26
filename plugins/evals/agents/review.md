@@ -24,15 +24,18 @@ Stored results only. Running evals is the author's job. When a result the claim 
 
 ## Checks
 
-- **Noise.** The gain clears the spread between the baseline's replicates. Each starred cell has enough runs a side for the comparison to mean anything, and no claimed gain sits on an underpowered cell.
-- **Drift.** The control arm, which never loads the change, moved no more than that spread. A control-arm move voids an equal move on the treatment arm.
-- **Leakage.** The changed text names no holdout case's nouns, phrases, or details. Naming a dev case's specifics is an overfit flag.
-- **Grader edits.** No grader or case changed between the baseline and the candidate, unless the stored baseline runs were re-scored under the new graders.
-- **Pre-registration.** The hypothesis, targets, and guards were stated before the result. A starred row outside them is a lead, not a result.
-- **Holdout.** The holdout ran once at the end, on base and candidate, at matched run counts, and did not fall.
-- **Saturation.** Cases at the ceiling on both arms are left out of the gain.
-- **Versions.** The model and the CLI or library version are the same across compared columns, or the baseline was rerun.
-- **Judge-only gain.** When a judge grader rises while the deterministic graders on the same case stay flat, the traces back the judge.
+Each check quotes the `evals:hill-climb` rule it audits, tagged with the `SKILL.md` section that holds it. A check holds when the climb followed the rule.
+
+- **Noise** (Compare). A cell needs at least 4 runs a side to star at that threshold. Accept only when a target grader is starred in the predicted direction.
+- **Drift** (Compare). Without arm. The candidate cannot touch it. A star there is drift or a lucky draw, and a with-arm star of the same size is no evidence.
+- **Leakage** (Candidate). Write the instruction as the failing behavior in general terms, never with a `dev` case's nouns, phrases, or fixture details. Check every example the change names against the `holdout` fixtures, and swap out any a `holdout` case uses.
+- **Grader edits** (Error Analysis). Fix the grader in its own change, then re-score every stored run and compare the re-scored copies. Leave graders fixed during a climb, since a grader edit moves the baseline.
+- **Pre-registration** (Candidate, Compare). Writing the target first keeps the decision from being fitted to whichever row happened to move. Treat a starred row outside the pre-registered targets and guards as a lead for error analysis. It is not a result.
+- **Holdout** (Holdout). After the last accepted change, run `holdout` on the original base and on the final commit, two replicates a side, each its own invocation, at matched run counts. The climb holds when the final commit's pooled with-arm `holdout` score is no lower than the base's minus the spread between the base's two `holdout` replicates. A fall past that spread fails the climb whether or not it stars.
+  - With one `holdout` replicate on either side, the spread is unknown, so mark this check `can't tell`.
+- **Saturation** (Compare). Leave cases at the ceiling on both arms out of a claimed gain.
+- **Versions** (Baseline). Record the harness version and the model each arm ran on beside the baseline. Re-baseline when either changes mid-climb.
+- **Judge-only gain** (Compare). When the diff cannot explain the size of a gain, or a judge grader rises while the deterministic graders on the same case stay flat, read five traces before accepting.
 
 Test each check against the numbers you recomputed. Where the claim and the files disagree, the files win, and the disagreement is a finding.
 

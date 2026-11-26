@@ -26,7 +26,7 @@ import {
   type WrappedParagraph,
 } from "./prose";
 import { classifyPrHeading } from "./sentence-heading";
-import { exceededLimits, measureStructure } from "./structure";
+import { exceededLimits, limitsReason, measureStructure } from "./structure";
 
 /** Facts about the repository the rules consult only when a body warrants it. */
 export interface RepoContext {
@@ -108,9 +108,7 @@ function wrapReason(wrapped: WrappedParagraph[]): string {
   return `Prose in the body is hard-wrapped at a fixed column. A PR body renders in a web UI that soft-wraps, so a hard wrap gains nothing and displays as a narrow column. Write one line per paragraph and one line per list item. This applies to the body only. A markdown file in the repo keeps its own wrapping convention, so a body sourced from one gets copied to a scratch file and unwrapped there.\n\n${examples}${more}`;
 }
 
-// Mirrors the writing plugin's "template on small document" detector: a full
-// `## Changes` + `## Testing` scaffold on a body under this many words is
-// over-structured. Reimplemented locally to avoid a cross-plugin import.
+// A full `## Changes` + `## Testing` scaffold on a body under this many words is over-structured.
 const SMALL_BODY_WORD_LIMIT = 150;
 const CHANGES_HEADING_PATTERN = /^##\s+Changes\b/m;
 const TESTING_HEADING_PATTERN = /^##\s+Testing\b/m;
@@ -303,12 +301,7 @@ const RULES = [
     id: "structure-limits",
     tier: "deny",
     detect: (body) => nonEmpty(exceededLimits(measureStructure(body))),
-    message: (exceeded) => {
-      const detail = exceeded
-        .map(({ label, measured, limit }) => `${label} ${measured} > ${limit}`)
-        .join(", ");
-      return `The body is over its structure limits (${detail}). Tables, fenced output, and \`<details>\` don't count. Rewrite it under them, then retry the create. This check doesn't run again, so make the cut in one rewrite.`;
-    },
+    message: limitsReason,
   }),
   rule({
     id: "title-length",

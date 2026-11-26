@@ -4,22 +4,18 @@ description: Execute JXA scripts scoped to a macOS application. Use when running
 argument-hint: <app> <expression-or-script-file>
 effort: low
 allowed-tools:
-  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts:*)"
-hooks:
-  PreToolUse:
-    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts:*)"
-      hooks:
-        - type: command
-          command: |
-            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'
+  - "Bash(jxa-run:*)"
+  - 'Bash(sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh":*)'
 ---
 
 # Run JXA
 
-Run the JXA expression or script file from the arguments. `$0` is the app name. Runner flags (`-e`) go before the script path. Every argument after the script path reaches the script unchanged, its own flags included.
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" jxa-run`
+
+Run the JXA expression or script file from the arguments. `$0` is the app name. Runner flags (`-e`) go before the script path. Every argument after the script path passes to the script unchanged, its own flags included.
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts $ARGUMENTS
+jxa-run $ARGUMENTS
 ```
 
-Return the output to the caller.
+Run it as the whole Bash command. The runner leaves the sandbox through a `sandbox.excludedCommands` entry, which matches only when nothing precedes, follows, or pipes from it.

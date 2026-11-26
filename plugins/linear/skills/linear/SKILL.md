@@ -11,11 +11,9 @@ allowed-tools:
 
 # Linear
 
-Tools and workflows for managing issues, projects, and teams in Linear.
-
 ## Environment
 
-The connector and MCP paths need no CLI. Before a CLI-only operation (relations without the connector, bulk work), run `linear --version`. When it fails, stay on the connector. Confirm the installed CLI's subcommands and flags with `linear <cmd> --help` or the `linear-cli:linear-cli` skill rather than assuming them.
+The connector and MCP paths need no CLI. Before a CLI-only operation (relations without the connector, bulk work), run `linear --version`, and stay on the connector when it fails. Check CLI subcommands and flags with `linear <cmd> --help` or the `linear-cli:linear-cli` skill.
 
 ## Arguments
 
@@ -45,8 +43,8 @@ Answer a list query with one line per issue, each its linked identifier, title, 
 
 ## Saving a Structured Issue File
 
-Skills that emit a Markdown file with YAML frontmatter (issue refinement, project planning) hand off here. [references/structured-file.md](references/structured-file.md) maps that frontmatter onto connector `save_issue` params, relations included, covers routing fields taken from the user at save time, and keeps the `linear` CLI as the fallback when the connector is unavailable.
+When another skill (issue refinement, project planning) hands off a Markdown file with YAML frontmatter, follow [references/structured-file.md](references/structured-file.md) to map it onto `save_issue` params.
 
 ## Conventions
 
-Apply [references/conventions.md](references/conventions.md) whenever you create, update, comment, or query: issue references by write path, collapsible markers, default state, queries, and labels.
+Apply [references/conventions.md](references/conventions.md) on every create, update, comment, or query: issue references and collapsible markers by write path, default state, CLI flags, and labels.

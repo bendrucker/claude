@@ -1,0 +1,9 @@
+import unittest
+
+from tally.export import csv_files
+
+
+class CsvFilesTest(unittest.TestCase):
+    def test_files_hold_two_rows_each(self):
+        rows = [(1, "a"), (2, "b"), (3, "c")]
+        self.assertEqual(csv_files(rows, 2), ["1,a\n2,b", "3,c"])

@@ -1,0 +1,3 @@
+wt -C /tmp/eval/cwd switch --create cap-reconnect-backoff --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval cap-reconnect-backoff -c /tmp/eval/cwd/.worktrees/cap-reconnect-backoff --json -- claude --name cap-reconnect-backoff -- <prompt>
+allow Bash(bun test:*)

@@ -1,6 +1,10 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["config:recommended", "schedule:weekly", ":preserveSemverRanges"],
+  extends: [
+    "local>bendrucker/renovate-config:application",
+    "schedule:weekly",
+    ":preserveSemverRanges",
+  ],
   minimumReleaseAge: "7 days",
   internalChecksFilter: "strict",
   customManagers: [
@@ -34,12 +38,17 @@
       depNameTemplate: "@anthropic-ai/claude-code",
       datasourceTemplate: "npm",
     },
+    {
+      customType: "regex",
+      description: "Vale packages pinned by release URL",
+      managerFilePatterns: ["**/.vale.ini"],
+      matchStrings: [
+        "https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+)/releases/download/(?<currentValue>[^/\\s]+)/",
+      ],
+      datasourceTemplate: "github-releases",
+    },
   ],
   packageRules: [
-    {
-      matchUpdateTypes: ["minor", "patch"],
-      automerge: true,
-    },
     {
       // The JS plugin API is alpha and unversioned, so @oxlint/plugins only works
       // against its matching oxlint. Bump them in one PR so CI proves the pair.

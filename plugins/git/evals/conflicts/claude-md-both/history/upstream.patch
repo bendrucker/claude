@@ -1,0 +1,10 @@
+diff --git a/docs/testing.md b/docs/testing.md
+new file mode 100644
+--- /dev/null
++++ b/docs/testing.md
+@@ -0,0 +1,5 @@
++# Testing
++
++Run `bun test` from the repository root. A test file sits beside the module it covers and ends in `.test.ts`.
++
++Tests that need the network are named `*.integration.ts` and stay out of the default run.

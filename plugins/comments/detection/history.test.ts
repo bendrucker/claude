@@ -7,12 +7,13 @@ import type { CommentFeatures } from "./features";
 import {
   type AuditHistory,
   commentShapes,
-  EMPTY_HISTORY,
   MIN_JUDGED,
   readHistory,
   shapeWeight,
   shapeWeights,
 } from "./history";
+
+const EMPTY_HISTORY: AuditHistory = { runs: 0, judged: 0, actioned: 0, shapes: [] };
 
 function features(overrides: Partial<CommentFeatures> = {}): CommentFeatures {
   return {

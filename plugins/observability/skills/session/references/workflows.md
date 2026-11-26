@@ -1,10 +1,10 @@
 # Parallel Query Workflows
 
-Worked pattern for fan-out investigations of the session corpus: breadth search for leads, then a depth pass per lead. Read [`SKILL.md`](../SKILL.md) "Parallel Queries (Workflows)" first for the refresh-once/read-only rule this extends.
+Fan-out investigations of the session corpus: a breadth pass for leads, then a depth pass per lead. The orchestrator refreshes once, and every agent reads the index read-only.
 
 ## Scoping Params From the CLI
 
-`getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare read-only run of a query file runs unfiltered. Prepend `SET VARIABLE` lines to scope it. Substitute `<db-path>` with the database path and `<skill-dir>` with the skill directory path, both from `SKILL.md`:
+A named query with an unset param runs unfiltered. Prepend `SET VARIABLE` lines to scope it, substituting `<db-path>` and `<skill-dir>` from `SKILL.md`:
 
 ```bash
 duckdb -readonly -json -init <skill-dir>/resources/limits.sql <db-path> <<'SQL'
@@ -16,4 +16,4 @@ SQL
 
 ## Breadth-First Leads
 
-Breadth-first leads come from the survey surfaces (`records` taxonomy, the `fields` registry, `activity`, `hooks`, `diagnostics`, `skill-activity`). A depth pass is then custom read-only SQL over whatever table or view the survey pointed at.
+Take leads from the survey surfaces: the `records` taxonomy, the `fields` registry, `activity`, `hooks`, `diagnostics`, and `skill-activity`. Then write custom read-only SQL over whatever table or view the survey pointed at.

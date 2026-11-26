@@ -43,7 +43,7 @@ export function resolveMetricsPath(
   return join(dir, `${hook.replace(UNSAFE_NAME, "-")}.jsonl`);
 }
 
-function appendHookMetric(hook: string, metric: HookMetric, path: string | null): void {
+function appendHookMetric(metric: HookMetric, path: string | null): void {
   if (path == null || path === "") return;
   try {
     mkdirSync(dirname(path), { recursive: true });
@@ -70,7 +70,6 @@ export async function timeHook<T>(
   const started = performance.now();
   const record = (outcome: HookOutcome) => {
     appendHookMetric(
-      hook,
       {
         ts: new Date().toISOString(),
         session_id: text(input.session_id) ?? "",

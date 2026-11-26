@@ -1,0 +1,6 @@
+allow_tools: [Bash, Edit, Write]
+judge_model: claude-sonnet-5-5
+wrap:
+  context: [user/CLAUDE.md]
+graders:
+  no-command-handoff: "*"

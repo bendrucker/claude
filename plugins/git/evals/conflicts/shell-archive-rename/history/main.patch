@@ -1,0 +1,43 @@
+diff --git a/README.md b/README.md
+index 9df4f48..8f6bef6 100644
+--- a/README.md
++++ b/README.md
+@@ -1,5 +1,5 @@
+ # Notes tooling
+ 
+-`scripts/backup.sh <dir> <dest>` writes a timestamped tarball of `<dir>` into `<dest>` and keeps the newest seven.
++`bin/backup <dir> <dest>` writes a timestamped tarball of `<dir>` into `<dest>` and keeps the newest seven.
+ 
+-`scripts/nightly.sh` runs it for `~/notes`.
++`bin/nightly` runs it for `~/notes`.
+diff --git a/scripts/backup.sh b/bin/backup
+similarity index 81%
+rename from scripts/backup.sh
+rename to bin/backup
+index e20c40d..18ea3f5 100755
+--- a/scripts/backup.sh
++++ b/bin/backup
+@@ -1,8 +1,8 @@
+ #!/usr/bin/env bash
+ set -euo pipefail
+ 
+-src=${1:?usage: backup.sh <dir> <dest>}
+-dest=${2:?usage: backup.sh <dir> <dest>}
++src=${1:?usage: backup <dir> <dest>}
++dest=${2:?usage: backup <dir> <dest>}
+ keep=7
+ 
+ mkdir -p "$dest"
+diff --git a/scripts/nightly.sh b/bin/nightly
+similarity index 61%
+rename from scripts/nightly.sh
+rename to bin/nightly
+index 68093a8..380db04 100755
+--- a/scripts/nightly.sh
++++ b/bin/nightly
+@@ -2,4 +2,4 @@
+ set -euo pipefail
+ 
+ dir=$(cd "$(dirname "$0")" && pwd)
+-"$dir/backup.sh" "$HOME/notes" "$HOME/backups"
++"$dir/backup" "$HOME/notes" "$HOME/backups"

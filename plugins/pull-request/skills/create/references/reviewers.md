@@ -1,7 +1,5 @@
 # Suggesting Reviewers
 
-Load this after creating the PR/MR on a corporate or internal repo.
-
 Gate on repository visibility first:
 
 - **GitHub**: `gh repo view --json visibility -q .visibility`

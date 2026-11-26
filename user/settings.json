@@ -12,7 +12,7 @@
         "hooks": [
           {
             "async": true,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ]
@@ -23,7 +23,7 @@
         "hooks": [
           {
             "async": false,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ]
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "async": true,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ],
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "async": true,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ],
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "async": true,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ],
@@ -66,7 +66,7 @@
         "hooks": [
           {
             "async": true,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ],
@@ -78,7 +78,7 @@
         "hooks": [
           {
             "async": true,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ]
@@ -100,7 +100,7 @@
         "hooks": [
           {
             "async": true,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ]
@@ -111,7 +111,7 @@
         "hooks": [
           {
             "async": true,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ]
@@ -122,7 +122,7 @@
         "hooks": [
           {
             "async": true,
-            "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
           }
         ]
@@ -184,14 +184,13 @@
     "go@bendrucker": true,
     "mac@bendrucker": true,
     "git@bendrucker": true,
-    "gitlab@bendrucker": true,
     "linear@bendrucker": true,
     "things@bendrucker": true,
     "issue@bendrucker": true,
     "review@bendrucker": true,
+    "hunk@bendrucker": true,
+    "plannotator@plannotator": true,
     "newline@bendrucker": true,
-    "github@bendrucker": true,
-    "auto-mode@bendrucker": true,
     "observability@bendrucker": true,
     "plugin@bendrucker": true,
     "agents@bendrucker": true,
@@ -203,7 +202,6 @@
     "writing@bendrucker": true,
     "type-ignore@bendrucker": true,
     "worktrunk@worktrunk": true,
-    "plan@bendrucker": true,
     "mod-events@bendrucker": true,
     "linear-cli@linear-cli": true,
     "bun@bendrucker": true,
@@ -213,14 +211,15 @@
     "atuin@bendrucker": true,
     "friction@bendrucker": true,
     "comments@bendrucker": true,
-    "plannotator@plannotator": true,
-    "herdr@bendrucker": true,
+    "dispatch@bendrucker": true,
+    "rex@bendrucker": true,
     "run-command@bendrucker": true,
     "session-limit@bendrucker": true,
-    "load@bendrucker": true,
+    "session-config@bendrucker": true,
     "performance@bendrucker": true,
     "zsh@bendrucker": true,
-    "sandbox@bendrucker": true
+    "sandbox@bendrucker": true,
+    "mddog@mddog": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -249,11 +248,18 @@
         "ref": "v3.0.0"
       }
     },
+    "mddog": {
+      "source": {
+        "source": "github",
+        "repo": "qu8n/mddog",
+        "ref": "v1.0.3"
+      }
+    },
     "plannotator": {
       "source": {
         "source": "github",
         "repo": "backnotprop/plannotator",
-        "ref": "v0.28.23"
+        "ref": "v0.29.1"
       }
     }
   },
@@ -273,6 +279,7 @@
         "github.com",
         "raw.githubusercontent.com",
         "api.github.com",
+        "uploads.github.com",
         "api.individual.githubcopilot.com",
         "gitlab.com",
         "api.linear.app",
@@ -303,8 +310,11 @@
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
         "~/.config/herdr/herdr.sock",
+        "~/.local/state/herdr-core",
+        "~/Library/Application Support/rex/server.sock",
         "~/.local/state/vm",
         "~/.docker/run/docker.sock",
+        "~/.agent-browser",
         "/tmp/claude"
       ]
     },
@@ -314,9 +324,18 @@
         "~/.herdr/worktrees",
         "~/src/.worktrees",
         "~/src/*/*/.worktrees/**/*",
+        "~/src/*/*/.git/worktrees/*/FETCH_HEAD",
+        "~/src/*/*/.git/worktrees/*/index",
+        "~/src/*/*/.git/worktrees/*/index.lock",
+        "~/src/*/*/.git/worktrees/*/HEAD",
+        "~/src/*/*/.git/worktrees/*/HEAD.lock",
+        "~/src/*/*/.git/worktrees/*/ORIG_HEAD",
+        "~/src/*/*/.git/worktrees/*/ORIG_HEAD.lock",
+        "~/src/*/*/.git/worktrees/*/logs/**/*",
         "~/.terraform.d/plugin-cache",
         "~/.cache",
         "~/.local/state/friction",
+        "~/.local/state/rex-try",
         "~/Library/Caches/go-build",
         "~/Library/Caches/ms-playwright",
         "~/Library/Caches/golangci-lint",
@@ -347,19 +366,29 @@
         "~/.agent-browser",
         "~/.claude/plans",
         "~/.claude/mod-events",
+        "~/.claude/session-imports",
+        "~/.local/share/claude-sessions",
         "/dev/fd",
         "/var/folders/*/*/T/**/*"
       ]
     },
-    "excludedCommands": ["git:*", "wt:*", "claude:*", "agent-browser:*", "open:*", "osascript:*"]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/scripts/statusline.ts"
-  },
-  "subagentStatusLine": {
-    "type": "command",
-    "command": "~/.claude/scripts/subagent-statusline.ts"
+    "excludedCommands": [
+      "git:*",
+      "wt:*",
+      "claude:*",
+      "agent-browser:*",
+      "open:*",
+      "osascript:*",
+      "claude-dispatch:*",
+      "claude-dispatch-close:*",
+      "session-index-pull:*",
+      "prompt-scan-edit:*",
+      "jxa-run:*",
+      "things-url:*",
+      "things-inbox:*",
+      "things-reorder:*",
+      "xcall-run:*"
+    ]
   },
   "skipAutoPermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
@@ -375,10 +404,11 @@
   "env": {
     "TMPDIR": "/tmp",
     "TMPPREFIX": "/tmp/claude/zsh",
-    "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}",
     "CLAUDE_CODE_NO_FLICKER": "1",
     "NODE_USE_ENV_PROXY": "1",
     "AGENT_BROWSER_IDLE_TIMEOUT_MS": "600000",
-    "CLAUDE_CODE_DISABLE_ARTIFACT": "1"
+    "CLAUDE_CODE_DISABLE_ARTIFACT": "1",
+    "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "1",
+    "PLANNOTATOR_INBOX_NOTES": "0"
   }
 }

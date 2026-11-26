@@ -1,0 +1,53 @@
+// Coverage math over parsed lcov records. Parsing lives in `reader.ts`. lcov is a line-based format:
+//   SF:<source file>
+//   FNF:<functions found>  FNH:<functions hit>
+//   DA:<line>,<execution count>
+//   end_of_record
+
+export interface FileCoverage {
+  /** Source file path, as written in the `SF:` record. */
+  file: string;
+  /** Line number to execution count, from `DA:` records. */
+  lineHits: Map<number, number>;
+  functionsFound: number;
+  functionsHit: number;
+}
+
+export function coveredLines(fc: FileCoverage): number[] {
+  return [...fc.lineHits.entries()]
+    .filter(([, hits]) => hits > 0)
+    .map(([line]) => line)
+    .toSorted((a, b) => a - b);
+}
+
+export function uncoveredLines(fc: FileCoverage): number[] {
+  return [...fc.lineHits.entries()]
+    .filter(([, hits]) => hits === 0)
+    .map(([line]) => line)
+    .toSorted((a, b) => a - b);
+}
+
+export interface LineCoverage {
+  total: number;
+  covered: number;
+  /** Percentage of executable lines covered, 0-100. 100 when there are no lines. */
+  pct: number;
+}
+
+export function lineCoverage(fc: FileCoverage): LineCoverage {
+  const total = fc.lineHits.size;
+  const covered = coveredLines(fc).length;
+  const pct = total === 0 ? 100 : (covered / total) * 100;
+  return { total, covered, pct };
+}
+
+export function totalCoverage(records: FileCoverage[]): number {
+  const all = records.map(lineCoverage);
+  const total = all.reduce((n, c) => n + c.total, 0);
+  const covered = all.reduce((n, c) => n + c.covered, 0);
+  return total === 0 ? 100 : (covered / total) * 100;
+}
+
+export function functionCoverage(fc: FileCoverage): number {
+  return fc.functionsFound === 0 ? 100 : (fc.functionsHit / fc.functionsFound) * 100;
+}

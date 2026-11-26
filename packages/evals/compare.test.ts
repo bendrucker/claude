@@ -3,10 +3,10 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadColumn } from "./column";
-import { render } from "./compare";
+import { costRatios, render } from "./compare";
 import { erroredRuns, readResult } from "./result";
 import { loadTags } from "./suite";
-import { traceMeasures } from "./trace";
+import { traceMeasures, traceUsage } from "./trace";
 
 interface RunSpec {
   score: number;
@@ -15,6 +15,8 @@ interface RunSpec {
   /** Fields of the trace's result line beside the reply. */
   stats?: Record<string, unknown>;
   error?: string | null | undefined;
+  costUsd?: number | undefined;
+  turns?: number | undefined;
 }
 
 /** Writes an aggregate-result.json with one case per entry, and a trace for each run with a reply. */
@@ -48,6 +50,8 @@ async function result(cases: Record<string, Record<string, RunSpec[]>>): Promise
               explanation,
             })),
             error: run.error,
+            costUsd: run.costUsd,
+            turns: run.turns,
           };
         }),
       ]),
@@ -90,6 +94,9 @@ describe("loadColumn", () => {
       tokens: [500, 900],
       cost: [0.1, 0.3],
       errored: 0,
+      runCost: [],
+      runTurns: [],
+      missingCost: 2,
       graders: new Map([
         ["fact", [true, false]],
         ["fired (indicator)", [true, false]],
@@ -161,10 +168,77 @@ describe("traceMeasures", () => {
       trace: jsonl({ type: "result", result: "one", total_cost_usd: null, usage: null }),
       expected: { words: 1 },
     },
+    {
+      name: "output tokens from modelUsage over usage",
+      trace: jsonl({
+        type: "result",
+        usage: { output_tokens: 1 },
+        modelUsage: { a: { outputTokens: 20 }, b: { outputTokens: 2 } },
+      }),
+      expected: { tokens: 22 },
+    },
     { name: "no result line", trace: jsonl({ type: "assistant" }), expected: {} },
     { name: "an empty trace", trace: "", expected: {} },
   ])("reads $name", ({ trace, expected }) => {
     expect(traceMeasures(trace)).toEqual(expected);
+  });
+});
+
+describe("traceUsage", () => {
+  const jsonl = (...lines: object[]) => lines.map((l) => JSON.stringify(l)).join("\n");
+
+  test.each<{ name: string; trace: string; expected: ReturnType<typeof traceUsage> }>([
+    {
+      name: "modelUsage summed across models, over usage",
+      trace: jsonl({
+        type: "result",
+        usage: { input_tokens: 1, output_tokens: 1 },
+        modelUsage: {
+          "claude-opus-5-5": {
+            inputTokens: 10,
+            outputTokens: 20,
+            cacheReadInputTokens: 5,
+            cacheCreationInputTokens: 3,
+          },
+          "claude-haiku-5-5": { inputTokens: 1, outputTokens: 2 },
+        },
+      }),
+      expected: { total: 41, output: 22 },
+    },
+    {
+      name: "usage without modelUsage",
+      trace: jsonl({
+        type: "result",
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+          cache_creation_input_tokens: 10,
+          cache_read_input_tokens: 5,
+        },
+      }),
+      expected: { total: 165, output: 50 },
+    },
+    {
+      name: "the last result line, since usage is cumulative",
+      trace: jsonl(
+        { type: "result", usage: { input_tokens: 1, output_tokens: 1 } },
+        { type: "result", usage: { input_tokens: 9, output_tokens: 9 } },
+      ),
+      expected: { total: 18, output: 9 },
+    },
+    {
+      name: "usage when modelUsage is empty",
+      trace: jsonl({ type: "result", usage: { output_tokens: 4 }, modelUsage: {} }),
+      expected: { total: 4, output: 4 },
+    },
+    {
+      name: "nothing from a result line without either",
+      trace: jsonl({ type: "result" }),
+      expected: undefined,
+    },
+    { name: "nothing from an empty trace", trace: "", expected: undefined },
+  ])("reads $name", ({ trace, expected }) => {
+    expect(traceUsage(trace)).toEqual(expected);
   });
 });
 
@@ -206,6 +280,32 @@ describe("render", () => {
   });
 });
 
+test("leads the markdown with named rows whether or not they starred", async () => {
+  const base = await result({
+    c: { with: Array.from({ length: 6 }, () => pass()) },
+    d: { with: Array.from({ length: 6 }, () => pass()) },
+  });
+  const next = await result({
+    c: { with: Array.from({ length: 6 }, fail) },
+    d: { with: Array.from({ length: 6 }, () => pass()) },
+  });
+  const columns = await Promise.all([loadColumn([base]), loadColumn([next])]);
+  const options = { columns, labels: ["base", "next"], alpha: 0.1, markdown: true };
+  const out = render({ ...options, rows: ["c/with/fact", "d/with"] });
+  const lead = out.slice(out.indexOf("#### Targets"), out.indexOf("#### Starred"));
+  expect(lead).toMatchInlineSnapshot(`
+    "#### Targets and Guards
+
+    | measure | row | base | next |
+    | --- | --- | --- | --- |
+    | Grader pass rate | c/with · fact | 1.00 | 0.00 (p=0.001)\\* |
+    | Case score | d/with | 1.00 | 1.00 (p=1.000) |
+
+    "
+  `);
+  expect(() => render({ ...options, rows: ["e/with"] })).toThrow("No score row named e/with");
+});
+
 test("marks cells too small to star", async () => {
   const base = await result({ c: { with: [fail(), fail()] } });
   const next = await result({ c: { with: [pass(), pass()] } });
@@ -218,4 +318,73 @@ test("marks a case whose errored runs left the pool", async () => {
   const next = await result({ c: { with: [{ ...pass(), error: "exit 1: session limit" }] } });
   const columns = await Promise.all([loadColumn([base]), loadColumn([next])]);
   expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain("c/with!");
+});
+
+describe("cost and turns", () => {
+  const costed = (costUsd: number | undefined, turns = 3): RunSpec => ({
+    score: 1,
+    graders: [["fact", true]],
+    costUsd,
+    turns,
+  });
+  const load = async (...paths: Record<string, Record<string, RunSpec[]>>[]) =>
+    Promise.all(paths.map(async (cases) => loadColumn([await result(cases)])));
+
+  test.each<{ name: string; candidate: number[]; ratio: number }>([
+    { name: "below the threshold", candidate: [0.15, 0.15, 0.15], ratio: 1.5 },
+    { name: "at the threshold", candidate: [0.2, 0.2, 0.2], ratio: 2 },
+    { name: "above the threshold", candidate: [0.3, 0.3, 0.3], ratio: 3 },
+  ])("ratios candidate to base median $name", async ({ candidate, ratio }) => {
+    const columns = await load(
+      { c: { with: [0.1, 0.1, 0.1].map((x) => costed(x)) } },
+      { c: { with: candidate.map((x) => costed(x)) } },
+    );
+    expect(costRatios(columns).ratios[0]).toBeCloseTo(ratio);
+    expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain(
+      `x${ratio.toFixed(2)})`,
+    );
+  });
+
+  test("skips a run missing costUsd and counts it", async () => {
+    const columns = await load(
+      { c: { with: [costed(0.1), costed(undefined)] } },
+      { c: { with: [costed(0.2), costed(0.2)] } },
+    );
+    const { ratios, missing } = costRatios(columns);
+    expect([ratios[0], missing]).toEqual([2, [1, 0]]);
+    expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain(
+      "missing costUsd: base 1, next 0",
+    );
+  });
+
+  test.each<{ name: string; runs: [number, number][]; cost: string; turns: string }>([
+    {
+      name: "an odd run count",
+      runs: [
+        [0.3, 9],
+        [0.1, 1],
+        [0.2, 5],
+      ],
+      cost: "0.200",
+      turns: "5.0",
+    },
+    {
+      name: "an even run count",
+      runs: [
+        [0.4, 8],
+        [0.1, 2],
+        [0.2, 4],
+        [0.3, 6],
+      ],
+      cost: "0.250",
+      turns: "5.0",
+    },
+  ])("reports per-case medians over $name", async ({ runs, cost, turns }) => {
+    const [column = new Map()] = await load({
+      c: { with: runs.map(([c, t]) => costed(c, t)) },
+    });
+    const out = render({ columns: [column], labels: ["run"], alpha: 0.1 });
+    expect(out).toMatch(new RegExp(`c/with\\s*│\\s*${cost}`));
+    expect(out).toMatch(new RegExp(`c/with\\s*│\\s*${turns}`));
+  });
 });

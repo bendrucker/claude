@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -u
+here=$(cd "$(dirname "$0")/.." && pwd)
+. "$here/lib/archive.sh"
+got=$(archive_size 2048)
+if [ "$got" != "archive: 2.0 MB" ]; then
+  echo "want 'archive: 2.0 MB', got '$got'" >&2
+  exit 1
+fi

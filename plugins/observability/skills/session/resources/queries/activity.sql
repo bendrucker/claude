@@ -2,8 +2,8 @@
 -- name: activity
 -- summary: >-
 --   Session interaction profile: one row per prompt source, plus interruptions, queued
---   goals, scheduled fires, compactions, API retries, hook friction, and the distribution
---   of permission modes.
+--   goals, scheduled fires, compactions split by kind (idle, away, precomputed, manual,
+--   auto), API retries, hook friction, and the distribution of permission modes.
 -- description: >-
 --   A `prompt: <source>` row carries the harness's own `$.promptSource` (`typed`, `system`,
 --   `queued`, `sdk`, `suggestion_accepted`), which is where human-versus-automated entry
@@ -92,6 +92,16 @@ FROM (
   SELECT 'compactions',
          COUNT(*), 6
     FROM scoped WHERE kind = 'system:compact_boundary'
+  UNION ALL
+  -- The boundary's own trigger says only manual or auto, so idle compaction hides inside
+  -- `auto`. The `compactions` view recovers it from the notice that follows the boundary.
+  SELECT 'compaction: ' || kind,
+         COUNT(*), 6
+    FROM compactions
+   WHERE date_filter(timestamp, getvariable('after_date'), getvariable('before_date'))
+     AND project_filter(project_path, getvariable('project'))
+     AND host_filter(host, getvariable('host'))
+   GROUP BY kind
   UNION ALL
   -- system:api_error stopped being emitted around CLI 2.1.179; newer versions mark
   -- the synthetic assistant message instead, so count both surfaces.

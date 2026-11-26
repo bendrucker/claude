@@ -1,0 +1,8 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+new file mode 100644
+--- /dev/null
++++ b/CHANGELOG.md
+@@ -0,0 +1,3 @@
++# Changelog
++
++- Add a retry flag to the greeter

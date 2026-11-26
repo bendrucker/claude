@@ -32,6 +32,7 @@ export const HookMetric = z.object({
   tool: z.string().nullable(),
   duration_ms: z.number(),
   outcome: HookOutcome,
+  stage: z.string().optional(),
 });
 export type HookMetric = z.infer<typeof HookMetric>;
 
@@ -94,14 +95,16 @@ export function appendHookMetric(
 
 // Wraps a hook's decision path so the caller stays a single line. A throw from
 // `run` is recorded as an error outcome and re-thrown: the hook's own error
-// handling decides what happens next.
+// handling decides what happens next. `run` may name the stage it stopped at,
+// which tells apart silent outcomes that return null for different reasons.
 export async function timeHook<T extends SyncHookJSONOutput | null | undefined>(
   hook: string,
   input: HookMetricInput,
-  run: () => T | Promise<T>,
+  run: (setStage: (stage: string) => void) => T | Promise<T>,
   path?: string | null,
 ): Promise<T> {
   const started = performance.now();
+  let stage: string | undefined;
   const record = (outcome: HookOutcome) => {
     const metric: HookMetric = {
       ts: new Date().toISOString(),
@@ -111,11 +114,14 @@ export async function timeHook<T extends SyncHookJSONOutput | null | undefined>(
       duration_ms: Math.round((performance.now() - started) * 1000) / 1000,
       outcome,
     };
+    if (stage !== undefined) metric.stage = stage;
     appendHookMetric(hook, metric, path);
   };
 
   try {
-    const output = await run();
+    const output = await run((value) => {
+      stage = value;
+    });
     record(classifyOutcome(output));
     return output;
   } catch (error) {

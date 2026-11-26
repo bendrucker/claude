@@ -1,0 +1,72 @@
+{
+  "description": "Nudges once per session to load prompting:prompting before editing a document a model executes",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Edit(**/SKILL.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Write(**/SKILL.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Edit(**/CLAUDE.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Write(**/CLAUDE.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Edit(**/AGENTS.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Write(**/AGENTS.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Edit(**/rules/*.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Write(**/rules/*.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Edit(**/agents/*.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Write(**/agents/*.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Edit(**/skills/*/references/**)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/load-nudge.ts\"",
+            "if": "Write(**/skills/*/references/**)"
+          }
+        ]
+      }
+    ]
+  }
+}

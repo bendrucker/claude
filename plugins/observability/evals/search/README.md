@@ -11,7 +11,7 @@ Scores `search.sql` as a ranker: each labeled query runs through an arm's `searc
 | MRR | mean of 1 / rank of the first relevant session |
 | zero-hit | queries that returned nothing |
 | wall p50, p90 | process start to exit, across every run |
-| P@5 p | paired sign-flip permutation p against the first arm, over the same queries |
+| P@5 p | paired sign-flip permutation p against the first arm, over the same queries, `-` when no query's P@5 moved |
 
 ## Labels
 

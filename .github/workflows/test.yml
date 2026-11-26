@@ -77,10 +77,10 @@ jobs:
           echo "$HOME/.duckdb/cli/$DUCKDB_VERSION" >> "$GITHUB_PATH"
 
       # The adapter suite's tests hand rescore calls to the real uv.
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@v10.3.3
 
       - name: Run tests
-        run: bun test evals/
+        run: bun test ./evals/
 
       - name: Check regex graders against examples
         run: |
@@ -100,6 +100,17 @@ jobs:
         uses: actions/checkout@v7
 
       - uses: ./.github/actions/bun-install
+
+      # prose-lab lints against the writing plugin's Vale config and its synced packages.
+      - name: Install Vale
+        uses: jdx/mise-action@v5
+        with:
+          working_directory: plugins/writing
+          cache: false
+
+      - name: Sync writing's Vale packages
+        working-directory: plugins/writing
+        run: bun hooks/sessionstart.ts
 
       - name: Test packages
         run: bun test packages/
@@ -151,6 +162,12 @@ jobs:
 
       - name: Check permission rules
         run: bun scripts/check-permission-rules.ts
+
+      - name: Check bang injection permissions
+        run: bun scripts/check-bang-permissions.ts
+
+      - name: Check Vale test names
+        run: bun scripts/check-vale-test-names.ts
 
       - name: Check for unenabled plugins
         if: github.event_name == 'pull_request'
@@ -232,7 +249,7 @@ jobs:
 
       # The evals adapter suite's tests hand rescore calls to the real uv.
       - if: matrix.plugin.name == 'evals'
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@v10.3.3
 
       - name: Validate plugin
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"
@@ -294,6 +311,12 @@ jobs:
           working_directory: plugins/${{ matrix.plugin.name }}
           # The cache key globs every file in the workspace (~24s), while a cold install takes ~3s.
           cache: false
+
+      - name: Run plugin setup
+        working-directory: plugins/${{ matrix.plugin.name }}
+        run: |
+          [[ -f .ci.json ]] || exit 0
+          jq -r '.setup // [] | .[]' .ci.json | while IFS= read -r cmd; do bash -c "$cmd"; done
 
       # Profilers record through perf events, which the runner's default paranoia level blocks.
       - name: Allow perf events

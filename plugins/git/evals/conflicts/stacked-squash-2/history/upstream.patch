@@ -1,0 +1,10 @@
+diff --git a/docs/evals.md b/docs/evals.md
+new file mode 100644
+--- /dev/null
++++ b/docs/evals.md
+@@ -0,0 +1,5 @@
++# Evals
++
++A suite lives under `evals/` in the plugin it covers. Run one with `claude plugin eval <suite>`.
++
++Results land in `results/`, which is gitignored.

@@ -6,7 +6,6 @@ import {
   candidateBody,
   type Candidate,
   countProseWordsAdded,
-  countWordsAdded,
   extractAddedProse,
   fitsDiffBudget,
   hasAiMarkers,
@@ -145,19 +144,6 @@ test.each<{
   },
 ])("fitsDiffBudget: $name", ({ stats, expected }) => {
   expect(fitsDiffBudget(stats)).toBe(expected);
-});
-
-test.each<{ name: string; patch: string; expected: number }>([
-  { name: "no patch", patch: "", expected: 0 },
-  {
-    name: "counts only added lines",
-    patch: "@@ -1,2 +1,3 @@\n-old line here\n+two words\n context line",
-    expected: 2,
-  },
-  { name: "skips the +++ file header", patch: "+++ b/README.md\n+one two three", expected: 3 },
-  { name: "skips a blank added line", patch: "+\n+real content here", expected: 3 },
-])("countWordsAdded: $name", ({ patch, expected }) => {
-  expect(countWordsAdded(patch)).toBe(expected);
 });
 
 test.each<{ name: string; patch: string; expected: string }>([

@@ -22,7 +22,7 @@ Delete a comment that says what simple code does. Keep a comment to one sentence
 
 Leave out:
 
-- Narration: migration stories, ticket breadcrumbs (`ENG-1234`), cross-references ("mirrors X", "at line 1208"), and arguments against approaches the code does not take.
+- Narration: migration stories, how a bug was found, ticket breadcrumbs (`ENG-1234`), cross-references ("mirrors X", "at line 1208"), and arguments against approaches the code does not take.
 - Self-praise: "never papered over", "can never escape".
 - Section-divider banners and Title Case label comments.
 

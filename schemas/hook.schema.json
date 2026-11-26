@@ -225,6 +225,10 @@
             "if": {
               "type": "string",
               "description": "Permission rule pattern to filter when this hook fires (e.g. Bash(git *), Edit(**/*.ts))"
+            },
+            "onFailure": {
+              "const": "block",
+              "description": "Block the action when the hook can't start, times out, or exits with an unexpected code, instead of letting it through"
             }
           }
         },

@@ -1,8 +1,7 @@
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 
 export function getExtension(filePath: string): string {
-  const parts = filePath.split(".");
-  return parts.length > 1 ? (parts.at(-1) ?? "") : "";
+  return extname(filePath).slice(1);
 }
 
 const MEMORY_PATH_PATTERN = /\/\.claude\/projects\/[^/]+\/memory\//;
@@ -38,10 +37,4 @@ export function isScratchPath(filePath: string, cwd: string = process.cwd()): bo
 
 export function isMarkdownFile(ext: string): boolean {
   return ext === "md" || ext === "markdown";
-}
-
-const PROSE_EXTENSIONS = new Set(["md", "markdown", "txt", "mdx", "rst", "adoc"]);
-
-export function isProseFile(filePath: string): boolean {
-  return PROSE_EXTENSIONS.has(getExtension(filePath));
 }

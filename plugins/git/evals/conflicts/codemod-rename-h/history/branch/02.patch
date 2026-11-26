@@ -1,0 +1,15 @@
+diff --git a/tally/export.py b/tally/export.py
+new file mode 100644
+index 0000000..60407ba
+--- /dev/null
++++ b/tally/export.py
+@@ -0,0 +1,9 @@
++from tally.seq import split_chunks
++
++
++def csv_files(rows, per_file):
++    """Renders rows as CSV bodies of at most per_file rows each."""
++    return [
++        "\n".join(",".join(map(str, row)) for row in chunk)
++        for chunk in split_chunks(rows, per_file)
++    ]

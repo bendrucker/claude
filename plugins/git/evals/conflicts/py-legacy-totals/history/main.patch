@@ -1,0 +1,28 @@
+diff --git a/billing/legacy_totals.py b/billing/legacy_totals.py
+deleted file mode 100644
+index 699314a..0000000
+--- a/billing/legacy_totals.py
++++ /dev/null
+@@ -1,6 +0,0 @@
+-"""Invoice totals for the monthly summary."""
+-
+-
+-def invoice_total(lines, tax_rate):
+-    subtotal = sum(line["qty"] * line["price"] for line in lines)
+-    return round(subtotal * (1 + tax_rate), 2)
+diff --git a/billing/summary.py b/billing/summary.py
+index 3c79768..1a98cf2 100644
+--- a/billing/summary.py
++++ b/billing/summary.py
+@@ -1,4 +1,10 @@
+-from billing.legacy_totals import invoice_total
++def _amount(line):
++    return line["qty"] * line["price"]
++
++
++def invoice_total(lines, tax_rate):
++    subtotal = sum(_amount(line) for line in lines)
++    return round(subtotal * (1 + tax_rate), 2)
+ 
+ 
+ def summarize(invoices, tax_rate=0.08):

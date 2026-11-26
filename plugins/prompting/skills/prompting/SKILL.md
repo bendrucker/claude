@@ -1,11 +1,17 @@
 ---
 name: prompting
 description: "Write a document a model executes: a product prompt, a system prompt, a skill, a tool or agent description, a CLAUDE.md or AGENTS.md, a reference file behind a pointer. Use when authoring or revising any of those, when deciding what belongs in a prompt versus behind a pointer, when a prompt produces different behavior from run to run, or when a prompt makes the model take the wrong approach."
+allowed-tools:
+  - Edit(//tmp/claude/prompting-skill/**)
+  - Bash(mkdir -p /tmp/claude/prompting-skill)
+  - Bash(touch /tmp/claude/prompting-skill/*)
 ---
 
 # Prompting
 
 Rules for any document a model executes. Each rule targets variance: the same document should drive the same process on every run.
+
+!`mkdir -p /tmp/claude/prompting-skill 2>/dev/null; touch /tmp/claude/prompting-skill/${CLAUDE_SESSION_ID} 2>/dev/null`
 
 To rewrite an existing document, see [references/conversion.md](references/conversion.md).
 
@@ -39,7 +45,7 @@ Keep a concept's definition, rules, and caveats under one heading. Test a sectio
 
 Split a sequence when later steps tempt the model to finish the current one early. That works only across a real context break: a hand-off, a subagent dispatch, a separate request. An inline reference leaves the later steps in context.
 
-Do not merge two sequences. Each step becomes visible from the one before it, and the model stops the earlier sequence at the later one's criterion.
+Keep two sequences in separate documents, each ending on its own completion criterion. The model then stops each sequence at its own criterion, because no step of the later sequence is visible from the earlier one.
 
 ## Goal
 
@@ -57,13 +63,13 @@ A goal still needs a completion criterion, or the model decides for itself when 
 
 End every unit of work on a completion criterion: the condition that tells the model the work is done.
 
-#### Clarity
+### Clarity
 
 Write a criterion the model can check. A vague bound such as "understanding reached" lets the model stop early.
 
 Sharpen the bound first. Split the sequence to hide later work only when the bound cannot be sharpened and you have observed the model stopping early.
 
-#### Demand
+### Demand
 
 Write a criterion that requires the work you want. "Every modified model accounted for" forces a full pass. "Produce a change list" lets the model stop at three items.
 
@@ -92,9 +98,9 @@ Look for passages that collapse into one token:
 
 State the rule first. When knowing why lets the model handle a case the rule does not list, add the reason after it in one clause. Cut a reason that only argues the rule is right.
 
-Write the literal fact instead of metaphor, epigram, or personification. A figurative phrasing is a weaker match target than a literal one when the model scans for the rule that applies.
+Write the literal fact instead of metaphor, epigram, or personification. A figurative phrasing is a weaker match target than a literal one when the model scans for the rule that applies. A term of art is literal in its field even when it began as a figure, so a leading word such as *tight* (loop) or *red* (test) meets this rule.
 
-#### Positive Form
+### Positive Form
 
 State the target behavior: "Write one-line comments". A prohibition names the behavior it bans, which makes that behavior more available.
 
@@ -102,17 +108,17 @@ Use an explicit ban only as a hard guardrail with no positive phrasing available
 
 ## Pruning
 
-#### Duplication
+### Duplication
 
 Keep each meaning in one place. A leading word is the deliberate exception: it repeats a token, never the meaning.
 
-#### Cache
+### Cache
 
 The environment already states part of what a document would say: package scripts, config files, the directory layout, `--help` output. A document restating it is a cache, and earns its place only when the lookup is expensive.
 
 Cache what the model cannot find by looking: the unwritten convention, the reason behind a choice, the gotcha no config records. Leave one-file and one-command lookups to the environment.
 
-#### No-ops
+### No-ops
 
 Delete instructions the model already follows by default. Test each sentence against the model's default: does this line change behavior? Settle a disagreement by running the document, through `evals:hill-climb` when it has an eval suite. When a sentence fails, delete the whole sentence.
 
@@ -122,7 +128,7 @@ For text written against an older model's failures, run `/claude-api prompt-audi
 
 Replace a leading word too weak to beat the default ("be thorough" when the model is already thorough) with a stronger word.
 
-#### Relevance
+### Relevance
 
 Check each line against what the document does. Delete a line that never bore on the task, including exposition and branches that belong behind a pointer. Delete a line that has gone stale as the world it describes changed.
 

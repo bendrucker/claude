@@ -43,7 +43,7 @@ bun evals/native/run.ts plugins/observability/evals/session -- --scaffold --abla
 bun plugins/observability/evals/session/scripts/score.ts plugins/observability/evals/session/results/<run>
 ```
 
-`score.ts` prints the metrics per case and arm, and writes every run's numbers to `<run>/scored.json`. Before judging a candidate, run the unchanged skill at the same `--runs` and use the spread of those runs as the bar a change has to clear.
+`score.ts` prints the metrics per case and arm, and writes every run's numbers to `<run>/scored/aggregate-result.json`, which `compare.ts` reads as a column. A run's score is the mean of its recall and precision, and its tokens, seconds, queries, and errors are kept as `metrics`. Before judging a candidate, run the unchanged skill at the same `--runs` and use the spread of those runs as the bar a change has to clear.
 
 `data/` and `results/` hold my session text and are kept only in the eval bucket, under `session/eval/`, beside the bench's replay set, snapshot and results under `session/bench/`. Push after a run, and pull to start from another machine. The index stays out, since `build` regenerates it:
 

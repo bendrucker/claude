@@ -1,6 +1,6 @@
-import { join } from "node:path";
 import { $ } from "bun";
 import { caseGraders, type Graders, RegexGrader, verdict } from "./graders";
+import { artifactsDir, resultPath, runId, tracePath, tracesDir } from "./layout";
 import { type Result, readResult, type Run, score } from "./result";
 import { scoreSuite } from "./score";
 import { traceReply } from "./trace";
@@ -58,7 +58,7 @@ function diff(before: Run, after: Run): [string, boolean | undefined][] {
  * with its traces, to `<out>`. Returns the verdicts that changed.
  */
 export async function regrade(suite: string, results: string, out: string): Promise<Flip[]> {
-  const result = await readResult(join(results, "aggregate-result.json"));
+  const result = await readResult(resultPath(results));
   const cases = await Promise.all(
     result.cases.map(async (c) => {
       const graders = await caseGraders(suite, c.name);
@@ -68,7 +68,7 @@ export async function regrade(suite: string, results: string, out: string): Prom
         Object.entries(c.arms).map(async ([arm, runs]) => {
           const next = await Promise.all(
             runs.map(async (run, i) => {
-              const file = Bun.file(join(results, "traces", `${c.name}-${arm}-${i}.jsonl`));
+              const file = Bun.file(tracePath(results, c.name, arm, i));
               if (!(await file.exists())) return run;
               return regradeRun(run, arm, graders, await file.text());
             }),
@@ -81,10 +81,10 @@ export async function regrade(suite: string, results: string, out: string): Prom
   );
   // The aggregates summarize the recorded scores, so a regraded result drops them.
   const { aggregates: _, ...rest } = result;
-  await Bun.write(join(out, "aggregate-result.json"), JSON.stringify({ ...rest, cases }, null, 2));
-  await $`cp -R ${join(results, "traces")} ${join(results, "artifacts")} ${out}/`.quiet().nothrow();
+  await Bun.write(resultPath(out), JSON.stringify({ ...rest, cases }, null, 2));
+  await $`cp -R ${tracesDir(results)} ${artifactsDir(results)} ${out}/`.quiet().nothrow();
   await scoreSuite(suite, out);
-  return flips(result, await readResult(join(out, "aggregate-result.json")));
+  return flips(result, await readResult(resultPath(out)));
 }
 
 function flips(before: Result, after: Result): Flip[] {
@@ -96,7 +96,7 @@ function flips(before: Result, after: Result): Flip[] {
         if (old === undefined) return [];
         return diff(old, run).map(([name, passed]) => ({
           grader: `${c.name}/${name}`,
-          run: `${c.name}-${arm}-${i}`,
+          run: runId(c.name, arm, i),
           passed,
         }));
       }),

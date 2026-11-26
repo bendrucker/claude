@@ -1,9 +1,7 @@
 #!/usr/bin/env bun
-import { globSync } from "node:fs";
-import { rm } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
-import { $ } from "bun";
+import { serializeCase, writeCases } from "../../../../../packages/evals/cases";
 import { all, type Decision, DECISIONS, type Evidence } from "./evidence";
 import { prompt, SYSTEM } from "./prompt";
 
@@ -24,39 +22,23 @@ export function lastDecision(decision: Decision): string {
   return String.raw`${LINE}(?:${DECISION_PATTERN[decision]})\b(?![\s\S]*${LINE}(?:${ANY})\b)`;
 }
 
-/** Wraps a sentence to 76 columns for a folded YAML scalar. */
-function fold(text: string, indent: string): string {
-  const lines: string[] = [];
-  let current = "";
-  for (const word of text.split(" ")) {
-    if (current !== "" && current.length + word.length + 1 > 76) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = current === "" ? word : `${current} ${word}`;
-    }
-  }
-  lines.push(current);
-  return lines.map((l) => `${indent}${l}`).join("\n");
-}
-
 /** Accept is where the skill dispatches `evals:review`, so those cases can call `Agent`. */
 const reviews = (e: Evidence) => e.trap.expected === "accept";
 
 export function caseYaml(e: Evidence): string {
-  return `${[
-    'schema_version: "1.1"',
-    `name: ${e.name}`,
-    `tags: [decide, ${e.split}, ${e.harness}]`,
-    'plugins: ["../../.."]',
-    "execution:",
-    "  model: claude-sonnet-5-5",
-    "  max_turns: 4",
-    `  timeout_seconds: ${reviews(e) ? 600 : 300}`,
-    `  allowed_tools: [${reviews(e) ? "Skill, Agent" : "Skill"}]`,
-    "  append_system_prompt: >-",
-    fold(SYSTEM, "    "),
-  ].join("\n")}\n`;
+  return serializeCase({
+    schema_version: "1.1",
+    name: e.name,
+    tags: ["decide", e.split, e.harness],
+    plugins: ["../../.."],
+    execution: {
+      model: "claude-sonnet-5-5",
+      max_turns: 4,
+      timeout_seconds: reviews(e) ? 600 : 300,
+      allowed_tools: reviews(e) ? ["Skill", "Agent"] : ["Skill"],
+      append_system_prompt: SYSTEM,
+    },
+  });
 }
 
 /** Native-only tooling. `compare.ts` reads another harness only through `--adapter`. */
@@ -139,27 +121,7 @@ export const program = new Command("gen-decide.ts")
     const wanted: Record<string, string> = Object.fromEntries(
       cases.flatMap((c) => Object.entries(files(c))),
     );
-    // Concurrent test files each generate the suite, so a run never removes a file another
-    // run is reading: it drops only stale paths and swaps each changed file in by rename.
-    const names = new Set(cases.map((c) => c.name));
-    const stale = [
-      ...globSync("decide-*", { cwd: suite }).filter((d) => !names.has(d)),
-      ...globSync("decide-*/**/*", { cwd: suite, withFileTypes: true })
-        .filter((d) => d.isFile())
-        .map((d) => relative(suite, join(d.parentPath, d.name)))
-        .filter((f) => !(f in wanted) && !f.endsWith(".tmp")),
-    ];
-    await Promise.all(stale.map((f) => rm(join(suite, f), { recursive: true, force: true })));
-    await Promise.all(
-      Object.entries(wanted).map(async ([f, text]) => {
-        const path = join(suite, f);
-        const file = Bun.file(path);
-        if ((await file.exists()) && (await file.text()) === text) return;
-        const tmp = `${path}.${process.pid}.tmp`;
-        await Bun.write(tmp, text);
-        await $`mv ${tmp} ${path}`;
-      }),
-    );
+    await writeCases(suite, wanted, { prefix: "decide-" });
     console.log(`wrote ${cases.length} cases`);
   });
 

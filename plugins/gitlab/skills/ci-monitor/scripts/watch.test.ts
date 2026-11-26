@@ -1,31 +1,27 @@
 import { describe, expect, it, test } from "bun:test";
-import * as hegel from "@hegeldev/hegel";
-import * as gs from "@hegeldev/hegel/generators";
 import {
   clearApiErrors,
-  computeInterval,
   deriveEvents,
   type Event,
-  type ExecFn,
-  type ExecResult,
+  fetchPipeline,
   type InternalState,
   initialState,
-  isNotFoundError,
+  isFatalError,
   type JobRecord,
   jobsContradictSuccess,
   normalizePipelineStatus,
-  type PipelineRecord,
   type Probe,
   parseMrUrl,
-  parsePipelineList,
   parseProject,
-  pipelineDurations,
-  probeBranch,
   probeMr,
-  probePipelineId,
+  probePipeline,
+  type Run,
+  type RunResult,
+  type RunTarget,
   registerApiError,
   resolveMergeStatus,
-  selectPipeline,
+  type WatchOptions,
+  watchLoop,
 } from "./watch";
 
 function makeProbe(overrides: Partial<Probe> = {}): Probe {
@@ -41,42 +37,57 @@ function makeProbe(overrides: Partial<Probe> = {}): Probe {
   };
 }
 
-// Stub `exec` for resolveMergeStatus tests: each entry maps a substring matcher
-// against the glab command line to a canned result, exhausted in order.
-function makeExec(scripted: { match: string; result: ExecResult }[]): {
-  exec: ExecFn;
-  remaining: () => { match: string; result: ExecResult }[];
+const ok = (stdout: string): RunResult => ({ ok: true, stdout });
+const fail = (stderr: string): RunResult => ({ ok: false, stderr });
+const noopSleep = (): Promise<void> => Promise.resolve();
+
+// Routes each glab call by its subcommand pair (`mr view`, `ci get`) and records the calls.
+function makeRun(routes: Record<string, RunResult | RunResult[]>): {
+  run: Run;
+  calls: string[][];
 } {
-  const queue = [...scripted];
+  const calls: string[][] = [];
+  const queues = new Map<string, RunResult[]>(
+    Object.entries(routes).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? [...value] : [value],
+    ]),
+  );
   return {
-    exec: (command: string): ExecResult => {
-      const next = queue.shift();
-      if (!next) {
-        throw new Error(`unexpected exec call: ${command}`);
-      }
-      if (!command.includes(next.match)) {
-        throw new Error(
-          `exec call did not match expected substring "${next.match}". got: ${command}`,
-        );
-      }
-      return next.result;
+    calls,
+    run: (args) => {
+      calls.push(args);
+      const key = `${args[0]} ${args[1]}`;
+      const queue = queues.get(key);
+      if (!queue) throw new Error(`unexpected glab call: ${args.join(" ")}`);
+      return (queue.length > 1 ? queue.shift() : queue[0]) ?? fail("empty route");
     },
-    remaining: () => queue,
   };
 }
 
-const ok = (stdout: string): ExecResult => ({ ok: true, stdout });
-const fail = (stderr: string): ExecResult => ({
-  ok: false,
-  stderr,
-  rateLimited: false,
-  retryAfter: "",
-});
-const noopSleep = (): Promise<void> => Promise.resolve();
+const mrView = (fields: Record<string, unknown> = {}): RunResult =>
+  ok(
+    JSON.stringify({
+      sha: "head-sha",
+      state: "opened",
+      has_conflicts: false,
+      merge_status: "can_be_merged",
+      detailed_merge_status: "mergeable",
+      ...fields,
+    }),
+  );
 
-function makeRecord(overrides: Partial<PipelineRecord> = {}): PipelineRecord {
-  return { id: 1, status: "running", sha: "sha1", source: "push", ...overrides };
-}
+const ciGet = (fields: Record<string, unknown> = {}): RunResult =>
+  ok(
+    JSON.stringify({
+      id: 901,
+      status: "running",
+      sha: "head-sha",
+      ref: "refs/merge-requests/7/head",
+      jobs: [],
+      ...fields,
+    }),
+  );
 
 function makeJob(overrides: Partial<JobRecord> = {}): JobRecord {
   return { name: "test", status: "success", allowFailure: false, ...overrides };
@@ -203,7 +214,7 @@ describe("normalizePipelineStatus", () => {
     ["running", "running"],
     ["pending", "queued"],
     ["created", "queued"],
-    ["manual", "queued"],
+    ["manual", "blocked"],
     ["skipped", "success"],
     ["waiting_for_resource", "queued"],
     ["preparing", "queued"],
@@ -212,170 +223,6 @@ describe("normalizePipelineStatus", () => {
     ["", "running"],
   ])("normalizes %p to %p", (status, normalized) => {
     expect(normalizePipelineStatus(status)).toBe(normalized);
-  });
-});
-
-describe("isNotFoundError", () => {
-  test.each<[string, boolean]>([
-    ["HTTP 404: Not Found", true],
-    ["error: 404 returned", true],
-    ["Pipeline Not Found", true],
-    ["pipeline not found", true],
-    ["connection reset", false],
-    ["", false],
-    ["500 internal server error", false],
-  ])("%p is %p", (message, expected) => {
-    expect(isNotFoundError(message)).toBe(expected);
-  });
-});
-
-describe("pipelineDurations", () => {
-  // The pipeline list endpoint returns none of `finished_at`, `started_at`, or
-  // `duration`, so the original `select(.finished_at != null)` filter matched
-  // nothing and every watch polled at the no-history rate. The fractional
-  // seconds below guard the trap underneath it: `fromdateiso8601` rejects them,
-  // so restoring the timing fields without moving the date math out of jq would
-  // have swapped a silent empty result for a hard jq failure.
-  test.each<{ name: string; raw: unknown[]; expected: number[] }>([
-    {
-      name: "measures elapsed wall time across fractional-second timestamps",
-      raw: [
-        {
-          status: "success",
-          created_at: "2026-07-30T19:00:00.123Z",
-          updated_at: "2026-07-30T19:02:05.456Z",
-        },
-      ],
-      expected: [125.333],
-    },
-    {
-      name: "keeps failed and canceled pipelines",
-      raw: [
-        {
-          status: "failed",
-          created_at: "2026-07-30T19:00:00Z",
-          updated_at: "2026-07-30T19:01:00Z",
-        },
-        {
-          status: "canceled",
-          created_at: "2026-07-30T19:00:00Z",
-          updated_at: "2026-07-30T19:00:30Z",
-        },
-      ],
-      expected: [60, 30],
-    },
-    {
-      name: "drops skipped and manual pipelines that never ran",
-      raw: [
-        {
-          status: "skipped",
-          created_at: "2026-07-30T19:00:00Z",
-          updated_at: "2026-07-30T19:00:01Z",
-        },
-        {
-          status: "manual",
-          created_at: "2026-07-30T19:00:00Z",
-          updated_at: "2026-07-30T19:00:01Z",
-        },
-      ],
-      expected: [],
-    },
-    {
-      name: "drops still-running pipelines",
-      raw: [
-        {
-          status: "running",
-          created_at: "2026-07-30T19:00:00Z",
-          updated_at: "2026-07-30T19:00:20Z",
-        },
-      ],
-      expected: [],
-    },
-    {
-      name: "drops entries with missing, malformed, or non-positive timing",
-      raw: [
-        { status: "success", created_at: "2026-07-30T19:00:00Z" },
-        { status: "success", created_at: "not a date", updated_at: "2026-07-30T19:01:00Z" },
-        {
-          status: "success",
-          created_at: "2026-07-30T19:01:00Z",
-          updated_at: "2026-07-30T19:01:00Z",
-        },
-        null,
-        "not an object",
-      ],
-      expected: [],
-    },
-  ])("$name", ({ raw, expected }) => {
-    const durations = pipelineDurations(raw);
-    expect(durations).toHaveLength(expected.length);
-    for (const [index, seconds] of expected.entries()) {
-      expect(durations[index]).toBeCloseTo(seconds, 2);
-    }
-  });
-
-  test("never yields a duration the clamped interval cannot consume", () => {
-    hegel.test((tc) => {
-      const entries = tc.draw(
-        gs.arrays(
-          gs.record({
-            status: gs.sampledFrom(["success", "failed", "canceled", "skipped", "running"]),
-            createdMs: gs.integers({ minValue: 0, maxValue: 4e12 }),
-            elapsedMs: gs.integers({ minValue: -5000, maxValue: 3_600_000 }),
-          }),
-        ),
-      );
-      const raw = entries.map(({ status, createdMs, elapsedMs }) => ({
-        status,
-        created_at: new Date(createdMs).toISOString(),
-        updated_at: new Date(createdMs + elapsedMs).toISOString(),
-      }));
-      const durations = pipelineDurations(raw);
-      expect(durations.every((seconds) => seconds > 0)).toBe(true);
-      expect(durations.length).toBeLessThanOrEqual(raw.length);
-      const interval = computeInterval(durations);
-      expect(interval).toBeGreaterThanOrEqual(30);
-      expect(interval).toBeLessThanOrEqual(600);
-    });
-  });
-});
-
-describe("computeInterval", () => {
-  test.each<{ name: string; durations: number[]; expected: number }>([
-    {
-      name: "returns fast poll floor when no data (first PR on branch)",
-      durations: [],
-      expected: 30,
-    },
-    { name: "adds a 30 second buffer to the average", durations: [60, 120], expected: 120 },
-    {
-      name: "clamps interval to a 30 second floor for very short pipelines",
-      durations: [0],
-      expected: 30,
-    },
-    { name: "clamps to 600 seconds", durations: [1200, 1200], expected: 600 },
-  ])("$name", ({ durations, expected }) => {
-    expect(computeInterval(durations)).toBe(expected);
-  });
-
-  test("stays within [30, 600] and agrees with a clamped-average oracle", () => {
-    hegel.test((tc) => {
-      const durations = tc.draw(gs.arrays(gs.integers({ minValue: 0 })));
-      const result = computeInterval(durations);
-      expect(result).toBeGreaterThanOrEqual(30);
-      expect(result).toBeLessThanOrEqual(600);
-      const oracle =
-        durations.length === 0
-          ? 30
-          : Math.min(
-              600,
-              Math.max(
-                30,
-                Math.round(durations.reduce((a, b) => a + b, 0) / durations.length + 30),
-              ),
-            );
-      expect(result).toBe(oracle);
-    });
   });
 });
 
@@ -599,41 +446,6 @@ describe("deriveEvents", () => {
   });
 });
 
-describe("api-error tracking", () => {
-  it("increments on failure and emits at threshold", () => {
-    let state = initialState();
-    let events: { type: string }[];
-    for (let i = 0; i < 4; i += 1) {
-      const outcome = registerApiError(state, 5);
-      state = outcome.state;
-      events = outcome.events;
-      expect(events).toEqual([]);
-    }
-    const final = registerApiError(state, 5);
-    expect(final.events).toContainEqual({ type: "api-error", consecutive: 5 });
-  });
-
-  it("resets on success", () => {
-    let state = initialState();
-    for (let i = 0; i < 3; i += 1) {
-      state = registerApiError(state, 5).state;
-    }
-    expect(state.apiErrorCount).toBe(3);
-    state = clearApiErrors(state);
-    expect(state.apiErrorCount).toBe(0);
-    expect(state.apiErrorEmittedAt).toBeNull();
-  });
-
-  it("does not re-emit for the same consecutive count", () => {
-    let state = initialState();
-    for (let i = 0; i < 5; i += 1) {
-      state = registerApiError(state, 5).state;
-    }
-    const again = registerApiError(state, 5);
-    expect(again.events.some((e) => e.type === "api-error" && e.consecutive === 5)).toBe(false);
-  });
-});
-
 describe("deriveEvents in branch mode", () => {
   it("emits status transitions without pr-closed or conflicts", () => {
     let state = initialState();
@@ -748,216 +560,6 @@ describe("deriveEvents in pipeline-id mode", () => {
   });
 });
 
-describe("resolveMergeStatus", () => {
-  const mrJson = (fields: Record<string, unknown>): string => JSON.stringify(fields);
-
-  it("resolves to a conflict once a re-poll settles merge status", async () => {
-    const { exec, remaining } = makeExec([
-      { match: "merge_requests/7", result: ok(mrJson({ merge_status: "checking" })) },
-      {
-        match: "merge_requests/7",
-        result: ok(
-          mrJson({
-            merge_status: "cannot_be_merged",
-            detailed_merge_status: "conflict",
-            has_conflicts: true,
-          }),
-        ),
-      },
-    ]);
-    const resolved = await resolveMergeStatus("group%2Fproject", 7, exec, noopSleep);
-    expect(resolved).toEqual({
-      hasConflicts: true,
-      mergeStatus: "cannot_be_merged",
-      detailedMergeStatus: "conflict",
-    });
-    expect(remaining()).toEqual([]);
-  });
-
-  it("returns undetermined after exhausting the retry budget", async () => {
-    const scripted = Array.from({ length: 4 }, () => ({
-      match: "merge_requests/7",
-      result: ok(mrJson({ merge_status: "unchecked", detailed_merge_status: "checking" })),
-    }));
-    const { exec, remaining } = makeExec(scripted);
-    const resolved = await resolveMergeStatus("group%2Fproject", 7, exec, noopSleep);
-    expect(resolved).toEqual({
-      hasConflicts: false,
-      mergeStatus: "unchecked",
-      detailedMergeStatus: "checking",
-    });
-    expect(remaining()).toEqual([]);
-  });
-});
-
-describe("parsePipelineList", () => {
-  test.each<{ name: string; raw: unknown; expected: PipelineRecord[] | null }>([
-    {
-      name: "returns null for a non-array body",
-      raw: { message: "403 Forbidden" },
-      expected: null,
-    },
-    { name: "returns null for a null body", raw: null, expected: null },
-    { name: "returns an empty list for an empty array", raw: [], expected: [] },
-    {
-      name: "parses numeric and string ids alike",
-      raw: [
-        { id: 10, status: "success", sha: "abc", source: "push" },
-        { id: "11", status: "failed", sha: "def", source: "merge_request_event" },
-      ],
-      expected: [
-        { id: 10, status: "success", sha: "abc", source: "push" },
-        { id: 11, status: "failing", sha: "def", source: "merge_request_event" },
-      ],
-    },
-    {
-      name: "drops entries without a usable id",
-      raw: [{ status: "success" }, { id: null }, { id: "not-a-number" }, { id: "" }, { id: 12 }],
-      expected: [{ id: 12, status: "running", sha: "", source: "" }],
-    },
-    {
-      name: "defaults a missing sha and source to empty strings",
-      raw: [{ id: 13, status: "running" }],
-      expected: [{ id: 13, status: "running", sha: "", source: "" }],
-    },
-  ])("$name", ({ raw, expected }) => {
-    expect(parsePipelineList(raw)).toEqual(expected);
-  });
-});
-
-describe("selectPipeline", () => {
-  test.each<{
-    name: string;
-    records: PipelineRecord[];
-    prefer: "merge-request" | "branch";
-    expectedId: number | null;
-  }>([
-    {
-      name: "ignores a newer external success in favour of the MR pipeline",
-      records: [
-        makeRecord({ id: 200, status: "success", source: "external" }),
-        makeRecord({ id: 199, status: "failing", source: "merge_request_event" }),
-      ],
-      prefer: "merge-request",
-      expectedId: 199,
-    },
-    {
-      name: "prefers a running MR pipeline over a newer skipped push pipeline",
-      records: [
-        makeRecord({ id: 300, status: "success", source: "push" }),
-        makeRecord({ id: 299, status: "running", source: "merge_request_event" }),
-      ],
-      prefer: "merge-request",
-      expectedId: 299,
-    },
-    {
-      name: "prefers the push pipeline in branch mode when both kinds are present",
-      records: [
-        makeRecord({ id: 300, status: "success", source: "push" }),
-        makeRecord({ id: 299, status: "running", source: "merge_request_event" }),
-      ],
-      prefer: "branch",
-      expectedId: 300,
-    },
-    {
-      name: "ignores parent_pipeline children whose status the parent aggregates",
-      records: [
-        makeRecord({ id: 400, status: "success", source: "parent_pipeline" }),
-        makeRecord({ id: 398, status: "failing", source: "merge_request_event" }),
-      ],
-      prefer: "merge-request",
-      expectedId: 398,
-    },
-    {
-      name: "returns null when every candidate has an excluded source",
-      records: [
-        makeRecord({ id: 500, source: "external" }),
-        makeRecord({ id: 501, source: "parent_pipeline" }),
-      ],
-      prefer: "merge-request",
-      expectedId: null,
-    },
-    { name: "returns null for an empty list", records: [], prefer: "branch", expectedId: null },
-    {
-      name: "falls back to branch pipelines in MR mode when the project runs none",
-      records: [makeRecord({ id: 600, source: "push" }), makeRecord({ id: 601, source: "web" })],
-      prefer: "merge-request",
-      expectedId: 601,
-    },
-    {
-      name: "falls back to MR pipelines in branch mode when the project runs none",
-      records: [
-        makeRecord({ id: 700, source: "merge_request_event" }),
-        makeRecord({ id: 701, source: "merge_request_event" }),
-      ],
-      prefer: "branch",
-      expectedId: 701,
-    },
-    {
-      name: "orders single-digit against double-digit ids numerically",
-      records: [makeRecord({ id: 9, source: "push" }), makeRecord({ id: 10, source: "push" })],
-      prefer: "branch",
-      expectedId: 10,
-    },
-    {
-      name: "orders realistic ten-digit ids numerically",
-      records: [
-        makeRecord({ id: 2712763426, source: "push" }),
-        makeRecord({ id: 2712702628, source: "push" }),
-      ],
-      prefer: "branch",
-      expectedId: 2712763426,
-    },
-  ])("$name", ({ records, prefer, expectedId }) => {
-    expect(selectPipeline(records, prefer)?.id ?? null).toBe(expectedId);
-  });
-
-  const pipelineRecord: gs.Generator<PipelineRecord> = gs.record({
-    id: gs.integers({ minValue: 1, maxValue: 3_000_000_000 }),
-    status: gs.sampledFrom<InternalState>(["running", "queued", "failing", "success"]),
-    sha: gs.text(),
-    source: gs.sampledFrom([
-      "push",
-      "merge_request_event",
-      "external",
-      "parent_pipeline",
-      "web",
-      "schedule",
-    ]),
-  });
-
-  test("picks an input record that is eligible and highest-id within its partition", () => {
-    hegel.test((tc) => {
-      const records = tc.draw(gs.arrays(pipelineRecord));
-      const prefer = tc.draw(
-        gs.sampledFrom<"merge-request" | "branch">(["merge-request", "branch"]),
-      );
-      const selected = selectPipeline(records, prefer);
-      const eligible = records.filter(
-        (record) => record.source !== "external" && record.source !== "parent_pipeline",
-      );
-      if (eligible.length === 0) {
-        expect(selected).toBeNull();
-        return;
-      }
-      expect(selected).not.toBeNull();
-      if (!selected) return;
-      expect(records).toContain(selected);
-      const isMergeRequest = (record: PipelineRecord) => record.source === "merge_request_event";
-      const preferred = eligible.filter((record) =>
-        prefer === "merge-request" ? isMergeRequest(record) : !isMergeRequest(record),
-      );
-      if (preferred.length > 0) {
-        expect(preferred).toContain(selected);
-      }
-      const partition = eligible.filter(
-        (record) => isMergeRequest(record) === isMergeRequest(selected),
-      );
-      expect(selected.id).toBe(Math.max(...partition.map((record) => record.id)));
-    });
-  });
-});
-
 describe("jobsContradictSuccess", () => {
   test.each<{ name: string; jobs: JobRecord[]; contradicting: string[] }>([
     {
@@ -994,154 +596,381 @@ describe("jobsContradictSuccess", () => {
   });
 });
 
-describe("probe pipeline selection", () => {
-  const mrJson = JSON.stringify({
-    sha: "head-sha",
-    source_branch: "feature",
-    merge_status: "can_be_merged",
-    detailed_merge_status: "mergeable",
-    state: "opened",
+describe("isFatalError", () => {
+  test.each<[string, boolean]>([
+    ["failed to get merge request 1: 404 Not Found.", true],
+    ["No pipeline with the given ID: 1: 404 Not Found.", true],
+    ["401 Unauthorized", true],
+    ["403 Forbidden", true],
+    ["no pipeline found. It might not exist yet.", false],
+    ["500 Internal Server Error", false],
+    ["failed to get merge request 404: 502 Bad Gateway", false],
+    ["spawnSync glab ETIMEDOUT", false],
+    ["", false],
+  ])("%p is %p", (message, expected) => {
+    expect(isFatalError(message)).toBe(expected);
+  });
+});
+
+describe("api-error tracking", () => {
+  it("emits once at the threshold and stays silent past it", () => {
+    let state = initialState();
+    const emitted: Event[] = [];
+    for (let i = 0; i < 9; i += 1) {
+      const outcome = registerApiError(state, 5);
+      state = outcome.state;
+      emitted.push(...outcome.events);
+    }
+    expect(emitted).toEqual([{ type: "api-error", consecutive: 5 }]);
   });
 
-  const pipelinesJson = (records: Record<string, unknown>[]): string => JSON.stringify(records);
+  it("resets on success so a later streak emits again", () => {
+    let state = initialState();
+    for (let i = 0; i < 3; i += 1) state = registerApiError(state, 5).state;
+    state = clearApiErrors(state);
+    expect(state.apiErrorCount).toBe(0);
+    const emitted: Event[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const outcome = registerApiError(state, 5);
+      state = outcome.state;
+      emitted.push(...outcome.events);
+    }
+    expect(emitted).toEqual([{ type: "api-error", consecutive: 5 }]);
+  });
+});
 
-  // Regression: an `external` pipeline is a commit status posted by another tool.
-  // It is created green and carries no jobs, and because it is created last it
-  // wins any newest-first selection. Resolving the MR's pipeline by that ordering
-  // reported success while the real CI run was red, so the watcher exited green
-  // on a failing MR.
-  it("reports failing when an external success outranks the real MR pipeline", () => {
-    const { exec } = makeExec([
-      { match: "merge_requests/7", result: ok(mrJson) },
-      {
-        match: "merge_requests/7/pipelines",
-        result: ok(
-          pipelinesJson([
-            { id: 902, status: "success", sha: "head-sha", source: "external" },
-            { id: 901, status: "failed", sha: "merge-sha", source: "merge_request_event" },
-          ]),
-        ),
-      },
+describe("blocked pipelines", () => {
+  it("emits one blocked event and a running status for a manual pipeline", () => {
+    let state = initialState();
+    const first = deriveEvents(makeProbe({ state: "blocked" }), state, 0, 15);
+    state = first.state;
+    expect(first.events).toEqual([
+      { type: "status", state: "running", sha: "sha1", run_id: "100" },
+      { type: "blocked", sha: "sha1", run_id: "100" },
     ]);
-    const probed = probeMr("group%2Fproject", 7, exec);
-    expect(probed.ok).toBe(true);
-    if (!probed.ok) return;
-    expect(probed.probe.state).toBe("failing");
-    expect(probed.probe.runId).toBe("901");
-    expect(probed.probe.sha).toBe("head-sha");
+    expect(deriveEvents(makeProbe({ state: "blocked" }), state, 1, 15).events).toEqual([]);
   });
 
-  it("downgrades a claimed success when a required job failed", () => {
-    const { exec } = makeExec([
-      { match: "merge_requests/7", result: ok(mrJson) },
-      {
-        match: "merge_requests/7/pipelines",
-        result: ok(
-          pipelinesJson([{ id: 901, status: "success", sha: "s", source: "merge_request_event" }]),
-        ),
-      },
-      {
-        match: "pipelines/901/jobs",
-        result: ok(
-          JSON.stringify([
-            { name: "build", status: "success", allow_failure: false },
-            { name: "rspec", status: "failed", allow_failure: false },
-          ]),
-        ),
-      },
-    ]);
-    const probed = probeMr("group%2Fproject", 7, exec);
-    expect(probed.ok).toBe(true);
-    if (!probed.ok) return;
-    expect(probed.probe.state).toBe("failing");
-    expect(probed.probe.runId).toBe("901");
+  it("does not start the queued-timeout clock", () => {
+    let state = initialState();
+    state = deriveEvents(makeProbe({ state: "blocked" }), state, 0, 15).state;
+    const later = deriveEvents(makeProbe({ state: "blocked" }), state, 60 * 60 * 1000, 15);
+    expect(later.events.some((e) => e.type === "queued-timeout")).toBe(false);
+  });
+});
+
+describe("resolveMergeStatus", () => {
+  it("resolves to a conflict once a re-poll settles merge status", async () => {
+    const { run, calls } = makeRun({
+      "mr view": [
+        mrView({ merge_status: "checking", detailed_merge_status: "" }),
+        mrView({
+          merge_status: "cannot_be_merged",
+          detailed_merge_status: "conflict",
+          has_conflicts: true,
+        }),
+      ],
+    });
+    const resolved = await resolveMergeStatus("group/project", 7, run, noopSleep);
+    expect(resolved).toEqual({
+      hasConflicts: true,
+      mergeStatus: "cannot_be_merged",
+      detailedMergeStatus: "conflict",
+    });
+    expect(calls).toHaveLength(2);
   });
 
-  it("confirms a success against the jobs endpoint with exactly one extra call", () => {
-    const { exec, remaining } = makeExec([
-      { match: "merge_requests/7", result: ok(mrJson) },
-      {
-        match: "merge_requests/7/pipelines",
-        result: ok(
-          pipelinesJson([{ id: 901, status: "success", sha: "s", source: "merge_request_event" }]),
-        ),
-      },
-      {
-        match: "pipelines/901/jobs",
-        result: ok(JSON.stringify([{ name: "build", status: "success", allow_failure: false }])),
-      },
+  it("returns undetermined after exhausting the retry budget", async () => {
+    const { run, calls } = makeRun({
+      "mr view": mrView({ merge_status: "unchecked", detailed_merge_status: "checking" }),
+    });
+    const resolved = await resolveMergeStatus("group/project", 7, run, noopSleep);
+    expect(resolved).toEqual({
+      hasConflicts: false,
+      mergeStatus: "unchecked",
+      detailedMergeStatus: "checking",
+    });
+    expect(calls).toHaveLength(4);
+  });
+});
+
+describe("fetchPipeline", () => {
+  it("calls glab without a shell, with the selector and job details", () => {
+    const { run, calls } = makeRun({ "ci get": ciGet() });
+    fetchPipeline(run, "group/it's", { kind: "branch", branch: "feat/it's" });
+    expect(calls[0]).toEqual([
+      "ci",
+      "get",
+      "-R",
+      "group/it's",
+      "--branch",
+      "feat/it's",
+      "-F",
+      "json",
+      "--with-job-details",
     ]);
-    const probed = probeMr("group%2Fproject", 7, exec);
-    expect(probed.ok).toBe(true);
-    if (!probed.ok) return;
-    expect(probed.probe.state).toBe("success");
-    expect(remaining()).toEqual([]);
   });
 
-  it("fails the probe rather than emitting a success it could not confirm", () => {
-    const { exec } = makeExec([
-      { match: "merge_requests/7", result: ok(mrJson) },
-      {
-        match: "merge_requests/7/pipelines",
-        result: ok(
-          pipelinesJson([{ id: 901, status: "success", sha: "s", source: "merge_request_event" }]),
-        ),
-      },
-      { match: "pipelines/901/jobs", result: fail("HTTP 500") },
-    ]);
-    expect(probeMr("group%2Fproject", 7, exec).ok).toBe(false);
+  it("reads a green pipeline with passing jobs as success", () => {
+    const { run } = makeRun({ "ci get": ciGet({ status: "success" }) });
+    expect(fetchPipeline(run, "g/p", { kind: "id", id: "901" })).toEqual({
+      ok: true,
+      pipeline: { id: "901", state: "success", sha: "head-sha", ref: "refs/merge-requests/7/head" },
+    });
   });
 
-  it("keeps polling when every pipeline on the page is excluded", () => {
-    const { exec } = makeExec([
-      { match: "merge_requests/7", result: ok(mrJson) },
-      {
-        match: "merge_requests/7/pipelines",
-        result: ok(pipelinesJson([{ id: 902, status: "success", sha: "s", source: "external" }])),
-      },
-    ]);
-    const probed = probeMr("group%2Fproject", 7, exec);
-    expect(probed.ok).toBe(true);
-    if (!probed.ok) return;
-    expect(probed.probe.runId).toBeNull();
-    expect(probed.probe.state).toBe("running");
+  it("downgrades a success whose required job failed", () => {
+    const { run } = makeRun({
+      "ci get": ciGet({
+        status: "success",
+        jobs: [{ name: "rspec", status: "failed", allow_failure: false }],
+      }),
+    });
+    const fetched = fetchPipeline(run, "g/p", { kind: "id", id: "901" });
+    expect(fetched.ok && fetched.pipeline?.state).toBe("failing");
   });
 
-  it("applies the job gate in pipeline-id mode as well", () => {
-    const { exec, remaining } = makeExec([
-      {
-        match: "pipelines/901'",
-        result: ok(JSON.stringify({ id: 901, status: "success", sha: "s" })),
-      },
-      {
-        match: "pipelines/901/jobs",
-        result: ok(JSON.stringify([{ name: "rspec", status: "failed", allow_failure: false }])),
-      },
-    ]);
-    const probed = probePipelineId("group%2Fproject", "901", exec);
-    expect(probed.ok).toBe(true);
-    if (!probed.ok) return;
-    expect(probed.probe.state).toBe("failing");
-    expect(remaining()).toEqual([]);
+  it("treats a missing pipeline as none yet", () => {
+    const { run } = makeRun({ "ci get": fail("no pipeline found. It might not exist yet.") });
+    expect(fetchPipeline(run, "g/p", { kind: "branch", branch: "b" })).toEqual({
+      ok: true,
+      pipeline: null,
+    });
   });
 
-  it("ignores an external success in branch mode too", () => {
-    const { exec } = makeExec([
+  it("keeps a 404 fatal when the message also says no pipeline found", () => {
+    const { run } = makeRun({
+      "ci get": fail(
+        'no pipeline found for branch main and failed to find associated merge request: failed to get merge requests for "main": 404 Not Found.',
+      ),
+    });
+    const fetched = fetchPipeline(run, "g/p", { kind: "branch", branch: "main" });
+    expect(fetched).toMatchObject({ ok: false, fatal: true });
+  });
+
+  it("fails softly on unparseable output", () => {
+    const { run } = makeRun({ "ci get": ok("not json") });
+    expect(fetchPipeline(run, "g/p", { kind: "id", id: "1" })).toMatchObject({
+      ok: false,
+      fatal: false,
+    });
+  });
+
+  it("surfaces a timeout as a retryable failure", () => {
+    const { run } = makeRun({ "ci get": fail("spawnSync glab ETIMEDOUT") });
+    expect(fetchPipeline(run, "g/p", { kind: "id", id: "1" })).toMatchObject({
+      ok: false,
+      fatal: false,
+    });
+  });
+});
+
+describe("probeMr", () => {
+  it("reports running when the pipeline is for an older sha than the MR head", () => {
+    const { run } = makeRun({
+      "mr view": mrView({ sha: "new-sha" }),
+      "ci get": ciGet({ status: "success", sha: "old-sha" }),
+    });
+    const probed = probeMr(run, "g/p", 7);
+    expect(probed.ok && probed.probe).toMatchObject({
+      sha: "new-sha",
+      state: "running",
+      runId: null,
+    });
+  });
+
+  it("trusts a merged-results pipeline whose sha is an ephemeral merge commit", () => {
+    const { run } = makeRun({
+      "mr view": mrView({ sha: "head-sha" }),
+      "ci get": ciGet({
+        status: "success",
+        sha: "merge-commit-sha",
+        ref: "refs/merge-requests/7/merge",
+      }),
+    });
+    const probed = probeMr(run, "g/p", 7);
+    expect(probed.ok && probed.probe.state).toBe("success");
+  });
+
+  it("reports green when the pipeline matches the head sha", () => {
+    const { run } = makeRun({
+      "mr view": mrView(),
+      "ci get": ciGet({ status: "success" }),
+    });
+    const probed = probeMr(run, "g/p", 7);
+    expect(probed.ok && probed.probe).toMatchObject({ state: "success", runId: "901" });
+  });
+
+  it("reports running when the MR has no pipeline yet", () => {
+    const { run } = makeRun({
+      "mr view": mrView(),
+      "ci get": fail("no pipeline found for merge request !7."),
+    });
+    const probed = probeMr(run, "g/p", 7);
+    expect(probed.ok && probed.probe).toMatchObject({ state: "running", runId: null });
+  });
+
+  it("maps a manual pipeline to blocked", () => {
+    const { run } = makeRun({ "mr view": mrView(), "ci get": ciGet({ status: "manual" }) });
+    const probed = probeMr(run, "g/p", 7);
+    expect(probed.ok && probed.probe.state).toBe("blocked");
+  });
+
+  it("returns a fatal failure when the MR is missing", () => {
+    const { run } = makeRun({ "mr view": fail("failed to get merge request 7: 404 Not Found.") });
+    expect(probeMr(run, "g/p", 7)).toMatchObject({ ok: false, fatal: true });
+  });
+});
+
+describe("probePipeline", () => {
+  it("uses the pipeline's own sha in branch mode", () => {
+    const { run } = makeRun({ "ci get": ciGet({ sha: "tip", status: "failed" }) });
+    const probed = probePipeline(run, "g/p", { kind: "branch", branch: "b" });
+    expect(probed.ok && probed.probe).toMatchObject({ sha: "tip", state: "failing" });
+  });
+});
+
+describe("watchLoop", () => {
+  const mrTarget: RunTarget = { mode: "mr", mrUrl: "https://gitlab.com/g/p/-/merge_requests/7" };
+  const idTarget: RunTarget = { mode: "pipeline-id", project: "g/p", pipelineId: "901" };
+
+  function harness(options: Partial<WatchOptions> & { target: RunTarget }, run: Run) {
+    let clock = 0;
+    const events: Event[] = [];
+    const logs: string[] = [];
+    const sleeps: number[] = [];
+    const exit = watchLoop(
+      { maxMinutes: 60, queuedTimeoutMinutes: 15, apiErrorThreshold: 5, ...options },
       {
-        match: "pipelines?ref=main",
-        result: ok(
-          pipelinesJson([
-            { id: 902, status: "success", sha: "a", source: "external" },
-            { id: 901, status: "failed", sha: "b", source: "push" },
-          ]),
-        ),
+        run,
+        now: () => clock,
+        sleep: (ms) => {
+          sleeps.push(ms);
+          clock += ms;
+          return Promise.resolve();
+        },
+        emit: (event) => {
+          events.push(event);
+        },
+        log: (message) => {
+          logs.push(message);
+        },
       },
+    );
+    return { exit, events, logs, sleeps };
+  }
+
+  it("exits 0 on a green pipeline in MR mode", async () => {
+    const { run } = makeRun({ "mr view": mrView(), "ci get": ciGet({ status: "success" }) });
+    const h = harness({ target: mrTarget }, run);
+    expect(await h.exit).toBe(0);
+    expect(h.events).toEqual([
+      { type: "status", state: "success", sha: "head-sha", run_id: "901" },
     ]);
-    const probed = probeBranch("group%2Fproject", "main", exec);
-    expect(probed.ok).toBe(true);
-    if (!probed.ok) return;
-    expect(probed.probe.state).toBe("failing");
-    expect(probed.probe.runId).toBe("901");
-    expect(probed.probe.sha).toBe("b");
+  });
+
+  it("does not report green for a pipeline on the previous sha", async () => {
+    const { run } = makeRun({
+      "mr view": mrView({ sha: "new-sha" }),
+      "ci get": ciGet({ status: "success", sha: "old-sha" }),
+    });
+    const h = harness({ target: mrTarget, maxMinutes: 2 }, run);
+    await h.exit;
+    expect(h.events.some((e) => e.type === "status" && e.state === "success")).toBe(false);
+    expect(h.events.at(-1)).toEqual({ type: "max-time-reached", minutes: 2 });
+  });
+
+  test.each<[string, Event["type"]]>([
+    ["merged", "merged"],
+    ["closed", "pr-closed"],
+  ])("exits on an MR that is %s", async (state, type) => {
+    const { run } = makeRun({ "mr view": mrView({ state }), "ci get": ciGet() });
+    const h = harness({ target: mrTarget }, run);
+    expect(await h.exit).toBe(0);
+    expect(h.events.at(-1)?.type).toBe(type);
+  });
+
+  it("keeps polling a failing pipeline in pipeline-id mode and sees the retry go green", async () => {
+    const { run } = makeRun({
+      "ci get": [
+        ciGet({ status: "failed" }),
+        ciGet({ status: "running" }),
+        ciGet({ status: "success" }),
+      ],
+    });
+    const h = harness({ target: idTarget }, run);
+    expect(await h.exit).toBe(0);
+    expect(h.events.map((e) => (e.type === "status" ? e.state : e.type))).toEqual([
+      "failing",
+      "running",
+      "success",
+    ]);
+  });
+
+  it("polls at a constant interval", async () => {
+    const { run } = makeRun({
+      "ci get": [ciGet(), ciGet(), ciGet({ status: "success" })],
+    });
+    const h = harness({ target: idTarget }, run);
+    await h.exit;
+    expect(h.sleeps).toEqual([30_000, 30_000]);
+  });
+
+  it("caps the final sleep at the deadline and emits max-time-reached", async () => {
+    const { run } = makeRun({ "ci get": ciGet() });
+    const h = harness({ target: idTarget, maxMinutes: 1.25 }, run);
+    expect(await h.exit).toBe(0);
+    expect(h.sleeps).toEqual([30_000, 30_000, 15_000]);
+    expect(h.events.at(-1)).toEqual({ type: "max-time-reached", minutes: 1.25 });
+  });
+
+  test.each(["404 Not Found", "403 Forbidden", "401 Unauthorized"])(
+    "exits 1 with stderr on %s in pipeline-id mode",
+    async (status) => {
+      const { run } = makeRun({ "ci get": fail(`No pipeline with the given ID: 901: ${status}.`) });
+      const h = harness({ target: idTarget }, run);
+      expect(await h.exit).toBe(1);
+      expect(h.logs[0]).toContain(status);
+      expect(h.events).toHaveLength(1);
+      expect(h.events[0]).toMatchObject({ type: "fatal" });
+      expect(JSON.stringify(h.events[0])).toContain(status);
+      expect(h.sleeps).toEqual([]);
+    },
+  );
+
+  it("exits 1 on a 404 in MR mode", async () => {
+    const { run } = makeRun({ "mr view": fail("failed to get merge request 7: 404 Not Found.") });
+    const h = harness({ target: mrTarget }, run);
+    expect(await h.exit).toBe(1);
+  });
+
+  it("exits 1 on a 403 in branch mode", async () => {
+    const { run } = makeRun({ "ci get": fail("403 Forbidden") });
+    const h = harness({ target: { mode: "branch", project: "g/p", branch: "b" } }, run);
+    expect(await h.exit).toBe(1);
+  });
+
+  it("emits api-error once at the threshold across a long outage", async () => {
+    const { run } = makeRun({ "ci get": fail("500 Internal Server Error") });
+    const h = harness({ target: idTarget, maxMinutes: 10, apiErrorThreshold: 3 }, run);
+    await h.exit;
+    expect(h.events.filter((e) => e.type === "api-error")).toEqual([
+      { type: "api-error", consecutive: 3 },
+    ]);
+  });
+
+  it("emits a blocked event for a manual pipeline and keeps polling", async () => {
+    const { run } = makeRun({ "ci get": ciGet({ status: "manual" }) });
+    const h = harness({ target: idTarget, maxMinutes: 2 }, run);
+    await h.exit;
+    expect(h.events.filter((e) => e.type === "blocked")).toHaveLength(1);
+    expect(h.events.at(-1)).toEqual({ type: "max-time-reached", minutes: 2 });
+  });
+
+  it("emits queued-timeout once for a queued pipeline", async () => {
+    const { run } = makeRun({ "ci get": ciGet({ status: "pending" }) });
+    const h = harness({ target: idTarget, maxMinutes: 20 }, run);
+    await h.exit;
+    expect(h.events.filter((e) => e.type === "queued-timeout")).toHaveLength(1);
   });
 });

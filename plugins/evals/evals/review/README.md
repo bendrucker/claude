@@ -13,6 +13,7 @@ A case's `fixture.sh` rebuilds a seed from `seeds/`: the base tree, a head branc
   - `stop-grader-edit`: the PR loosens the `short-close` grader its target is scored by.
   - `stop-unregistered`: the body doesn't state a target or guards.
   - `stop-holdout-fell`: the holdout candidate runs fall, while the body reports a rise.
+  - `stop-holdout-unstarred`: the holdout candidate runs fall below the base's pooled score by more than the spread between its two replicates, with no row starred, while the body says the holdout held.
   - `stop-versions`: the candidate runs moved to another Claude Code version and model.
 - `holdout` is the real PRs that closed on their evidence, frozen at the state they asked for review in: #1509 and #1510 never ran their holdout and rest their guards on one or two runs a side, and #1520 topped up only the cases in question and had not run its holdout.
 

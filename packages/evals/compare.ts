@@ -1,4 +1,4 @@
-import { mean, min } from "simple-statistics";
+import { mean, median, min } from "simple-statistics";
 import { table } from "table";
 import type { Cell, Column } from "./column";
 import { pFloor, pValue } from "./stats";
@@ -11,6 +11,8 @@ export interface RenderOptions {
   /** Case name to tags, which adds a per-tag score section. */
   tags?: Map<string, string[]> | undefined;
   markdown?: boolean | undefined;
+  /** Score rows (`<case>/<arm>`, `<tag>/<arm>`, or `<case>/<arm>/<grader>`) the markdown leads with. */
+  rows?: string[] | undefined;
 }
 
 type Section = [title: string, head: string[], rows: string[][]];
@@ -29,14 +31,52 @@ const fmt = (xs: number[], digits: number) => (xs.length > 0 ? mean(xs).toFixed(
  * A cell's p-value against the baseline and its mark: `*` when it moved, `†` when too few runs
  * could ever star it.
  */
-function mark(base: number[], xs: number[], alpha: number): string {
+export function mark(base: number[], xs: number[], alpha: number): string {
   if (base.length === 0 || xs.length === 0) return "";
   const p = pValue(base, xs);
   if (pFloor(base.length, xs.length) >= alpha) return ` (p=${p.toFixed(2)})†`;
   return ` (p=${p.toFixed(3)})${p < alpha ? "*" : ""}`;
 }
 
+/** The key to `mark`'s output, for a report whose baseline column is `base`. */
+export function legend(base: string, alpha: number): string {
+  return `Each cell shows its two-sided permutation p-value against ${base}, and * marks p < ${alpha}. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1.`;
+}
+
 const ARMS = ["with", "without"];
+
+const med = (xs: number[], digits: number) => (xs.length > 0 ? median(xs).toFixed(digits) : "-");
+
+/** Each column's median against the baseline's, as a candidate-to-base ratio. */
+function ratioCells(series: number[][], digits: number): string[] {
+  const [base = [], ...rest] = series;
+  const cells = rest.map((xs) => {
+    if (xs.length === 0 || base.length === 0 || median(base) === 0) return med(xs, digits);
+    return `${med(xs, digits)} (x${(median(xs) / median(base)).toFixed(2)})`;
+  });
+  return [med(base, digits), ...cells];
+}
+
+export interface CostRatios {
+  /** Per column after the baseline, its all-run median cost over the baseline's, if both have runs. */
+  ratios: (number | undefined)[];
+  /** Runs without a `costUsd` per column. */
+  missing: number[];
+}
+
+/** Median `costUsd` over every run in each column, as a ratio to the first column's. */
+export function costRatios(columns: Column[]): CostRatios {
+  const costs = columns.map((c) => [...c.values()].flatMap((cell) => cell.runCost));
+  const [base = [], ...rest] = costs;
+  return {
+    ratios: rest.map((xs) =>
+      xs.length === 0 || base.length === 0 || median(base) === 0
+        ? undefined
+        : median(xs) / median(base),
+    ),
+    missing: columns.map((c) => [...c.values()].reduce((n, cell) => n + cell.missingCost, 0)),
+  };
+}
 
 /** Every case's runs on one arm, pooled, so a suite-wide shift can star where no case can. */
 function poolArm(columns: Column[], keys: string[], arm: string, pick: (cell: Cell) => number[]) {
@@ -95,6 +135,38 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
       ),
     ];
   });
+  const hasRunCost = columns.some((c) => [...c.values()].some((cell) => cell.runCost.length > 0));
+  const runSections: Section[] = hasRunCost
+    ? (
+        [
+          ["Median cost per run (USD, x = candidate / base)", (c: Cell) => c.runCost, 3],
+          ["Median turns per run (x = candidate / base)", (c: Cell) => c.runTurns, 1],
+        ] as const
+      ).map(([title, pick, digits]): Section => {
+        const pooled = (arm: string | undefined) =>
+          ratioCells(
+            columns.map((c) =>
+              [...c]
+                .filter(([key]) => arm === undefined || key.endsWith(`/${arm}`))
+                .flatMap(([, cell]) => pick(cell)),
+            ),
+            digits,
+          );
+        const all: string[][] = [];
+        if (keys.length > 1) {
+          for (const arm of ARMS) {
+            if (keys.some((key) => key.endsWith(`/${arm}`)))
+              all.push([`all/${arm}`, ...pooled(arm)]);
+          }
+          all.push(["all", ...pooled(undefined)]);
+        }
+        return [
+          title,
+          ["case/arm"],
+          [...all, ...keys.map((key) => [key, ...ratioCells(series(key, pick), digits)])],
+        ];
+      })
+    : [];
   const graderRows = keys.flatMap((key) => {
     const names = new Set(columns.flatMap((c) => [...(c.get(key)?.graders.keys() ?? [])]));
     return [...names].toSorted().map((name) =>
@@ -125,6 +197,7 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
     ],
     ["Case minimum", ["case/arm"], minRows],
     ...measureSections,
+    ...runSections,
     ["Grader pass rate", ["case/arm", "grader"], [...graderPoolRows, ...graderRows]],
   ];
   if (tags !== undefined) {
@@ -144,9 +217,47 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
 }
 
 const starred = (r: string[]) => r.some((cell) => cell.endsWith("*"));
-const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
+// Escaped so a reader who bolds a starred cell doesn't merge the star into the emphasis.
+const line = (cells: string[]) =>
+  `| ${cells.map((c) => c.replace(/\*$/, String.raw`\*`)).join(" | ")} |`;
 const markdown = (head: string[], rows: string[][]) =>
   [line(head), line(head.map(() => "---")), ...rows.map(line)].join("\n");
+
+/** Each starred row as its measure, its row label, then one cell per column. */
+function flaggedRows(all: Section[]): string[][] {
+  return all.flatMap(([title, head, rows]) =>
+    rows.filter(starred).map((r) => {
+      const cells = [title, r.slice(0, head.length).join(" · ")];
+      cells.push(...r.slice(head.length));
+      return cells;
+    }),
+  );
+}
+
+const scoreSections = new Set(["Tag score", "Case score", "Grader pass rate"]);
+
+/** The score row each label names, in label order, failing on a label that names none. */
+function namedRows(all: Section[], patterns: string[]): string[][] {
+  const byLabel = new Map<string, string[]>();
+  for (const [title, head, rows] of all) {
+    if (!scoreSections.has(title)) continue;
+    for (const r of rows) {
+      const label = r
+        .slice(0, head.length)
+        .join("/")
+        .replace(/!(?=\/|$)/, "");
+      byLabel.set(label, [title, r.slice(0, head.length).join(" · "), ...r.slice(head.length)]);
+    }
+  }
+  const missing = patterns.filter((p) => !byLabel.has(p));
+  if (missing.length > 0) throw new Error(`No score row named ${missing.join(", ")}`);
+  return patterns.map((p) => byLabel.get(p) ?? []);
+}
+
+/** The rows the markdown report flags as moved against the first column. */
+export function flagged(options: RenderOptions): string[][] {
+  return options.columns.length === 1 ? [] : flaggedRows(sections(options));
+}
 
 /** Sections a single-column markdown report shows open rather than collapsed. */
 const headline = new Set(["Tag score", "Case score"]);
@@ -162,8 +273,17 @@ export function render(options: RenderOptions): string {
   const out = single
     ? []
     : [
-        `Each cell shows its two-sided permutation p-value against ${labels[0]}, and * marks p < ${alpha}. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
+        `${legend(labels[0] ?? "base", alpha)} all/<arm> pools every case's runs. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
       ];
+  const { missing } = costRatios(options.columns);
+  const hasCost = options.columns.some((c) =>
+    [...c.values()].some((cell) => cell.runCost.length > 0),
+  );
+  const missingNote =
+    hasCost && missing.some((n) => n > 0)
+      ? `Runs skipped for cost, missing costUsd: ${labels.map((l, i) => `${l} ${missing[i] ?? 0}`).join(", ")}.\n`
+      : undefined;
+  if (missingNote !== undefined) out.push(missingNote);
   if (!options.markdown) {
     for (const [title, head, rows] of all) out.push(title, table([[...head, ...labels], ...rows]));
     return out.join("\n");
@@ -181,17 +301,13 @@ export function render(options: RenderOptions): string {
     return out.join("\n");
   }
 
-  const flagged = all.flatMap(([title, head, rows]) =>
-    rows.filter(starred).map((r) => {
-      const cells = [title, r.slice(0, head.length).join(" · ")];
-      cells.push(...r.slice(head.length));
-      return cells;
-    }),
-  );
+  const lead = ["measure", "row", ...labels];
+  if (options.rows !== undefined && options.rows.length > 0) {
+    out.push(`#### Targets and Guards\n\n${markdown(lead, namedRows(all, options.rows))}\n`);
+  }
+  const moved = flaggedRows(all);
   out.push(
-    flagged.length > 0
-      ? markdown(["measure", "row", ...labels], flagged)
-      : "No row moved past the noise rule.",
+    `#### Starred\n\n${moved.length > 0 ? markdown(lead, moved) : "No row moved past the noise rule."}`,
   );
   for (const [title, head, rows] of all) {
     out.push(

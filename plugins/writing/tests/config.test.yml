@@ -1,0 +1,213 @@
+- name: flags a single splice in markdown
+  format: .md
+  input: &spliced |
+    The cache starts cold; the first request fills it.
+  contains: [ai-tells.SemicolonUsage]
+- name: flags a splice in a message
+  format: .prbody
+  input: *spliced
+  contains: [ai-tells.SemicolonUsage]
+- name: leaves code-comment splices to CommentSplice
+  about: SemicolonUsage also fired on semicolons inside quoted attributes in comments.
+  format: .ts
+  input: |
+    // The cache starts cold; the first request fills it.
+    const x = 1;
+  contains: [Writing.CommentSplice]
+  absent: ai-tells.SemicolonUsage
+
+- name: allows a double hyphen in an argument hint
+  about: DoubleHyphen fired on CLI flags in frontmatter, which the model cannot rewrite.
+  format: .md
+  input: |
+    ---
+    argument-hint: "[--base <ref>] [--force]"
+    ---
+
+    Pass --force to skip the check.
+  absent: ai-tells.DoubleHyphen
+
+- name: flags a consequence clause once
+  about: ConsequenceClause owns the determiner-subject ", so" that ConsequenceChain also reported.
+  format: .md
+  input: |
+    The worker drains the queue, so the scheduler skips the next tick.
+  want: |
+    1:28:ai-tells.ConsequenceClause:AI consequence clause: ', so the scheduler skips'. End the sentence before the comma and state the effect as its own claim.
+
+- name: a spliced code comment fires
+  format: .ts
+  input: |
+    // keep sorted; callers rely on order
+    const x = 1;
+  contains: [Writing.CommentSplice]
+- name: commented-out code is not a splice
+  format: .ts
+  input: |
+    // foo(); bar()
+    const x = 1;
+  absent: Writing.CommentSplice
+- name: a semicolon in a string literal is not a splice
+  format: .ts
+  input: |
+    const label = "cold start; warm later";
+  absent: Writing.CommentSplice
+- name: hex colors in an HTML style block are not splices
+  format: .html
+  input: |
+    <style>
+    /* Dark palette. */
+    :root { --bg: #12151b; --surface: #1a1e26; --fg: #e4e8ef; --muted: #98a1b0; --line: #2c323d;
+      --accent: #6c9cf0; --accent-fg: #0d1117; --chip: #232934; --good: #4cc27f; color-scheme: dark; }
+    </style>
+  absent: [Writing.CommentSplice, ai-tells.SemicolonUsage]
+- name: an SVG style block and style attribute are not prose
+  format: .svg
+  input: |
+    <svg xmlns="http://www.w3.org/2000/svg">
+    <style>.cap { font-size: 12px; letter-spacing: 1.2px; font-weight: 600; }</style>
+    <text class="cap" style="fill: red; font-size: 9px;">Cold start; warm later.</text>
+    </svg>
+  absent: [ai-tells.SemicolonUsage]
+- name: CSS declarations are not prose
+  format: .css
+  input: |
+    .cap { font-size: 12px; letter-spacing: 1.2px; font-weight: 600; }
+  absent: [ai-tells.SemicolonUsage]
+- name: a CSS comment is prose
+  format: .css
+  input: |
+    /* The cache starts cold; the first request fills it. */
+    .cap { font-size: 12px; }
+  contains: [Writing.CommentSplice]
+
+- name: a trope in a code comment fires
+  format: .ts
+  input: |
+    // All 8 tests pass
+    const x = 1;
+  contains: [Writing.TestResultReporting]
+- name: a trope in a string literal is skipped
+  format: .ts
+  input: |
+    const msg = "All 8 tests pass";
+  absent: Writing.TestResultReporting
+- name: block comments are linted
+  format: .ts
+  input: |
+    /**
+     * The cache — cold at first — warms up.
+     */
+    const x = 1;
+  contains: [ai-tells.EmDashUsage]
+
+- name: a salutation fires in a PR body
+  format: .prbody
+  input: &salutation |
+    Hi Dana, this fires for the entire run rather than the changed files.
+  contains: [Writing.Salutation]
+- name: a salutation is off in a markdown file
+  format: .md
+  input: *salutation
+  absent: Writing.Salutation
+- name: a connective opener is not a salutation
+  format: .prbody
+  input: |
+    Otherwise, this looks right.
+  absent: Writing.Salutation
+- name: a consequence clause fires in a commit message
+  format: .commitmsg
+  input: |
+    The handler reads the cache, so the event costs no extra query.
+  contains: [ai-tells.ConsequenceClause]
+
+- name: the section template on a short PR body fires
+  format: .prbody
+  input: |
+    Adds a flag.
+
+    ## Changes
+
+    - Adds `--verbose`
+
+    ## Testing
+
+    Manual.
+  contains: [Writing.TemplateOnSmallDocument]
+
+- name: a bold label in a string literal is skipped
+  format: .ts
+  input: |
+    const help = "**Note:** run the installer first.";
+  absent: Writing.BoldLabel
+
+- name: a tool name in a heading is accepted by the vocabulary
+  format: .md
+  input: |
+    ## Profiling With py-spy on macOS
+
+    Text.
+  absent: Writing.TitleCaseHeading
+
+- name: flags commit self-narration in a commit message
+  format: .commitmsg
+  input: &self-narration |
+    Retry the upload on a timeout
+
+    This commit adds a retry around the upload call.
+  contains: [ai-tells-commits.CommitSelfReference]
+- name: flags commit self-narration in a PR body
+  format: .prbody
+  input: *self-narration
+  contains: [ai-tells-commits.CommitSelfReference]
+- name: flags commit self-narration in a review body
+  format: .reviewbody
+  input: |
+    This commit adds a retry, but the timeout still applies to the first attempt.
+  contains: [ai-tells-commits.CommitSelfReference]
+- name: allows commit self-narration in a markdown file
+  format: .md
+  input: *self-narration
+  absent: ai-tells-commits.CommitSelfReference
+
+- name: flags a past-tense subject in a commit message
+  format: .commitmsg
+  input: &past-subject |
+    Added a retry around the upload call
+  contains: [ai-tells-commits.CommitPastTense]
+- name: allows a past-tense opening line in a PR body
+  about: CommitPastTense anchors on the first line as a commit subject, which a PR body does not have.
+  format: .prbody
+  input: *past-subject
+  absent: ai-tells-commits.CommitPastTense
+
+- name: allows the harness attribution trailer
+  format: .commitmsg
+  input: |
+    Retry the upload on a timeout
+
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+  absent: ai-tells-commits.CommitAttribution
+- name: allows the index as the session index
+  format: .commitmsg
+  input: |
+    Count denied calls in the index
+
+    The index now records each denied call with its reason.
+  absent: ai-tells-commits.CommitGitJargon
+
+- name: allows literal hand-work in a message
+  about: CommitFigurativeVerbs reads "by hand" and "hand-written" as figures, and they were literal in every sampled commit.
+  format: .commitmsg
+  input: |
+    Rebuild the fixtures by hand
+
+    The hand-written cases stay beside the generated ones.
+  absent: ai-tells-commits.CommitFigurativeVerbs
+- name: flags an inanimate subject that arrives
+  format: .commitmsg
+  input: |
+    Report the gate outcome
+
+    The outcome arrives after the turn ends.
+  contains: [ai-tells-commits.CommitFigurativeVerbs]

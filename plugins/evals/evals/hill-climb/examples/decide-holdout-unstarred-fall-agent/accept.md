@@ -1,0 +1,3 @@
+---
+fail: [decision, reason]
+---

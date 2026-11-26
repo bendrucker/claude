@@ -4,6 +4,7 @@ import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { table } from "table";
 import { z } from "zod";
+import { tracePath } from "../../../../../packages/evals/layout";
 import { type Run, Result, score } from "../../../../../packages/evals/result";
 import { traceReply } from "../../../../../packages/evals/trace";
 import { CHECKS, ROWS, checkKeys } from "../limits";
@@ -96,7 +97,7 @@ export async function applyLimits(results: string, out: string): Promise<Counts>
         Object.entries(c.arms).map(async ([arm, runs]) => {
           const next = await Promise.all(
             runs.map(async (run, i) => {
-              const file = Bun.file(join(results, "traces", `${c.name}-${arm}-${i}.jsonl`));
+              const file = Bun.file(tracePath(results, c.name, arm, i));
               if (!(await file.exists())) return run;
               const limited = limitRun(run, arm, await file.text());
               for (const g of limited.graders.filter((x) => names.has(x.name))) {
@@ -145,7 +146,7 @@ export function render(counts: Counts): string {
 
 const program = new Command()
   .description(
-    "Add visible-words, max-block, prose-code-spans, path-spans, contrast-phrases, hidden-words, and list-items rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
+    "Add a row per limit and guard check to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
   )
   .argument("<results-dir...>", "results directories holding aggregate-result.json and traces/")
   .action(async (dirs) => {

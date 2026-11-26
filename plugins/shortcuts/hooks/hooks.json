@@ -8,7 +8,8 @@
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/open.ts\"",
-            "if": "Bash(open:*)"
+            "if": "Bash(open:*)",
+            "onFailure": "block"
           }
         ]
       }

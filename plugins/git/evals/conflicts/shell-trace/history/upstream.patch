@@ -1,0 +1,8 @@
+diff --git a/docs/upgrading.md b/docs/upgrading.md
+new file mode 100644
+--- /dev/null
++++ b/docs/upgrading.md
+@@ -0,0 +1,3 @@
++# Upgrading
++
++The nightly job pulls `main` and runs the installers again.

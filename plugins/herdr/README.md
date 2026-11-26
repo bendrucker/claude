@@ -31,4 +31,4 @@ claude = [
 
 ## Tests
 
-`bun test plugins/herdr` runs the skill's bun tests, and `bun scripts/mod-test.ts herdr` runs the mod's.
+`bun scripts/mod-test.ts herdr` runs the mod's tests.

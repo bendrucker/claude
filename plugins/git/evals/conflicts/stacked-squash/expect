@@ -1,0 +1,5 @@
+4b12c1bdd17ccd1b4d04ad4be342da27379e1dee .claude-plugin/marketplace.json
+8aa7e6315178115c928f0a6d89f2a6d5f678c4a0 plugins/mod-events/.claude-plugin/plugin.json
+1c0601fb3b48581354c270799a7fea36961c57e6 plugins/mod-events/README.md
+e4c5793cf46ac854eeb66a20bbfca42260fabe9c plugins/mod-events/mod/register.ts
+b529df97336d087c19264f830cab234dfbbdfe81 plugins/mod-events/types/index.d.ts

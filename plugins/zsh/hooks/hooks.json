@@ -1,5 +1,5 @@
 {
-  "description": "Quotes flag globs, =words, and URLs that zsh would expand in Bash commands, sets cshnullglob so a glob with no match drops out when another in the command matched, and explains zsh errors in the result",
+  "description": "Unsets nomatch and equals so zsh passes an unmatched glob or an =word through as written, as bash does, and explains zsh errors in the result",
   "modules": ["../mod/register.ts"],
   "hooks": {
     "SessionStart": [
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -z \"$CLAUDE_ENV_FILE\" ] || grep -qs cshnullglob \"$CLAUDE_ENV_FILE\" || echo 'if [ -n \"$ZSH_VERSION\" ]; then setopt cshnullglob; fi' >> \"$CLAUDE_ENV_FILE\"",
+            "command": "[ -z \"$CLAUDE_ENV_FILE\" ] || grep -qs 'unsetopt nomatch' \"$CLAUDE_ENV_FILE\" || echo 'if [ -n \"$ZSH_VERSION\" ]; then unsetopt nomatch equals; fi' >> \"$CLAUDE_ENV_FILE\"",
             "timeout": 5
           }
         ]

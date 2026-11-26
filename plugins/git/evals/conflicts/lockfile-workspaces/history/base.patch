@@ -1,0 +1,56 @@
+diff --git a/bun.lock b/bun.lock
+new file mode 100644
+index 0000000..5f24a54
+--- /dev/null
++++ b/bun.lock
+@@ -0,0 +1,20 @@
++{
++  "lockfileVersion": 2,
++  "configVersion": 1,
++  "workspaces": {
++    "": {
++      "name": "agents",
++    },
++    "packages/judge": {
++      "name": "@agents/judge",
++      "dependencies": {
++        "zod": "^4.4.3",
++      },
++    },
++  },
++  "packages": {
++    "@agents/judge": ["@agents/judge@workspace:packages/judge"],
++
++    "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
++  }
++}
+diff --git a/package.json b/package.json
+new file mode 100644
+index 0000000..2ec4a2c
+--- /dev/null
++++ b/package.json
+@@ -0,0 +1,5 @@
++{
++  "name": "agents",
++  "private": true,
++  "workspaces": ["packages/*"]
++}
+diff --git a/packages/judge/index.ts b/packages/judge/index.ts
+new file mode 100644
+index 0000000..cb0ff5c
+--- /dev/null
++++ b/packages/judge/index.ts
+@@ -0,0 +1 @@
++export {};
+diff --git a/packages/judge/package.json b/packages/judge/package.json
+new file mode 100644
+index 0000000..4f0fb61
+--- /dev/null
++++ b/packages/judge/package.json
+@@ -0,0 +1,6 @@
++{
++  "name": "@agents/judge",
++  "private": true,
++  "type": "module",
++  "dependencies": { "zod": "^4.4.3" }
++}

@@ -1,0 +1,625 @@
+diff --git a/.prettierrc b/.prettierrc
+new file mode 100644
+index 0000000..c563e85
+--- /dev/null
++++ b/.prettierrc
+@@ -0,0 +1,4 @@
++{
++  "printWidth": 80,
++  "singleQuote": true
++}
+diff --git a/src/args.test.ts b/src/args.test.ts
+index 103312f..d953023 100644
+--- a/src/args.test.ts
++++ b/src/args.test.ts
+@@ -1,57 +1,56 @@
+-import { describe, expect, test } from "bun:test";
++import { describe, expect, test } from 'bun:test';
+ import {
+   buildDispatchArgs,
+   PERMISSION_MODES,
+   type PermissionMode,
+   parseBackgroundedId,
+   parsePermissionMode,
+-} from "./args";
++} from './args';
+ 
+ const ESC = String.fromCharCode(27);
+ const modeRows: [PermissionMode][] = PERMISSION_MODES.map((mode) => [mode]);
+ 
+-describe("buildDispatchArgs", () => {
+-  test("omitted permissionMode dispatches the review agent in the background", () => {
+-    expect(buildDispatchArgs({ url: "https://github.com/o/r/pull/1" })).toEqual([
+-      "--bg",
+-      "--agent",
+-      "review:review",
+-      "https://github.com/o/r/pull/1",
+-    ]);
++describe('buildDispatchArgs', () => {
++  test('omitted permissionMode dispatches the review agent in the background', () => {
++    expect(buildDispatchArgs({ url: 'https://github.com/o/r/pull/1' })).toEqual(
++      ['--bg', '--agent', 'review:review', 'https://github.com/o/r/pull/1'],
++    );
+   });
+ 
+-  test.each(modeRows)("mode %s appears once, just before the url", (mode) => {
+-    const args = buildDispatchArgs({ url: "URL", permissionMode: mode });
++  test.each(modeRows)('mode %s appears once, just before the url', (mode) => {
++    const args = buildDispatchArgs({ url: 'URL', permissionMode: mode });
+ 
+-    expect(args.filter((a) => a === "--permission-mode")).toHaveLength(1);
++    expect(args.filter((a) => a === '--permission-mode')).toHaveLength(1);
+ 
+-    const flagIndex = args.indexOf("--permission-mode");
++    const flagIndex = args.indexOf('--permission-mode');
+     expect(args[flagIndex + 1]).toBe(mode);
+-    expect(args[flagIndex + 2]).toBe("URL");
+-    expect(args.at(-1)).toBe("URL");
++    expect(args[flagIndex + 2]).toBe('URL');
++    expect(args.at(-1)).toBe('URL');
+   });
+ });
+ 
+-describe("parseBackgroundedId", () => {
++describe('parseBackgroundedId', () => {
+   test.each<[string, string, string | null]>([
+     [
+-      "ansi-wrapped id",
++      'ansi-wrapped id',
+       `backgrounded · ${ESC}[36me80ff70a${ESC}[39m\n  claude agents\n`,
+-      "e80ff70a",
++      'e80ff70a',
+     ],
+-    ["plain id", "backgrounded · 4b7077bc\n", "4b7077bc"],
+-    ["absent", "some other output\n", null],
+-  ])("%s", (_name, stdout, expected) => {
++    ['plain id', 'backgrounded · 4b7077bc\n', '4b7077bc'],
++    ['absent', 'some other output\n', null],
++  ])('%s', (_name, stdout, expected) => {
+     expect(parseBackgroundedId(stdout)).toBe(expected);
+   });
+ });
+ 
+-describe("parsePermissionMode", () => {
+-  test.each(modeRows)("returns %s for a valid mode", (mode) => {
++describe('parsePermissionMode', () => {
++  test.each(modeRows)('returns %s for a valid mode', (mode) => {
+     expect(parsePermissionMode(mode)).toBe(mode);
+   });
+ 
+-  test("throws for an unknown mode", () => {
+-    expect(() => parsePermissionMode("nope")).toThrow("Invalid permission mode: nope");
++  test('throws for an unknown mode', () => {
++    expect(() => parsePermissionMode('nope')).toThrow(
++      'Invalid permission mode: nope',
++    );
+   });
+ });
+diff --git a/src/args.ts b/src/args.ts
+index 187f946..fabe07e 100644
+--- a/src/args.ts
++++ b/src/args.ts
+@@ -1,4 +1,9 @@
+-export const PERMISSION_MODES = ["default", "acceptEdits", "plan", "bypassPermissions"] as const;
++export const PERMISSION_MODES = [
++  'default',
++  'acceptEdits',
++  'plan',
++  'bypassPermissions',
++] as const;
+ 
+ export type PermissionMode = (typeof PERMISSION_MODES)[number];
+ 
+@@ -6,7 +11,7 @@ export function parsePermissionMode(value: string): PermissionMode {
+   const mode = PERMISSION_MODES.find((m) => m === value);
+   if (mode == null) {
+     throw new Error(
+-      `Invalid permission mode: ${value} (expected one of ${PERMISSION_MODES.join(", ")})`,
++      `Invalid permission mode: ${value} (expected one of ${PERMISSION_MODES.join(', ')})`,
+     );
+   }
+   return mode;
+@@ -28,10 +33,10 @@ export function buildDispatchArgs({
+   permissionMode?: PermissionMode | undefined;
+ }): string[] {
+   return [
+-    "--bg",
+-    "--agent",
+-    "review:review",
+-    ...(permissionMode != null ? ["--permission-mode", permissionMode] : []),
++    '--bg',
++    '--agent',
++    'review:review',
++    ...(permissionMode != null ? ['--permission-mode', permissionMode] : []),
+     url,
+   ];
+ }
+@@ -42,7 +47,7 @@ export function buildDispatchArgs({
+ // match skips. Returns null when the line is absent (an older claude, or a
+ // launch failure that still exited zero).
+ export function parseBackgroundedId(stdout: string): string | null {
+-  const clean = stdout.replaceAll(/\[[0-9;]*m/g, "");
++  const clean = stdout.replaceAll(/\[[0-9;]*m/g, '');
+   const match = clean.match(/backgrounded[^0-9a-f]*([0-9a-f]{6,})/i);
+   return match?.[1] ?? null;
+ }
+diff --git a/src/effort.test.ts b/src/effort.test.ts
+index 8e76641..ebcc31e 100644
+--- a/src/effort.test.ts
++++ b/src/effort.test.ts
+@@ -1,33 +1,33 @@
+-import { describe, expect, test } from "bun:test";
+-import { type EffortMarker, effortGlyph, effortMarker } from "./effort";
++import { describe, expect, test } from 'bun:test';
++import { type EffortMarker, effortGlyph, effortMarker } from './effort';
+ 
+-describe("effortMarker", () => {
++describe('effortMarker', () => {
+   test.each<[string | null | undefined, EffortMarker | null]>([
+-    ["low", { glyph: "∙", isDefault: false }],
+-    ["medium", { glyph: "⁚", isDefault: false }],
+-    ["high", { glyph: "⁝", isDefault: true }],
+-    ["xhigh", { glyph: "⁞", isDefault: false }],
+-    ["max", { glyph: "⁙", isDefault: false }],
+-    ["unknown", null],
+-    ["", null],
++    ['low', { glyph: '∙', isDefault: false }],
++    ['medium', { glyph: '⁚', isDefault: false }],
++    ['high', { glyph: '⁝', isDefault: true }],
++    ['xhigh', { glyph: '⁞', isDefault: false }],
++    ['max', { glyph: '⁙', isDefault: false }],
++    ['unknown', null],
++    ['', null],
+     [null, null],
+     [undefined, null],
+-  ])("level %p -> %p", (level, expected) => {
++  ])('level %p -> %p', (level, expected) => {
+     expect(effortMarker(level)).toEqual(expected);
+   });
+ });
+ 
+-describe("effortGlyph", () => {
++describe('effortGlyph', () => {
+   test.each<[string | number | null | undefined, string | null]>([
+-    ["low", "∙"],
+-    ["high", "⁝"],
+-    ["max", "⁙"],
+-    ["unknown", null],
++    ['low', '∙'],
++    ['high', '⁝'],
++    ['max', '⁙'],
++    ['unknown', null],
+     [20_000, null],
+     [0, null],
+     [null, null],
+     [undefined, null],
+-  ])("effort %p -> %p", (effort, expected) => {
++  ])('effort %p -> %p', (effort, expected) => {
+     expect(effortGlyph(effort)).toBe(expected);
+   });
+ });
+diff --git a/src/effort.ts b/src/effort.ts
+index 43171a8..9773230 100644
+--- a/src/effort.ts
++++ b/src/effort.ts
+@@ -2,16 +2,16 @@
+ // count grows with effort, and the dots sit on the text baseline so the glyph
+ // aligns with the model letter rather than floating like braille.
+ const EFFORT_GLYPHS: Record<string, string> = {
+-  low: "∙",
+-  medium: "⁚",
+-  high: "⁝",
+-  xhigh: "⁞",
+-  max: "⁙",
++  low: '∙',
++  medium: '⁚',
++  high: '⁝',
++  xhigh: '⁞',
++  max: '⁙',
+ };
+ 
+ // The un-highlighted level. Effort at any other level renders in the accent
+ // color so an off-default session config stands out.
+-const DEFAULT_EFFORT = "high";
++const DEFAULT_EFFORT = 'high';
+ 
+ export interface EffortMarker {
+   glyph: string;
+@@ -21,9 +21,9 @@ export interface EffortMarker {
+ // Null when the level is unknown or the model reports no effort, so the segment
+ // simply drops rather than rendering a placeholder.
+ export function effortMarker(level?: string | null): EffortMarker | null {
+-  if (level == null || level === "") return null;
++  if (level == null || level === '') return null;
+   const glyph = EFFORT_GLYPHS[level];
+-  if (glyph == null || glyph === "") return null;
++  if (glyph == null || glyph === '') return null;
+   return { glyph, isDefault: level === DEFAULT_EFFORT };
+ }
+ 
+@@ -31,6 +31,6 @@ export function effortMarker(level?: string | null): EffortMarker | null {
+ // Nothing on the ramp represents one, and a bare number in the meta would read
+ // as a second token count, so integer efforts render nothing.
+ export function effortGlyph(effort?: string | number | null): string | null {
+-  if (typeof effort !== "string") return null;
++  if (typeof effort !== 'string') return null;
+   return effortMarker(effort)?.glyph ?? null;
+ }
+diff --git a/src/metrics.test.ts b/src/metrics.test.ts
+index 345b4f5..d5b759d 100644
+--- a/src/metrics.test.ts
++++ b/src/metrics.test.ts
+@@ -1,16 +1,26 @@
+-import { expect, test } from "bun:test";
+-import { pairedP, score } from "./metrics";
++import { expect, test } from 'bun:test';
++import { pairedP, score } from './metrics';
+ 
+ test.each([
+-  ["a hit at rank 1", ["a", "x", "y"], ["a"], { p5: 0.2, recall10: 1, rr: 1 }],
+-  ["a hit at rank 3", ["x", "y", "a"], ["a"], { p5: 0.2, recall10: 1, rr: 1 / 3 }],
+-  ["a hit past 5", ["1", "2", "3", "4", "5", "a"], ["a", "b"], { p5: 0, recall10: 0.5, rr: 1 / 6 }],
+-  ["no hit", [], ["a"], { p5: 0, recall10: 0, rr: 0 }],
+-] as const)("%s", (_, ranked, relevant, expected) => {
++  ['a hit at rank 1', ['a', 'x', 'y'], ['a'], { p5: 0.2, recall10: 1, rr: 1 }],
++  [
++    'a hit at rank 3',
++    ['x', 'y', 'a'],
++    ['a'],
++    { p5: 0.2, recall10: 1, rr: 1 / 3 },
++  ],
++  [
++    'a hit past 5',
++    ['1', '2', '3', '4', '5', 'a'],
++    ['a', 'b'],
++    { p5: 0, recall10: 0.5, rr: 1 / 6 },
++  ],
++  ['no hit', [], ['a'], { p5: 0, recall10: 0, rr: 0 }],
++] as const)('%s', (_, ranked, relevant, expected) => {
+   expect(score([...ranked], [...relevant])).toEqual(expected);
+ });
+ 
+-test("pairedP separates a consistent gain from none", () => {
++test('pairedP separates a consistent gain from none', () => {
+   const base = Array.from({ length: 20 }, () => 0);
+   expect(
+     pairedP(
+diff --git a/src/metrics.ts b/src/metrics.ts
+index 152b93c..0d87bbf 100644
+--- a/src/metrics.ts
++++ b/src/metrics.ts
+@@ -18,7 +18,8 @@ export interface Scored {
+ 
+ export function score(ranked: string[], relevant: string[]): Scored {
+   const want = new Set(relevant);
+-  const hits = (k: number) => ranked.slice(0, k).filter((r) => want.has(r)).length;
++  const hits = (k: number) =>
++    ranked.slice(0, k).filter((r) => want.has(r)).length;
+   const first = ranked.findIndex((r) => want.has(r));
+   return {
+     p5: hits(5) / 5,
+@@ -39,7 +40,12 @@ export function median(xs: number[]): number {
+ }
+ 
+ /** Paired sign-flip permutation test on per-query differences, two-sided. */
+-export function pairedP(a: number[], b: number[], rounds = 10_000, seed = 1): number {
++export function pairedP(
++  a: number[],
++  b: number[],
++  rounds = 10_000,
++  seed = 1,
++): number {
+   const d = a.map((x, i) => x - (b[i] ?? 0));
+   const observed = Math.abs(mean(d));
+   let state = seed;
+@@ -49,7 +55,11 @@ export function pairedP(a: number[], b: number[], rounds = 10_000, seed = 1): nu
+   };
+   let extreme = 0;
+   for (let r = 0; r < rounds; r++) {
+-    if (Math.abs(mean(d.map((x) => (rand() < 0.5 ? -x : x)))) >= observed - 1e-12) extreme++;
++    if (
++      Math.abs(mean(d.map((x) => (rand() < 0.5 ? -x : x)))) >=
++      observed - 1e-12
++    )
++      extreme++;
+   }
+   return (extreme + 1) / (rounds + 1);
+ }
+diff --git a/src/model.test.ts b/src/model.test.ts
+index f55c773..de90988 100644
+--- a/src/model.test.ts
++++ b/src/model.test.ts
+@@ -1,24 +1,27 @@
+-import { describe, expect, test } from "bun:test";
+-import { type ModelMarker, modelMarker } from "./model";
++import { describe, expect, test } from 'bun:test';
++import { type ModelMarker, modelMarker } from './model';
+ 
+-describe("modelMarker", () => {
++describe('modelMarker', () => {
+   test.each<[string, string | null, ModelMarker | null]>([
+-    ["claude-opus-5", null, { letter: "o", isDefault: true }],
+-    ["claude-opus-4-8", null, { letter: "o", isDefault: true }],
+-    ["claude-opus-4-8[1m]", null, { letter: "o", isDefault: true }],
+-    ["claude-sonnet-5", null, { letter: "s", isDefault: false }],
+-    ["claude-haiku-4-5-20251001", null, { letter: "h", isDefault: false }],
+-    ["claude-fable-5", null, { letter: "f", isDefault: false }],
+-    ["claude-newmodel-1", "NewModel 1", { letter: "n", isDefault: false }],
+-    ["claude-unknown-1", null, null],
+-    ["", "Opus", { letter: "o", isDefault: false }],
+-    ["", "", null],
+-    ["", null, null],
+-  ])("id %p / name %p -> %p", (id, name, expected) => {
++    ['claude-opus-5', null, { letter: 'o', isDefault: true }],
++    ['claude-opus-4-8', null, { letter: 'o', isDefault: true }],
++    ['claude-opus-4-8[1m]', null, { letter: 'o', isDefault: true }],
++    ['claude-sonnet-5', null, { letter: 's', isDefault: false }],
++    ['claude-haiku-4-5-20251001', null, { letter: 'h', isDefault: false }],
++    ['claude-fable-5', null, { letter: 'f', isDefault: false }],
++    ['claude-newmodel-1', 'NewModel 1', { letter: 'n', isDefault: false }],
++    ['claude-unknown-1', null, null],
++    ['', 'Opus', { letter: 'o', isDefault: false }],
++    ['', '', null],
++    ['', null, null],
++  ])('id %p / name %p -> %p', (id, name, expected) => {
+     expect(modelMarker(id, name)).toEqual(expected);
+   });
+ 
+-  test("undefined id falls back to display name", () => {
+-    expect(modelMarker(undefined, "Haiku")).toEqual({ letter: "h", isDefault: false });
++  test('undefined id falls back to display name', () => {
++    expect(modelMarker(undefined, 'Haiku')).toEqual({
++      letter: 'h',
++      isDefault: false,
++    });
+   });
+ });
+diff --git a/src/model.ts b/src/model.ts
+index 2428fd9..028305c 100644
+--- a/src/model.ts
++++ b/src/model.ts
+@@ -3,19 +3,19 @@
+ // fallback for ids whose family we don't recognize, so a future model still
+ // gets a letter.
+ 
+-export const MODEL_FAMILIES = ["opus", "sonnet", "haiku", "fable"] as const;
++export const MODEL_FAMILIES = ['opus', 'sonnet', 'haiku', 'fable'] as const;
+ export type ModelFamily = (typeof MODEL_FAMILIES)[number];
+ 
+ const FAMILY_LETTERS: Record<ModelFamily, string> = {
+-  opus: "o",
+-  sonnet: "s",
+-  haiku: "h",
+-  fable: "f",
++  opus: 'o',
++  sonnet: 's',
++  haiku: 'h',
++  fable: 'f',
+ };
+ 
+ // The un-highlighted family. Any other model renders in the accent color so a
+ // non-default model stands out.
+-const DEFAULT_FAMILY: ModelFamily = "opus";
++const DEFAULT_FAMILY: ModelFamily = 'opus';
+ 
+ export interface ModelMarker {
+   letter: string;
+@@ -23,15 +23,23 @@ export interface ModelMarker {
+ }
+ 
+ export function modelFamily(id?: string | null): ModelFamily | null {
+-  const hay = (id ?? "").toLowerCase();
++  const hay = (id ?? '').toLowerCase();
+   return MODEL_FAMILIES.find((family) => hay.includes(family)) ?? null;
+ }
+ 
+-export function modelMarker(id?: string | null, displayName?: string | null): ModelMarker | null {
++export function modelMarker(
++  id?: string | null,
++  displayName?: string | null,
++): ModelMarker | null {
+   const family = modelFamily(id);
+   if (family !== null)
+-    return { letter: FAMILY_LETTERS[family], isDefault: family === DEFAULT_FAMILY };
++    return {
++      letter: FAMILY_LETTERS[family],
++      isDefault: family === DEFAULT_FAMILY,
++    };
+ 
+-  const fallback = (displayName ?? "").match(/[a-z]/i);
+-  return fallback ? { letter: fallback[0].toLowerCase(), isDefault: false } : null;
++  const fallback = (displayName ?? '').match(/[a-z]/i);
++  return fallback
++    ? { letter: fallback[0].toLowerCase(), isDefault: false }
++    : null;
+ }
+diff --git a/src/tags.test.ts b/src/tags.test.ts
+index e576d14..07e0bc8 100644
+--- a/src/tags.test.ts
++++ b/src/tags.test.ts
+@@ -1,87 +1,110 @@
+-import { describe, expect, test } from "bun:test";
+-import { mergeTags, parseTags, resolveTags, type TagResolution } from "./tags";
++import { describe, expect, test } from 'bun:test';
++import { mergeTags, parseTags, resolveTags, type TagResolution } from './tags';
+ 
+-describe("parseTags", () => {
++describe('parseTags', () => {
+   test.each<{ name: string; input: string | undefined; expected: string[] }>([
+-    { name: "undefined", input: undefined, expected: [] },
+-    { name: "empty string", input: "", expected: [] },
+-    { name: "single tag", input: "claude-code", expected: ["claude-code"] },
+-    { name: "comma-separated tags", input: "claude-code,work", expected: ["claude-code", "work"] },
+-    { name: "trims whitespace", input: " claude-code , work ", expected: ["claude-code", "work"] },
++    { name: 'undefined', input: undefined, expected: [] },
++    { name: 'empty string', input: '', expected: [] },
++    { name: 'single tag', input: 'claude-code', expected: ['claude-code'] },
+     {
+-      name: "filters empty segments",
+-      input: "claude-code,,work",
+-      expected: ["claude-code", "work"],
++      name: 'comma-separated tags',
++      input: 'claude-code,work',
++      expected: ['claude-code', 'work'],
+     },
+-  ])("$name", ({ input, expected }) => {
++    {
++      name: 'trims whitespace',
++      input: ' claude-code , work ',
++      expected: ['claude-code', 'work'],
++    },
++    {
++      name: 'filters empty segments',
++      input: 'claude-code,,work',
++      expected: ['claude-code', 'work'],
++    },
++  ])('$name', ({ input, expected }) => {
+     expect(parseTags(input)).toEqual(expected);
+   });
+ });
+ 
+-describe("mergeTags", () => {
++describe('mergeTags', () => {
+   test.each<{ name: string; sources: string[][]; expected: string[] }>([
+-    { name: "returns single source as-is", sources: [["Claude"]], expected: ["Claude"] },
+     {
+-      name: "combines multiple sources",
+-      sources: [["Claude"], ["work"]],
+-      expected: ["Claude", "work"],
++      name: 'returns single source as-is',
++      sources: [['Claude']],
++      expected: ['Claude'],
+     },
+     {
+-      name: "deduplicates across sources",
+-      sources: [["Claude"], ["Claude", "work"]],
+-      expected: ["Claude", "work"],
++      name: 'combines multiple sources',
++      sources: [['Claude'], ['work']],
++      expected: ['Claude', 'work'],
+     },
+     {
+-      name: "preserves insertion order",
+-      sources: [["Claude", "claude-code"], ["work"]],
+-      expected: ["Claude", "claude-code", "work"],
++      name: 'deduplicates across sources',
++      sources: [['Claude'], ['Claude', 'work']],
++      expected: ['Claude', 'work'],
+     },
+-    { name: "handles empty sources", sources: [[], ["Claude"]], expected: ["Claude"] },
+-  ])("$name", ({ sources, expected }) => {
++    {
++      name: 'preserves insertion order',
++      sources: [['Claude', 'claude-code'], ['work']],
++      expected: ['Claude', 'claude-code', 'work'],
++    },
++    {
++      name: 'handles empty sources',
++      sources: [[], ['Claude']],
++      expected: ['Claude'],
++    },
++  ])('$name', ({ sources, expected }) => {
+     expect(mergeTags(...sources)).toEqual(expected);
+   });
+ });
+ 
+-describe("resolveTags", () => {
+-  const existing = ["claude", "review", "Work"];
++describe('resolveTags', () => {
++  const existing = ['claude', 'review', 'Work'];
+ 
+   test.each<{ name: string; requested: string[]; expected: TagResolution }>([
+     {
+-      name: "passes through a known tag",
+-      requested: ["review"],
+-      expected: { resolved: ["review"], unknown: [] },
++      name: 'passes through a known tag',
++      requested: ['review'],
++      expected: { resolved: ['review'], unknown: [] },
+     },
+     {
+-      name: "remaps to the casing Things stores",
+-      requested: ["CLAUDE", "work"],
+-      expected: { resolved: ["claude", "Work"], unknown: [] },
++      name: 'remaps to the casing Things stores',
++      requested: ['CLAUDE', 'work'],
++      expected: { resolved: ['claude', 'Work'], unknown: [] },
+     },
+     {
+-      name: "collapses spellings that differ only in case",
+-      requested: ["claude", "Claude"],
+-      expected: { resolved: ["claude"], unknown: [] },
++      name: 'collapses spellings that differ only in case',
++      requested: ['claude', 'Claude'],
++      expected: { resolved: ['claude'], unknown: [] },
+     },
+     {
+-      name: "names a tag Things does not hold",
+-      requested: ["review", "bug"],
+-      expected: { resolved: ["review"], unknown: ["bug"] },
++      name: 'names a tag Things does not hold',
++      requested: ['review', 'bug'],
++      expected: { resolved: ['review'], unknown: ['bug'] },
+     },
+     {
+-      name: "reports an unknown tag once",
+-      requested: ["bug", "BUG"],
+-      expected: { resolved: [], unknown: ["bug"] },
++      name: 'reports an unknown tag once',
++      requested: ['bug', 'BUG'],
++      expected: { resolved: [], unknown: ['bug'] },
+     },
+     {
+-      name: "keeps requested order",
+-      requested: ["Work", "claude"],
+-      expected: { resolved: ["Work", "claude"], unknown: [] },
++      name: 'keeps requested order',
++      requested: ['Work', 'claude'],
++      expected: { resolved: ['Work', 'claude'], unknown: [] },
+     },
+-    { name: "handles no request", requested: [], expected: { resolved: [], unknown: [] } },
+-  ])("$name", ({ requested, expected }) => {
++    {
++      name: 'handles no request',
++      requested: [],
++      expected: { resolved: [], unknown: [] },
++    },
++  ])('$name', ({ requested, expected }) => {
+     expect(resolveTags(requested, existing)).toEqual(expected);
+   });
+ 
+-  test("rejects everything when Things holds no tags", () => {
+-    expect(resolveTags(["claude"], [])).toEqual({ resolved: [], unknown: ["claude"] });
++  test('rejects everything when Things holds no tags', () => {
++    expect(resolveTags(['claude'], [])).toEqual({
++      resolved: [],
++      unknown: ['claude'],
++    });
+   });
+ });
+diff --git a/src/tags.ts b/src/tags.ts
+index 6a2fbde..6145c7a 100644
+--- a/src/tags.ts
++++ b/src/tags.ts
+@@ -1,7 +1,7 @@
+ export function parseTags(value: string | undefined): string[] {
+-  if (value == null || value === "") return [];
++  if (value == null || value === '') return [];
+   return value
+-    .split(",")
++    .split(',')
+     .map((t) => t.trim())
+     .filter(Boolean);
+ }
+@@ -27,7 +27,10 @@ export interface TagResolution {
+  * Matching folds case because Things does: asking for `CLAUDE` when `claude`
+  * exists names the same tag, and emitting both would send it twice.
+  */
+-export function resolveTags(requested: string[], existing: string[]): TagResolution {
++export function resolveTags(
++  requested: string[],
++  existing: string[],
++): TagResolution {
+   const byFolded = new Map<string, string>();
+   for (const tag of existing) {
+     const folded = tag.toLowerCase();

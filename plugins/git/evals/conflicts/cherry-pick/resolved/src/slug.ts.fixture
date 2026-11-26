@@ -1,0 +1,7 @@
+export function slugify(input: string, max = 64): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, max)
+    .replace(/^-+|-+$/g, "");
+}

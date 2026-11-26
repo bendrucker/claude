@@ -42,8 +42,7 @@ jobs:
         # every reader on that version.
         run: |
           version=$(bun -p 'require("./plugins/observability/package.json").dependencies["@duckdb/node-api"].split("-")[0]')
-          curl -fsSLo "$RUNNER_TEMP/duckdb.zip" "https://github.com/duckdb/duckdb/releases/download/v$version/duckdb_cli-linux-$(dpkg --print-architecture).zip"
-          sudo unzip -q "$RUNNER_TEMP/duckdb.zip" -d /usr/local/bin
+          curl -fsSL "https://github.com/duckdb/duckdb/releases/download/v$version/duckdb-cli-linux-$(dpkg --print-architecture).tar.gz" | sudo tar -xz -C /usr/local/bin duckdb
           curl -fsSLo "$RUNNER_TEMP/awscliv2.zip" "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip"
           unzip -q "$RUNNER_TEMP/awscliv2.zip" -d "$RUNNER_TEMP"
           sudo "$RUNNER_TEMP/aws/install"

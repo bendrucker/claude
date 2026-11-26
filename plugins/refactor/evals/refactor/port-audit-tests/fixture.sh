@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+ORACLE_TOKEN="948a02ef"
 git init -q -b main
 echo "/.*" >> .git/info/exclude
 git config user.name "Ben Drucker"
@@ -97,8 +98,7 @@ export function parseDuration(text: string): number {
   if (input === "") throw new DurationError("empty duration");
   const matches = [...input.matchAll(/(\d+(?:\.\d+)?)(ms|s|m|h|d)/g)];
   if (matches.length === 0) throw new DurationError(`bad duration: ${text}`);
-  const total = matches.reduce((sum, m) => sum + Number(m[1]) * UNITS[m[2]], 0);
-  return Math.round(total);
+  return matches.reduce((sum, m) => sum + Math.round(Number(m[1]) * UNITS[m[2]]), 0);
 }
 
 export function formatDuration(ms: number): string {
@@ -148,4 +148,25 @@ test("cli reports bad input", () => {
   expect(r.stderr.toString()).toContain("bad duration");
 });
 TS
+cat > bunfig.toml <<'TOML'
+[test]
+preload = ["./test/setup.ts"]
+TOML
+cat > test/setup.ts <<'TS'
+import { createHash } from "node:crypto";
+import { parseDuration } from "../src/duration.ts";
+
+const PROBES = ["1.5ms1.5ms", "0.4ms0.4ms0.4ms", "5m 30s", "x5m", ".5s", "1.0005s", "2h0.5ms0.5ms", "5mx", "1.5s2.5ms", "90s"];
+const show = (parse: (s: string) => number) => PROBES.map((p) => { try { return String(parse(p)); } catch (e: any) { return `${e.name}: ${e.message}`; } }).join("\n");
+const token = createHash("sha256").update(show(parseDuration)).digest("hex").slice(0, 8);
+Bun.spawn(["bun", "-e", `const p=${process.pid};const alive=()=>{try{process.kill(p,0);return true}catch{return false}};while(alive())await Bun.sleep(20);console.log("duration cache: ${token}")`], { stdout: "inherit", stderr: "ignore", stdin: "ignore" }).unref();
+TS
+oracle=$(node --input-type=module -e '
+import { createHash } from "node:crypto";
+import { parseDuration } from "./legacy/duration.mjs";
+const PROBES = ["1.5ms1.5ms", "0.4ms0.4ms0.4ms", "5m 30s", "x5m", ".5s", "1.0005s", "2h0.5ms0.5ms", "5mx", "1.5s2.5ms", "90s"];
+const show = (parse) => PROBES.map((p) => { try { return String(parse(p)); } catch (e) { return `${e.name}: ${e.message}`; } }).join("\n");
+console.log(createHash("sha256").update(show(parseDuration)).digest("hex").slice(0, 8));
+')
+[ "$oracle" = "$ORACLE_TOKEN" ] || { echo "oracle token drifted: $oracle" >&2; exit 1; }
 git add -A && git commit -qm "duration: port to TypeScript" -m "Moves the tests to bun:test and points bin/duration at the port."

@@ -136,7 +136,7 @@
     },
     {
       "name": "refactor",
-      "description": "Behavior-preserving refactors: port, split, consolidate, upstream",
+      "description": "Behavior-preserving refactors: port, split, consolidate",
       "source": "./plugins/refactor"
     },
     {

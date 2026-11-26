@@ -1,5 +1,5 @@
 schema_version: "1.1"
-name: upstream-semver
+name: port-upstream-semver
 tags: [dev]
 plugins: ["../../.."]
 runs: 2

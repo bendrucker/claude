@@ -8,7 +8,7 @@ argument-hint: "[<the duplicated logic>]"
 
 Replace the copies of `$ARGUMENTS`, or the logic the user named, with one shared implementation. Every caller of every copy sees the same behavior it saw before. Each copy is the *oracle* for its own callers.
 
-When the copies reimplement a solved problem, such as escaping, parsing, or retries, use [upstream](../upstream/SKILL.md) instead and replace each copy with the library.
+When the copies reimplement a solved problem, such as escaping, parsing, or retries, replace each copy with the library as a [port](../port/references/upstream.md) instead.
 
 ## Inventory
 

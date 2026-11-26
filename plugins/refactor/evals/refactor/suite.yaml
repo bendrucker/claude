@@ -5,8 +5,7 @@ graders:
   skill-fired: "port-*"
   split-fired: "split-*"
   consolidate-fired: "consolidate-*"
-  upstream-fired: "upstream-*"
   compared-both: "port-*"
   old-kept: "port-*"
   quiet: "quiet-*"
-  ran-tests: ["split-*", "consolidate-*", "upstream-*"]
+  ran-tests: ["split-*", "consolidate-*", "port-upstream-*"]

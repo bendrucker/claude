@@ -29,7 +29,6 @@ import {
   reviewrOpenArgs,
   rexReviewArgs,
   type RexReview,
-  rexSurface,
   sessionHost,
   type Host,
   surfaceState,
@@ -257,22 +256,24 @@ describe("sessionHost", () => {
 
 describe("rexReviewArgs", () => {
   test.each<{ name: string; review: RexReview; expected: string[] }>([
-    { name: "working diff", review: {}, expected: ["mode=live"] },
-    { name: "empty base", review: { base: "" }, expected: ["mode=live"] },
+    { name: "working diff", review: {}, expected: [] },
+    { name: "empty base", review: { base: "" }, expected: [] },
     {
       name: "against a base",
       review: { base: "origin/main" },
-      expected: ["revisions=origin/main..HEAD", "mode=live"],
+      expected: ["base=origin/main"],
     },
+    { name: "plannotator ignores batch", review: { batch: true }, expected: [] },
+    { name: "Hunk diff live", review: { app: "hunk" }, expected: ["app=hunk", "mode=live"] },
     {
-      name: "plannotator diff in batch",
-      review: { reviewer: "plannotator", batch: true },
-      expected: ["reviewer=plannotator", "mode=batch"],
+      name: "Hunk diff in batch",
+      review: { app: "hunk", batch: true },
+      expected: ["app=hunk", "mode=batch"],
     },
     {
       name: "a document passes its absolute path and drops diff options",
-      review: { doc: "/repo/tmp/pr-body.md", base: "origin/main", reviewer: "hunk" },
-      expected: ["doc=/repo/tmp/pr-body.md", "mode=live"],
+      review: { doc: "/repo/tmp/pr-body.md", base: "origin/main", app: "hunk" },
+      expected: ["doc=/repo/tmp/pr-body.md"],
     },
   ])("$name", ({ review, expected }) => {
     expect(rexReviewArgs("block:01a1", review)).toEqual([
@@ -287,21 +288,6 @@ describe("rexReviewArgs", () => {
     expect(rexReviewArgs("block:01a1", { doc: "design.md" })).toContain(
       `doc=${join(process.cwd(), "design.md")}`,
     );
-  });
-});
-
-describe("rexSurface", () => {
-  test.each<{ name: string; review: RexReview; expected: string }>([
-    {
-      name: "a document",
-      review: { doc: "pr-body.md", reviewer: "hunk" },
-      expected: "plannotator-tui",
-    },
-    { name: "plannotator diff", review: { reviewer: "plannotator" }, expected: "plannotator-tui" },
-    { name: "Hunk diff", review: { reviewer: "hunk" }, expected: "Hunk" },
-    { name: "diff with no reviewer passed", review: {}, expected: "the diff reviewer" },
-  ])("$name", ({ review, expected }) => {
-    expect(rexSurface(review)).toBe(expected);
   });
 });
 

@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: mac-only
+tags: [dev]
+plugins: ["../.."]
+runs: 2
+execution:
+  model: claude-opus-5-5
+  max_turns: 30
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Bash, Edit, Write]
+  append_system_prompt: >-
+    This is a cloud VM. The user's Mac, Studio, is not attached. The user reads only your final reply.
+context:
+  scaffold_script: fixture.sh

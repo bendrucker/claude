@@ -166,15 +166,17 @@ const instant: Pause = () => Promise.resolve();
 
 const writable: Probe = () => Promise.resolve(null);
 
+const asGiven = (spec: string) => Promise.resolve(spec);
+
 const dispatch = (options: DispatchOptions, run?: Runner, pause?: Pause) =>
-  dispatchWith(options, run, pause, writable);
+  dispatchWith(options, run, pause, writable, asGiven);
 
 const execSession = (
   options: Parameters<typeof execSessionWith>[0],
   run?: Runner,
   pause?: Pause,
   start?: Start,
-) => execSessionWith(options, run, pause, start, writable);
+) => execSessionWith(options, run, pause, start, writable, asGiven);
 
 function recordedPause(): { pause: Pause; pauses: number[] } {
   const pauses: number[] = [];
@@ -1141,7 +1143,7 @@ describe("dispatch worktree", () => {
   test("refuses a read-only worktree admin directory before touching git", async () => {
     const { run, calls } = fakeRunner([GIT_COMMON]);
     const denied: Probe = () => Promise.resolve("/repo/.git/worktrees is not writable");
-    const failure = await failureOf(dispatchWith(makeOptions(), run, instant, denied));
+    const failure = await failureOf(dispatchWith(makeOptions(), run, instant, denied, asGiven));
     expect(failure.message).toBe("/repo/.git/worktrees is not writable");
     expect(failure.partial).toBeNull();
     expect(calls.map((argv) => argv.slice(3, 5))).toEqual([["worktree", "list"]]);
@@ -1181,6 +1183,55 @@ describe("dispatch worktree", () => {
       "https://github.com/owner/repo.git",
       "origin",
     ]);
+  });
+
+  test.each<{ name: string; remotes: CommandResult; head: CommandResult[]; base: string }>([
+    {
+      name: "upstream's default branch when the checkout has an upstream remote",
+      remotes: REMOTE_LIST,
+      head: [ok("upstream/trunk\n")],
+      base: "upstream/trunk",
+    },
+    {
+      name: "upstream/main when upstream names no default branch",
+      remotes: REMOTE_LIST,
+      head: [fail("fatal: ref refs/remotes/upstream/HEAD is not a symbolic ref", 128)],
+      base: "upstream/main",
+    },
+    {
+      name: "origin/main without an upstream remote",
+      remotes: ok("origin\n"),
+      head: [],
+      base: "origin/main",
+    },
+  ])("defaults the base to $name", async ({ remotes, head, base }) => {
+    const { run, calls } = fakeRunner([
+      GIT_COMMON,
+      remotes,
+      NO_BRANCH,
+      ...head,
+      REMOTE_URL,
+      ok(""),
+      NO_BRANCH,
+      BASE_OK,
+      switched(),
+      REX_CREATED,
+      REPORTED_WORKING,
+    ]);
+    await dispatch(makeOptions({ base: undefined }), run, instant);
+    const wt = calls.find((argv) => argv[0] === "wt");
+    expect(wt?.[wt.indexOf("--base") + 1]).toBe(base);
+  });
+
+  test("reports a repository it cannot resolve before touching git", async () => {
+    const { run, calls } = fakeRunner([]);
+    const refuse = () => Promise.reject(new Error("/nowhere does not exist"));
+    const failure = await failureOf(
+      dispatchWith(makeOptions({ repo: "/nowhere" }), run, instant, writable, refuse),
+    );
+    expect(failure.message).toBe("/nowhere does not exist");
+    expect(failure.partial).toBeNull();
+    expect(calls).toEqual([]);
   });
 
   test("fetches the remote the base names", async () => {
@@ -1592,6 +1643,19 @@ describe("dispatch to another host", () => {
     const { run } = fakeRunner([REX_CREATED, REPORTED_WORKING, shown]);
     const { record } = await dispatch(remoteOptions({ branch: "pr:42" }), run, instant);
     expect(record).toMatchObject({ path: REMOTE_PATH, branch: "fix-pr" });
+  });
+
+  test("hands a slug to the host and opens the tab with no working directory", async () => {
+    const { run, calls } = fakeRunner([REX_CREATED, REPORTED_WORKING, WORKING_SCREEN]);
+    await dispatch(
+      remoteOptions({ repo: "backnotprop/plannotator", base: undefined }),
+      run,
+      instant,
+    );
+    const [launch = []] = calls;
+    expect(launch.slice(0, launch.indexOf("--"))).not.toContain("-c");
+    expect(launch).not.toContain("--base");
+    expect(launch[launch.indexOf("--repo") + 1]).toBe("backnotprop/plannotator");
   });
 
   test("leaves no record when the host refuses the tab", async () => {

@@ -1,9 +1,0 @@
-{
-  "name": "plannotator",
-  "description": "Ben's Plannotator review gate, on top of the upstream Plannotator plugin",
-  "dependencies": ["plannotator@plannotator"],
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  }
-}

@@ -118,6 +118,7 @@ An entry earns its place globally only when sandboxed runs of the command fail a
 
 - `git`: escaped in most projects. Sandboxed, it fails where the sandbox protects `.git/config` (`push -u`, `fetch`, `branch` lock the config) and `.claude/` (`worktree add`, `rebase`, and `merge` writing tracked files there), and on the keychain credential helper. Those are too many subcommands to list one by one.
 - `wt`, `claude`: worktree and session control. `wt` creates worktrees outside the session directory.
+- `claude-sync`, `dotfiles-sync`: deploy merged `main` into `~/.claude-repo` and `~/.dotfiles`, as `platform.md` has agents do after a merge. Sandboxed, `claude-sync` can't revert installer-written entries in the deployed `user/settings.json` or relink `~/.claude`. Its dirty-tree gate then stops the sync. The escape lets either command write the settings files the sandbox otherwise protects, limited to what has merged.
 - `agent-browser`: the escape lets the daemon launch Chrome off the egress proxy, which an arbitrary page needs.
 - `open`, `osascript`: Apple Events and Launch Services handoff, which the sandbox cannot model even with `allowAppleEvents`.
 
@@ -160,13 +161,15 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop them** when `Artifact` loads deferred behind ToolSearch, or when relaunching to publish becomes routine.
 
-`PLANNOTATOR_PLAN_REVIEW=false` turns off plan review in the upstream `plannotator@plannotator` plugin, which [`plannotator`](../plugins/plannotator) depends on. Its `ExitPlanMode` and `EnterPlanMode` hooks then pass through, so plan approval stays in Claude Code's own dialog, and its inbox and review commands stay on. The hooks run the `plannotator` binary on `PATH`, which honors the variable from 0.29.1. It is in managed settings because the plugin dependency installs on every platform.
+`PLANNOTATOR_PLAN_REVIEW=false` turns off plan review in the upstream `plannotator@plannotator` plugin, which [`review`](../plugins/review) depends on. Its `ExitPlanMode` and `EnterPlanMode` hooks then pass through, so plan approval stays in Claude Code's own dialog, and its inbox and review commands stay on. The hooks run the `plannotator` binary on `PATH`, which honors the variable from 0.29.1. It is in managed settings because the plugin dependency installs on every platform.
 
-**Drop it** to route plan approval through Plannotator, or when the `plannotator` plugin drops its upstream dependency.
+**Drop it** to route plan approval through Plannotator, or when `review` drops its upstream dependency.
 
 `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1` turns on [Code Mode](https://code.claude.com/docs/en/code-mode), where Claude writes JavaScript that makes several tool calls in one `REPL` step. It lives in `user/settings.json` because Claude Code ignores it in project settings, managed settings can only turn it off, and cloud sessions don't support it. Each call inside the code still passes `deny` and `ask` rules and `PreToolUse` hooks under its own tool name, but the auto-mode classifier reviews the code as a whole and not the run-time values it computes. It needs Claude Code 2.1.329 or later, where a mod that hooks tool calls no longer keeps it off. Earlier versions start without it and name the blocking mod on the startup line and in `/status`. A session started in Code Mode resumes only with it on. It is working while the session index records `REPL` tool calls on the Mac.
 
 **Drop it** if no session records a `REPL` call within two weeks, if it regresses latency or tokens per task, or when Code Mode leaves experimental status.
+
+`PLANNOTATOR_INBOX_NOTES=0` keeps an Inbox that an agent starts from writing its note to `~/.claude/rules/plannotator-inbox.md`. That path is this repo's `user/rules`, and the note would load into every session and steer decisions away from `AskUserQuestion`, which blocks in Rex and Moshi where Ben can answer it. Agents keep the `plannotator_inbox` tool. It is in user settings because the Inbox runs only on local machines. The launchd agent in dotfiles sets the same variable for the Inbox it starts. **Drop it** to have agents send decisions to the Inbox unprompted.
 
 ## Compaction
 
@@ -220,7 +223,7 @@ Rex's `SessionStart` entry is absent from the tracked file. `rex skill setup` ad
 
 `prependPlugins` is empty in `managed/settings.json`. On a machine with managed settings, Claude Code seats its built-in `sec-default@builtin` outermost unless this list is set. Seated there, it skips user-tier plugin hooks like `plan` and `plannotator`, and these self-authored managed settings don't need its guard. An empty list counts as set, so it leaves sec-default unseated (verified against CLI 2.1.304). **List a plugin** here when a managed plugin should run outermost.
 
-`enabledPlugins` in `managed/settings.json` enables `herdr`, `load`, and `plan`, which hook events Claude Code passes over for plugins a user installs (the `classic.*` events and ones like `session.compact` and `prompt.attachment`) whenever managed settings are present. A plugin counts as the organization's own, and runs those hooks, only when managed settings enable it and declare its marketplace as a local directory that lists it by a relative path, which the local drop-in does (verified against CLI 2.1.327). **Move a plugin** here when `/plugin` warns that its hooks "do not run here". **Move them back** to `user/settings.json` if Claude Code stops passing over these events for user-installed plugins.
+`enabledPlugins` in `managed/settings.json` enables `github`, `gitlab`, `herdr`, `load`, and `plan`, which hook events Claude Code passes over for plugins a user installs (the `classic.*` events and ones like `session.compact` and `prompt.attachment`) whenever managed settings are present. A plugin counts as the organization's own, and runs those hooks, only when managed settings enable it and declare its marketplace as a local directory that lists it by a relative path, which the local drop-in does (verified against CLI 2.1.327). **Move a plugin** here when `/plugin` warns that its hooks "do not run here". **Move them back** to `user/settings.json` if Claude Code stops passing over these events for user-installed plugins.
 
 `pluginConfigs` sets `load@bendrucker` for these Macs, where an agent's heavy work slows everything else on the machine. Cloud sessions never read this file, so there the mod stays inert and can saturate the VM. The caps are generous backstops: 4 builds and test runs, and 4 DuckDB processes. Reminders start at 1.5x load per core (`remind`), turn firm at 3x (`warn`), and capped commands are refused above 4x (`refuse`). **Tighten a cap** when `cap.start` events show its pool full during a slowdown. **Raise `remind`** if `pace` events fire on a machine that still feels responsive.
 

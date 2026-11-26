@@ -126,6 +126,15 @@ jobs:
           REF: ${{ inputs.ref }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          # On Linux the runner denies Bash writes to every temp dir it finds
+          # (os.tmpdir(), $TMPDIR, /tmp, /var/tmp), yet creates each session's
+          # home and tmp under os.tmpdir(), so every write and the shell's cwd
+          # file hit a read-only bind. It drops a relative $TMPDIR from that
+          # deny list, so point it, relative, at a dir outside those and $HOME.
+          # Remove once claude plugin eval exempts its own root on Linux.
+          sudo install -d -o "$USER" /srv/claude-eval
+          TMPDIR=$(realpath --relative-to=. /srv/claude-eval)
+          export TMPDIR
           ref=()
           if [ -n "$REF" ]; then
             # git fetch takes a full SHA only, so resolve a short one, or a

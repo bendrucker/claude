@@ -124,7 +124,8 @@ describe("classifier query", () => {
         "permission-decision | Read |  | 1 | 0 | 0 | 0",
       ]
     `);
-  });
+    // Indexing from empty can download the community extensions on a cold runner.
+  }, 60_000);
 });
 
 describe("telemetry ingest", () => {

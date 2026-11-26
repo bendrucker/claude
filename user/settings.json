@@ -184,16 +184,13 @@
     "go@bendrucker": true,
     "mac@bendrucker": true,
     "git@bendrucker": true,
-    "gitlab@bendrucker": true,
     "linear@bendrucker": true,
     "things@bendrucker": true,
     "issue@bendrucker": true,
     "review@bendrucker": true,
     "hunk@bendrucker": true,
-    "plannotator@bendrucker": true,
     "plannotator@plannotator": true,
     "newline@bendrucker": true,
-    "github@bendrucker": true,
     "observability@bendrucker": true,
     "plugin@bendrucker": true,
     "agents@bendrucker": true,
@@ -379,6 +376,8 @@
       "git:*",
       "wt:*",
       "claude:*",
+      "claude-sync:*",
+      "dotfiles-sync:*",
       "agent-browser:*",
       "open:*",
       "osascript:*",
@@ -411,6 +410,7 @@
     "NODE_USE_ENV_PROXY": "1",
     "AGENT_BROWSER_IDLE_TIMEOUT_MS": "600000",
     "CLAUDE_CODE_DISABLE_ARTIFACT": "1",
-    "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "1"
+    "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "1",
+    "PLANNOTATOR_INBOX_NOTES": "0"
   }
 }

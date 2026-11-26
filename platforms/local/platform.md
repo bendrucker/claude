@@ -50,7 +50,9 @@ To show me an image (PNG, JPEG, or SVG), open a pane and render it with `chafa -
 
 Edit `bendrucker/claude` at `~/src/bendrucker/claude`. `claude-sync` updates `~/.claude-repo` from `main`, so a merged change goes live only after that sync runs. Dotfiles are deployed at `~/.dotfiles`.
 
-When work in another repo needs a change in either repo, hand it to a sibling agent through `dispatch:dispatch` and report the PR back to me. Where dispatch can't run, queue it with `spawn_task`, or tell me the change.
+When work in another repo needs a change in either repo, hand it to a sibling agent through `dispatch:dispatch` and report the PR back to me. Where dispatch can't run, queue it with `spawn_task`.
+
+After a change to either repo merges, run `claude-sync` or `dotfiles-sync` yourself so it goes live. If the sandbox or the classifier refuses one, propose the rule that lets it run.
 
 When an `aws --profile` call fails on an expired SSO session, run `aws sso login --profile <name> --use-device-code` in the background and send me the URL and code it prints. I approve it on my phone and the command exits. The default flow redirects to localhost, which a phone never reaches.
 

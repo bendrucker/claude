@@ -34,6 +34,9 @@ describe("selectSuites", () => {
     "plugins/p/evals/local/.local-only": "",
     "plugins/p/evals/notes/README.md": "no cases",
     "plugins/q/skills/s/SKILL.md": "",
+    "plugins/q/.claude-plugin/plugin.json": '{ "dependencies": ["upstream@elsewhere", "r@home"] }',
+    "plugins/r/.claude-plugin/plugin.json": "{}",
+    ".claude-plugin/marketplace.json": '{ "name": "home" }',
     "evals/user/tdd/suite.yaml":
       "wrap:\n  skills: [user/skills/tdd]\n  context: [user/rules/ts.md]\n",
     "evals/user/tdd/one/case.yaml": "plugins: [../.., ../../../../plugins/q]\n",
@@ -54,6 +57,11 @@ describe("selectSuites", () => {
     {
       name: "a plugin the cases load runs the suite",
       changed: ["plugins/q/skills/s/SKILL.md"],
+      expected: ["evals/user/tdd", "plugins/p/evals/b"],
+    },
+    {
+      name: "a dependency qualified with the repo's marketplace, past one from another",
+      changed: ["plugins/r/.claude-plugin/plugin.json"],
       expected: ["evals/user/tdd", "plugins/p/evals/b"],
     },
     {

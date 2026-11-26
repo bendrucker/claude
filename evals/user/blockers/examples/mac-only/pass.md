@@ -1,0 +1,1 @@
+The index lives only on Studio, and Studio isn't attached to this session, so I can't count the sessions. If you make a Studio folder available to cloud sessions, I'll run the query myself, and later sessions can reach the index too.

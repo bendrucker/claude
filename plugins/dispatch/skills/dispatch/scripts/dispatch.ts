@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
 import { appendDispatch, type DispatchLedgerRow, resolveDataDir } from "./ledger";
+import { type ResolveRepo, resolveRepo } from "./repo";
 import { createSessionsCommand, currentSession, resolveSessionLabel } from "./sessions";
 
 const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
@@ -991,7 +992,8 @@ export interface DispatchOptions {
   prompt: string;
   name?: string | undefined;
   title?: string | undefined;
-  base: string;
+  // Defaults to the upstream remote's default branch, or origin/main without one.
+  base?: string | undefined;
   timeout: number;
   mux: Mux;
   split?: boolean;
@@ -1017,7 +1019,7 @@ function validateCommon(
     );
   // A ref may hold ~, ^, and @{}, so only a leading dash that a parser would
   // read as a flag is out.
-  if (options.base.startsWith("-") || options.base.trim() === "")
+  if (options.base != null && (options.base.startsWith("-") || options.base.trim() === ""))
     throw new DispatchError(`base ${JSON.stringify(options.base)} must name a ref`, null);
   const promptBytes = Buffer.byteLength(options.prompt);
   if (promptBytes > MAX_PROMPT_BYTES)
@@ -1091,8 +1093,7 @@ export function remoteCommand(options: DispatchOptions, name: string): string[] 
     options.repo,
     "--branch",
     options.branch,
-    "--base",
-    options.base,
+    ...(options.base == null ? [] : ["--base", options.base]),
     "--name",
     name,
     "--timeout",
@@ -1124,8 +1125,7 @@ async function dispatchRemote(
       "-s",
       options.rexSession ?? "",
       title,
-      "-c",
-      options.repo,
+      ...(isAbsolute(options.repo) ? ["-c", options.repo] : []),
       "--keep-open",
       "--focus=false",
       "--json",
@@ -1183,6 +1183,7 @@ export async function dispatch(
   run: Runner = spawnRunner,
   pause: Pause = Bun.sleep,
   probe: Probe = probeWorktreeAdmin,
+  resolve: ResolveRepo = resolveRepo,
 ): Promise<DispatchResult> {
   validate(options);
   if (options.host != null) return dispatchRemote(options, options.host, run, pause);
@@ -1206,6 +1207,7 @@ export async function dispatch(
     run,
     pause,
     probe,
+    resolve,
   );
   try {
     const ctx: Context = { run, pause, options, partial, path };
@@ -1267,6 +1269,26 @@ async function branchExists(
   return listed.stdout.split("\n").some((line) => wanted.has(line.trim()));
 }
 
+// A fork's own main lags its parent, so a checkout with an upstream remote
+// branches from the parent's default branch.
+async function defaultBase(
+  run: Runner,
+  root: string,
+  remotes: ReadonlySet<string>,
+): Promise<string> {
+  if (!remotes.has("upstream")) return "origin/main";
+  const head = await run([
+    "git",
+    "-C",
+    root,
+    "symbolic-ref",
+    "--short",
+    "refs/remotes/upstream/HEAD",
+  ]);
+  const ref = head.stdout.trim();
+  return head.code === 0 && ref !== "" ? ref : "upstream/main";
+}
+
 // The words naming what wt switch checks out. Only a branch that exists
 // nowhere is created, and only then does the base matter.
 async function switchTarget(
@@ -1278,16 +1300,14 @@ async function switchTarget(
   if (CHANGE_PATTERN.test(options.branch)) return [options.branch];
   // A local branch needs nothing from the network.
   if (await branchExists(run, root, new Set(), options.branch)) return [options.branch];
-  await fetchBase(run, root, remotes, options.base);
+  const base = options.base ?? (await defaultBase(run, root, remotes));
+  await fetchBase(run, root, remotes, base);
   if (await branchExists(run, root, remotes, options.branch)) return [options.branch];
 
-  const verified = await run(["git", "-C", root, "rev-parse", "--verify", "--quiet", options.base]);
+  const verified = await run(["git", "-C", root, "rev-parse", "--verify", "--quiet", base]);
   if (verified.code !== 0)
-    throw new DispatchError(
-      `base ${JSON.stringify(options.base)} names no commit in ${root}`,
-      null,
-    );
-  return ["--create", options.branch, "--base", options.base];
+    throw new DispatchError(`base ${JSON.stringify(base)} names no commit in ${root}`, null);
+  return ["--create", options.branch, "--base", base];
 }
 
 function checkoutOf(switched: z.infer<typeof WtSwitched>): Checkout {
@@ -1333,21 +1353,24 @@ async function prepareWorktree(
   run: Runner,
   pause: Pause,
   probe: Probe,
+  resolve: ResolveRepo,
 ): Promise<Prepared> {
+  let repo: string;
+  try {
+    repo = await resolve(options.repo, run);
+  } catch (error) {
+    throw new DispatchError(error instanceof Error ? error.message : String(error), null);
+  }
   // The porcelain listing puts the main worktree first whatever the
   // repository's git layout, and wt runs from there.
-  const listing = await required(
-    run,
-    ["git", "-C", options.repo, "worktree", "list", "--porcelain"],
-    null,
-  );
+  const listing = await required(run, ["git", "-C", repo, "worktree", "list", "--porcelain"], null);
   const root = listing.stdout
     .split("\n")
     .find((line) => line.startsWith("worktree "))
     ?.slice("worktree ".length)
     .trim();
   if (root == null || root === "")
-    throw new DispatchError(`git named no worktree for ${options.repo}`, null);
+    throw new DispatchError(`git named no worktree for ${repo}`, null);
 
   try {
     const denied = await probe(root);
@@ -1415,6 +1438,7 @@ export async function execSession(
   pause: Pause = Bun.sleep,
   start: Start = inheritStart,
   probe: Probe = probeWorktreeAdmin,
+  resolve: ResolveRepo = resolveRepo,
 ): Promise<number> {
   validateCommon(options);
   const { path, partial } = await prepareWorktree(
@@ -1423,6 +1447,7 @@ export async function execSession(
     run,
     pause,
     probe,
+    resolve,
   );
   process.stdout.write(`dispatch worktree: ${path}\ndispatch branch: ${partial.branch}\n`);
   if (partial.submoduleError != null)
@@ -1462,7 +1487,12 @@ if (import.meta.main && process.argv[2] === "sessions") {
         "Check out a branch, PR, or MR in a worktree with wt, write its local Claude settings, and start `claude --name <name> <prompt>` in a new Rex tab or herdr workspace. The repository's own checkout is never moved.",
     },
     flags: {
-      repo: { type: String, default: process.cwd(), description: "Repository to branch from" },
+      repo: {
+        type: String,
+        default: process.cwd(),
+        description:
+          "Repository to branch from: a path, an owner/name slug, or a GitHub URL. A missing checkout is cloned to ~/src/<upstream owner>/<name>, through your fork when you cannot push upstream",
+      },
       branch: {
         type: String,
         description:
@@ -1482,8 +1512,8 @@ if (import.meta.main && process.argv[2] === "sessions") {
       },
       base: {
         type: String,
-        default: "origin/main",
-        description: "Ref a newly created branch starts from",
+        description:
+          "Ref a newly created branch starts from; defaults to the upstream remote's default branch when the checkout has one, origin/main otherwise",
       },
       mux: {
         type: String,

@@ -75,24 +75,41 @@ async function ownMarketplace(repo: string): Promise<string | undefined> {
   return (await file.exists()) ? Marketplace.parse(await file.json()).name : undefined;
 }
 
+/** The plugin's declared dependencies, split into names from the repo's marketplace and from another. */
+async function declared(
+  repo: string,
+  plugin: string,
+): Promise<{ own: string[]; foreign: string[] }> {
+  const manifest = Bun.file(join(repo, plugin, ".claude-plugin/plugin.json"));
+  if (!(await manifest.exists())) return { own: [], foreign: [] };
+  const { dependencies: deps } = PluginManifest.parse(await manifest.json());
+  const marketplace = await ownMarketplace(repo);
+  const own: string[] = [];
+  const foreign: string[] = [];
+  for (const dep of deps) {
+    const [name = dep, from] = dep.split("@");
+    (from === undefined || from === marketplace ? own : foreign).push(name);
+  }
+  return { own, foreign };
+}
+
 /** Repo-relative directories of the plugin's dependencies, leaving out ones from another marketplace. */
 async function dependencies(repo: string, plugin: string): Promise<string[]> {
-  const manifest = Bun.file(join(repo, plugin, ".claude-plugin/plugin.json"));
-  if (!(await manifest.exists())) return [];
-  const { dependencies: declared } = PluginManifest.parse(await manifest.json());
-  const own = await ownMarketplace(repo);
-  const names = declared.flatMap((dep) => {
-    const [name = dep, marketplace] = dep.split("@");
-    return marketplace === undefined || marketplace === own ? [name] : [];
-  });
+  const { own } = await declared(repo, plugin);
   return Promise.all(
-    names.map(async (name) => {
+    own.map(async (name) => {
       const dep = join(dirname(plugin), name);
       if (!(await Bun.file(join(repo, dep, ".claude-plugin/plugin.json")).exists()))
         throw new Error(`${plugin} depends on ${name}, but ${dep} is not a plugin`);
       return dep;
     }),
   );
+}
+
+/** Names of the plugins from another marketplace that the given plugin directories depend on. */
+export async function foreignDependencies(repo: string, plugins: string[]): Promise<string[]> {
+  const found = await Promise.all(plugins.map(async (p) => (await declared(repo, p)).foreign));
+  return [...new Set(found.flat())].toSorted();
 }
 
 /** Repo-relative plugin directories a case lists, as written in its `case.yaml`. */

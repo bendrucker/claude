@@ -14,6 +14,14 @@ A ported test suite is a weak signal. It was written against the old implementat
 
 Build the harness before porting. It runs old and new on the same input and diffs the results. Every later step reports against it.
 
+When both implementations run as commands over input files, use the bundled runner instead of writing one:
+
+```sh
+bun ${CLAUDE_PLUGIN_ROOT}/skills/port/scripts/diff-run.ts --old '<old command> {}' --new '<new command> {}' --out tmp/<task> <inputs...>
+```
+
+It compares exit code, then stdout, then stderr, records the first that differs, and writes the ledger as `ledger.json` and `ledger.md` under `--out`. `{}` becomes the quoted input path, or pass `--stdin`. `--normalize <regex>` masks a field in both outputs. Expose an in-process checkpoint by wrapping each implementation in a small command that prints it as JSON, which the runner diffs by path.
+
 - **Inputs.** Draw them from real use first: logged invocations, fixture repos, recorded payloads, shell history. Add generated inputs for the edges real use rarely reaches. Count matches over real inputs, since a hand-picked set inflates the match rate. With no record of real use, mine the repository's callers, tests, and docs for the arguments they pass, generate the rest from the format's grammar, and report which set the match rate counts.
 - **Generated inputs.** When old and new can both be called in one test process, write a property test asserting they agree on generated inputs. Its shrinking returns the smallest input that diverges. Use [Hegel](https://github.com/hegeldev) where it has a library for the language, then the ecosystem's standard: Hypothesis for Python, fast-check for TypeScript.
 - **Checkpoints.** Diff intermediate stages as well as the final output: parsed input, resolved config, the built request, the emitted bytes, exit code, stderr, files written. Report the first checkpoint that differs, since the bug is in the code that produced it. An end-to-end diff alone says only that something differs.
@@ -22,11 +30,11 @@ Build the harness before porting. It runs old and new on the same input and diff
 
 ## Ledger
 
-Keep a ledger of divergences in a file, such as `tmp/<task>/ledger.md`, one row per distinct bug, with the fingerprint, the inputs it covers, the first checkpoint that differs, and its status: open, fixed with the commit, or exempt with who signed off. A later session resumes from the file. Group diffs by *fingerprint*: the checkpoint, the field or byte offset, and the kind of difference (missing, extra, reordered, escaped, truncated). Many diffs that share a fingerprint are one row.
+Keep a ledger of divergences in a file, such as the runner's `tmp/<task>/ledger.json`, one row per distinct bug, with the fingerprint, the inputs it covers, the first checkpoint that differs, and its status: open, fixed with the commit, or exempt with who signed off. A later session resumes from the file. Group diffs by *fingerprint*: the checkpoint, the field or byte offset, and the kind of difference (missing, extra, reordered, escaped, truncated). Many diffs that share a fingerprint are one row.
 
 Work the row covering the most inputs first. A divergence early in the pipeline masks the ones after it, so expect new rows to appear as dominant ones close.
 
-Classify each row as a bug or an intended change. An intended change needs the user's sign-off, then becomes an exemption the harness skips and the PR body lists. Absent sign-off, the row is a bug. With nobody present to sign off, mark the row proposed, finish the other rows, and lead the report with the proposals.
+Classify each row as a bug or an intended change. An intended change needs the user's sign-off, then becomes an exemption the harness skips and the PR body lists. In the runner's ledger, set the row's `status` to `exempt` and its `note` to who signed off. A rerun keeps both and marks rows that stopped appearing `fixed`. Absent sign-off, the row is a bug. With nobody present to sign off, mark the row proposed, finish the other rows, and lead the report with the proposals.
 
 ## Porting Rules
 

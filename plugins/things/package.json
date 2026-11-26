@@ -12,8 +12,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@commander-js/extra-typings": "~15.0.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "cleye": "^2.0.0",
+    "commander": "~15.0.0",
     "table": "^6.9.0",
     "zod": "^4.4.3"
   },

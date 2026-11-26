@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { cli, command } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { decodeFile } from "../packages/decode/index";
 import { loadPlugins } from "../packages/marketplace/index";
@@ -213,7 +213,7 @@ export function devInstalled(
     : `${name}: declares devDependencies without omit=dev in .npmrc, so npm ci installs them`;
 }
 
-const check = command({ name: "check" }, async () => {
+const check = new Command("check").action(async () => {
   await runCheck(
     async () => {
       const [plugins, manifests] = await Promise.all([
@@ -252,20 +252,12 @@ const check = command({ name: "check" }, async () => {
   );
 });
 
-const generateCommand = command(
-  {
-    name: "generate",
-    parameters: ["[plugins...]"],
-    flags: {
-      force: {
-        type: Boolean,
-        description: "Regenerate lockfiles that are already present and current",
-      },
-    },
-    help: { description: "Write a package-lock.json for each plugin that declares dependencies." },
-  },
-  async (argv) => {
-    const selected = new Set(argv._.plugins);
+const generateCommand = new Command("generate")
+  .description("Write a package-lock.json for each plugin that declares dependencies.")
+  .argument("[plugins...]")
+  .option("--force", "Regenerate lockfiles that are already present and current")
+  .action(async (requested, flags) => {
+    const selected = new Set(requested);
     const plugins = (await pluginPackages()).filter(
       (plugin) =>
         hasRuntimeDependencies(plugin.manifest) &&
@@ -275,7 +267,7 @@ const generateCommand = command(
     for (const plugin of plugins) {
       // oxlint-disable-next-line no-await-in-loop -- npm resolves against the registry, and a serial run keeps the printed progress in order.
       const lockfile = await existingLockfile(plugin.dir);
-      if (lockfile !== null && !argv.flags.force) {
+      if (lockfile !== null && flags.force !== true) {
         // oxlint-disable-next-line no-await-in-loop -- see above.
         const packages = await lockPackages(plugin.dir, lockfile);
         const root = packages?.[""] ?? null;
@@ -292,21 +284,18 @@ const generateCommand = command(
       await generate(plugin);
       console.log(`+ ${plugin.name}/${GENERATED}`);
     }
-  },
-);
+  });
+
+export const program = new Command("plugin-lockfiles")
+  .description(
+    "Manage the lockfiles Claude Code needs to install plugin dependencies. It installs them when it caches a plugin, but only when the plugin root holds a lockfile beside package.json, and skips a plugin without one silently. `generate` writes those lockfiles, `check` fails when one is missing, disagrees with package.json, lacks an entry for a declared dependency, or when a manifest sits below the plugin root where the install never reaches it.",
+  )
+  .addCommand(check)
+  .addCommand(generateCommand)
+  .action(() => {
+    program.help();
+  });
 
 if (import.meta.main) {
-  await cli(
-    {
-      name: "plugin-lockfiles",
-      commands: [check, generateCommand],
-      help: {
-        description:
-          "Manage the lockfiles Claude Code needs to install plugin dependencies. It installs them when it caches a plugin, but only when the plugin root holds a lockfile beside package.json, and skips a plugin without one silently. `generate` writes those lockfiles, `check` fails when one is missing, disagrees with package.json, lacks an entry for a declared dependency, or when a manifest sits below the plugin root where the install never reaches it.",
-      },
-    },
-    (parsed) => {
-      parsed.showHelp();
-    },
-  );
+  await program.parseAsync();
 }

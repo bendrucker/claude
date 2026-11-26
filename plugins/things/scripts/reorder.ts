@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { ensureThingsRunning } from "./ensure-running";
 import { type DispatchResult, dispatch, warnFallback } from "./url";
 
@@ -68,25 +68,20 @@ export async function reorder(
   return { success: true, list: targetList, reordered: ids.length };
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "reorder",
-    parameters: ["[ids...]"],
-    flags: {
-      list: {
-        type: String,
-        default: "today",
-        description: "Target list: today (default), anytime, someday",
-      },
-    },
+export const program = new Command("reorder")
+  .argument("[ids...]")
+  .option("--list <list>", "Target list: today (default), anytime, someday", "today")
+  .action(async (ids, flags) => {
+    await ensureThingsRunning();
+
+    try {
+      console.log(JSON.stringify(await reorder(flags.list, ids)));
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
   });
 
-  await ensureThingsRunning();
-
-  try {
-    console.log(JSON.stringify(await reorder(argv.flags.list, argv._.ids)));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
+if (import.meta.main) {
+  await program.parseAsync();
 }

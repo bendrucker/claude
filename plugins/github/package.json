@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "cleye": "^2.0.0",
+    "@commander-js/extra-typings": "~15.0.0",
+    "commander": "~15.0.0",
     "table": "^6.9.0",
     "url-pattern": "^1.0.3",
     "zod": "^4.4.3"

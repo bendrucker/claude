@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@commander-js/extra-typings": "~15.0.0",
     "ap-style-title-case": "^2.0.0",
-    "cleye": "^2.0.0",
+    "commander": "~15.0.0",
     "mdast-util-from-markdown": "^2.0.2",
     "mdast-util-gfm": "^3.1.0",
     "mdast-util-to-string": "^4.0.0",

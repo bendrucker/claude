@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { XMLParser } from "fast-xml-parser";
 import { z } from "zod";
 import { decode } from "../decode/index";
@@ -209,34 +209,41 @@ export async function fetchAll(
   return Promise.all(selected.map((source) => fetchSource(source, days, now)));
 }
 
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+function collect(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
+}
+
+export const program = new Command("fetch")
+  .option("--days <n>", "Look back this many days for posts", number, 8)
+  .option(
+    "--source <name>",
+    "Only fetch sources whose name contains this (repeatable, case-insensitive)",
+    collect,
+    [],
+  )
+  .option(
+    "--include-x-only",
+    "Include x-only sources in the output (they have no feed and yield no posts)",
+    false,
+  )
+  .action(async (flags) => {
+    const filters = flags.source.map((s) => s.toLowerCase());
+    const selected = sources.filter((source) => {
+      if (source.sourceType === "x-only" && !flags.includeXOnly) return false;
+      if (filters.length === 0) return true;
+      return filters.some((filter) => source.name.toLowerCase().includes(filter));
+    });
+
+    const results = await fetchAll(selected, flags.days, Date.now());
+    console.log(JSON.stringify(results, null, 2));
+  });
+
 if (import.meta.main) {
-  const argv = cli({
-    name: "fetch",
-    flags: {
-      days: {
-        type: Number,
-        description: "Look back this many days for posts",
-        default: 8,
-      },
-      source: {
-        type: [String],
-        description: "Only fetch sources whose name contains this (repeatable, case-insensitive)",
-      },
-      includeXOnly: {
-        type: Boolean,
-        description: "Include x-only sources in the output (they have no feed and yield no posts)",
-        default: false,
-      },
-    },
-  });
-
-  const filters = argv.flags.source.map((s) => s.toLowerCase());
-  const selected = sources.filter((source) => {
-    if (source.sourceType === "x-only" && !argv.flags.includeXOnly) return false;
-    if (filters.length === 0) return true;
-    return filters.some((filter) => source.name.toLowerCase().includes(filter));
-  });
-
-  const results = await fetchAll(selected, argv.flags.days, Date.now());
-  console.log(JSON.stringify(results, null, 2));
+  await program.parseAsync();
 }

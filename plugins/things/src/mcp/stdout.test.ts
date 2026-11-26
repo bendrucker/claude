@@ -46,15 +46,19 @@ async function importClosure(entry: string): Promise<string[]> {
 }
 
 /**
- * stdout writes that a tool call can reach. A write below `import.meta.main`
- * belongs to the module's own CLI, which the server never enters.
+ * stdout writes that a tool call can reach. A write from the exported commander
+ * `program` down, or below `import.meta.main`, belongs to the module's own CLI,
+ * whose actions run only from that block, which the server never enters.
  */
 async function findStdoutWrites(): Promise<string[]> {
   const perFile = await Promise.all(
     (await importClosure(ENTRY)).map(async (file) => {
       const source = await Bun.file(file).text();
       const lines = source.split("\n");
-      const cliStart = lines.findIndex((line) => line.includes("import.meta.main"));
+      const cliStart = lines.findIndex(
+        (line) =>
+          line.includes("import.meta.main") || line.startsWith("export const program = new "),
+      );
       const reachable = cliStart === -1 ? lines : lines.slice(0, cliStart);
       const name = relative(PLUGIN_ROOT, file);
       const writes: string[] = [];

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { execFileSync } from "node:child_process";
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import UrlPattern from "url-pattern";
 import { z } from "zod";
 
@@ -669,76 +669,62 @@ export async function watchLoop(
   }
 }
 
-async function main(): Promise<void> {
-  const argv = cli({
-    name: "watch",
-    flags: {
-      mr: { type: String, description: "MR URL (MR mode)" },
-      branch: {
-        type: String,
-        description: "Branch name (branch mode; alternative to --mr)",
-      },
-      pipelineId: {
-        type: String,
-        description: "GitLab pipeline ID (pipeline-id mode)",
-      },
-      project: {
-        type: String,
-        description:
-          "Project path group/name (branch and pipeline-id modes; inferred from git remote if omitted)",
-      },
-      maxMinutes: { type: Number, description: "Wall-clock cap in minutes", default: 60 },
-      queuedTimeout: {
-        type: Number,
-        description: "Queued-state timeout (minutes)",
-        default: 15,
-      },
-      apiErrorThreshold: {
-        type: Number,
-        description: "Consecutive API errors before emit",
-        default: 5,
-      },
-    },
-  });
-
-  const mrUrl = argv.flags.mr;
-  const branch = argv.flags.branch;
-  const pipelineId = argv.flags.pipelineId;
-
-  const modeCount = [mrUrl, branch, pipelineId].filter(
-    (v): v is string => typeof v === "string" && v.length > 0,
-  ).length;
-  if (modeCount !== 1) {
-    console.error("Specify exactly one of --mr <url>, --branch <name>, or --pipeline-id <id>");
-    process.exit(1);
-  }
-
-  let target: RunTarget;
-  if (mrUrl != null && mrUrl !== "") {
-    target = { mode: "mr", mrUrl };
-  } else {
-    const project = argv.flags.project ?? detectProjectFromRemote();
-    if (project == null || project === "") {
-      console.error("Could not infer project from git remote. Pass --project <group/project>.");
-      process.exit(1);
-    }
-    target =
-      branch != null && branch !== ""
-        ? { mode: "branch", project, branch }
-        : { mode: "pipeline-id", project, pipelineId: pipelineId ?? "" };
-  }
-
-  const code = await watchLoop({
-    target,
-    maxMinutes: argv.flags.maxMinutes,
-    queuedTimeoutMinutes: argv.flags.queuedTimeout,
-    apiErrorThreshold: argv.flags.apiErrorThreshold,
-  });
-  process.exit(code);
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
 }
 
+export const program = new Command("watch")
+  .option("--mr <url>", "MR URL (MR mode)")
+  .option("--branch <name>", "Branch name (branch mode; alternative to --mr)")
+  .option("--pipeline-id <id>", "GitLab pipeline ID (pipeline-id mode)")
+  .option(
+    "--project <path>",
+    "Project path group/name (branch and pipeline-id modes; inferred from git remote if omitted)",
+  )
+  .option("--max-minutes <n>", "Wall-clock cap in minutes", number, 60)
+  .option("--queued-timeout <minutes>", "Queued-state timeout (minutes)", number, 15)
+  .option("--api-error-threshold <n>", "Consecutive API errors before emit", number, 5)
+  .action(async (flags) => {
+    const mrUrl = flags.mr;
+    const branch = flags.branch;
+    const pipelineId = flags.pipelineId;
+
+    const modeCount = [mrUrl, branch, pipelineId].filter(
+      (v): v is string => typeof v === "string" && v.length > 0,
+    ).length;
+    if (modeCount !== 1) {
+      console.error("Specify exactly one of --mr <url>, --branch <name>, or --pipeline-id <id>");
+      process.exit(1);
+    }
+
+    let target: RunTarget;
+    if (mrUrl != null && mrUrl !== "") {
+      target = { mode: "mr", mrUrl };
+    } else {
+      const project = flags.project ?? detectProjectFromRemote();
+      if (project == null || project === "") {
+        console.error("Could not infer project from git remote. Pass --project <group/project>.");
+        process.exit(1);
+      }
+      target =
+        branch != null && branch !== ""
+          ? { mode: "branch", project, branch }
+          : { mode: "pipeline-id", project, pipelineId: pipelineId ?? "" };
+    }
+
+    const code = await watchLoop({
+      target,
+      maxMinutes: flags.maxMinutes,
+      queuedTimeoutMinutes: flags.queuedTimeout,
+      apiErrorThreshold: flags.apiErrorThreshold,
+    });
+    process.exit(code);
+  });
+
 if (import.meta.main) {
-  main().catch((error: unknown) => {
+  await program.parseAsync().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 
 export const ReviewState = z.enum([
@@ -91,26 +91,22 @@ export function assertComplete(currentUser: CurrentUser): void {
   }
 }
 
+export const program = new Command("review-queue").action(async () => {
+  const result = ReviewQueueResponse.parse(await $`glab api graphql -f query=${QUERY}`.json());
+  const errors = result.errors ?? [];
+  if (errors.length > 0) {
+    console.error(`GraphQL errors: ${errors.map((e) => e.message).join("; ")}`);
+    process.exit(1);
+  }
+  const currentUser = result.data?.currentUser;
+  if (!currentUser) {
+    console.error("No currentUser in GraphQL response (is glab authenticated?)");
+    process.exit(1);
+  }
+  assertComplete(currentUser);
+  console.log(JSON.stringify(filterReviewQueue(currentUser), null, 2));
+});
+
 if (import.meta.main) {
-  await cli(
-    {
-      name: "review-queue",
-      flags: {},
-    },
-    async () => {
-      const result = ReviewQueueResponse.parse(await $`glab api graphql -f query=${QUERY}`.json());
-      const errors = result.errors ?? [];
-      if (errors.length > 0) {
-        console.error(`GraphQL errors: ${errors.map((e) => e.message).join("; ")}`);
-        process.exit(1);
-      }
-      const currentUser = result.data?.currentUser;
-      if (!currentUser) {
-        console.error("No currentUser in GraphQL response (is glab authenticated?)");
-        process.exit(1);
-      }
-      assertComplete(currentUser);
-      console.log(JSON.stringify(filterReviewQueue(currentUser), null, 2));
-    },
-  );
+  await program.parseAsync();
 }

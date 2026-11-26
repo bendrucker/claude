@@ -2,7 +2,7 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { isAbsolute, join } from "node:path";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { appendDispatch, type DispatchLedgerRow, resolveDataDir } from "./ledger";
 import { type ResolveRepo, resolveRepo } from "./repo";
@@ -1477,254 +1477,240 @@ function inspectHint(record: DispatchRecord): string {
   return `herdr agent read ${record.name}`;
 }
 
+function collect(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
+}
+
+export const program = new Command("dispatch")
+  .description(
+    "Check out a branch, PR, or MR in a worktree with wt, write its local Claude settings, and start `claude --name <name> <prompt>` in a new Rex tab or herdr workspace. The repository's own checkout is never moved.",
+  )
+  .option(
+    "--repo <repo>",
+    "Repository to branch from: a path, an owner/name slug, or a GitHub URL. A missing checkout is cloned to ~/src/<upstream owner>/<name>, through your fork when you cannot push upstream",
+    process.cwd(),
+  )
+  .option(
+    "--branch <branch>",
+    "Branch for the session, created when it exists nowhere, or a pr:<n>, mr:<n>, or PR/MR URL (required)",
+  )
+  .option("--prompt <file>", "File holding the prompt; reads stdin when absent")
+  .option("--name <name>", "Session name; derived from the branch when absent")
+  .option(
+    "--title <title>",
+    "Rex tab or pane label, two to four Title Case words naming the task; derived from the branch when absent",
+  )
+  .option(
+    "--keep-open",
+    "Leave out the prompt's instruction to run dispatch:close once the PR is open",
+    false,
+  )
+  .option(
+    "--base <ref>",
+    "Ref a newly created branch starts from; defaults to the upstream remote's default branch when the checkout has one, origin/main otherwise",
+  )
+  .option("--mux <mux>", `rex, herdr, or bg (claude --bg); ${describeMuxDefault(process.env)}`)
+  .option(
+    "--session <session>",
+    "Rex session ID or label for the new tab; defaults to this pane's session",
+  )
+  .option(
+    "--split",
+    "Rex only: open a pane in this tab, beside the current block at 160 columns or more and below it otherwise, instead of a new tab",
+    false,
+  )
+  .option("--allow <rule>", "Permission rule for permissions.allow (repeatable)", collect, [])
+  .option(
+    "--sandbox-write <path>",
+    "Path for sandbox.filesystem.allowWrite (repeatable)",
+    collect,
+    [],
+  )
+  .option(
+    "--settings-json <file>",
+    "JSON file deep-merged into the worktree's .claude/settings.local.json",
+  )
+  .option(
+    "--host <label>",
+    "Rex only: saved host label (`rex hosts list`) to run the session on; --repo is a path there",
+  )
+  .option(
+    "--exec",
+    "Internal: the --host side. Prepare the worktree here and run claude in the foreground",
+    false,
+  )
+  .option("--prompt-base64 <text>", "Internal: --exec prompt, base64")
+  .option("--settings-base64 <text>", "Internal: --exec settings JSON, base64")
+  .option("--data-dir <dir>", "Dispatch ledger directory; defaults to the plugin data dir")
+  // Number, not a throwing parser: the action reports a non-number with the
+  // other --timeout check, as a usage error that exits 2.
+  .option("--timeout <ms>", "Milliseconds to wait for the session to start working", Number, 30_000)
+  .action(async (flags) => {
+    // The caller's poll reads this screen, so every failure prints its marker.
+    if (flags.exec) {
+      try {
+        const { branch, name, promptBase64, settingsBase64 } = flags;
+        if (branch == null || branch === "") throw new Error("--branch is required");
+        if (name == null || name === "") throw new Error("--name is required");
+        if (promptBase64 == null) throw new Error("--prompt-base64 is required");
+        const settings =
+          settingsBase64 == null
+            ? {}
+            : parseSettings(decodeArg(settingsBase64, "--settings-base64"), "--settings-base64");
+        process.exit(
+          await execSession({
+            repo: flags.repo,
+            branch,
+            base: flags.base,
+            timeout: flags.timeout,
+            name,
+            prompt: decodeArg(promptBase64, "--prompt-base64"),
+            settings,
+          }),
+        );
+      } catch (error) {
+        process.stdout.write(
+          `dispatch failed: ${error instanceof Error ? error.message.trim() : String(error)}\n`,
+        );
+        if (error instanceof DispatchError && error.partial != null)
+          process.stdout.write(`${formatRecord(error.partial)}\n`);
+        process.exit(1);
+      }
+    }
+
+    if (flags.branch == null || flags.branch === "") {
+      process.stderr.write("--branch is required\n");
+      program.outputHelp();
+      process.exit(2);
+    }
+
+    if (!Number.isFinite(flags.timeout) || flags.timeout <= 0) {
+      process.stderr.write("--timeout must be a positive number of milliseconds\n");
+      process.exit(2);
+    }
+
+    const muxFlag = z.enum(MUXES).optional().safeParse(flags.mux);
+    if (!muxFlag.success) {
+      process.stderr.write(`--mux must be one of ${MUXES.join(", ")}\n`);
+      process.exit(2);
+    }
+    let mux: Mux;
+    try {
+      mux = muxFlag.data ?? detectMux(process.env);
+    } catch (error) {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      process.exit(2);
+    }
+
+    let settings: Settings;
+    try {
+      const extra =
+        flags.settingsJson == null
+          ? {}
+          : parseSettings(await Bun.file(flags.settingsJson).text(), flags.settingsJson);
+      settings = mergeSettings(extra, settingsPatch(flags.allow, flags.sandboxWrite));
+    } catch (error) {
+      process.stderr.write(
+        `cannot read --settings-json: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      process.exit(2);
+    }
+
+    const prompt = await readPrompt(flags.prompt);
+    if (prompt.trim() === "") {
+      process.stderr.write("the prompt is empty; pass --prompt <file> or pipe it on stdin\n");
+      process.exit(2);
+    }
+    const sender = await readSender(process.env);
+    // This pane's session is on this machine, never the host's.
+    const rexSessionValue =
+      flags.session ??
+      (flags.host == null && mux === "rex"
+        ? await currentSession(process.env, spawnRunner)
+        : undefined);
+    const rexSession =
+      mux === "rex" && rexSessionValue != null && rexSessionValue !== "" && flags.host == null
+        ? await resolveSessionLabel(spawnRunner, rexSessionValue)
+        : undefined;
+
+    // The session is already running and the caller needs its identifiers, so a
+    // ledger failure warns rather than failing the dispatch.
+    const writeLedger = (
+      record: DispatchRecord,
+      repo: string,
+      outcome: "dispatched" | "orphaned" | "failed",
+    ) => {
+      try {
+        const row: DispatchLedgerRow = {
+          ts: new Date().toISOString(),
+          task: taskSummary(prompt),
+          repo,
+          branch: record.branch,
+          path: record.path,
+          mux: record.mux,
+          target: record.target,
+          host: record.host,
+          name: record.name,
+          title: record.title,
+          place: record.place,
+          session: record.session,
+          sender: sender?.name ?? null,
+          outcome,
+        };
+        if (rexSession != null) row.rexSession = rexSession;
+        appendDispatch(row, resolveDataDir(flags.dataDir));
+      } catch (error) {
+        process.stderr.write(
+          `warning: dispatch ledger not written: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+      }
+    };
+
+    try {
+      const { record, root } = await dispatch({
+        repo: flags.repo,
+        branch: flags.branch,
+        prompt: withSender(prompt, sender, !flags.keepOpen && mux !== "bg"),
+        name: flags.name,
+        title: flags.title,
+        base: flags.base,
+        timeout: flags.timeout,
+        mux,
+        split: flags.split,
+        rexSession: rexSessionValue,
+        host: flags.host,
+        rexBlock: process.env.REX_BLOCK,
+        settings,
+      });
+
+      if (record.submoduleError != null)
+        process.stderr.write(
+          `warning: submodules in ${record.path} were not initialized: ${record.submoduleError}\n`,
+        );
+      if (record.status !== "working")
+        process.stderr.write(
+          `warning: ${record.name} is ${record.status} after ${flags.timeout}ms. Read its screen with \`${inspectHint(record)}\`.\n`,
+        );
+
+      writeLedger(record, root, "dispatched");
+      process.stdout.write(`${formatRecord(record)}\n`);
+    } catch (error) {
+      if (!(error instanceof DispatchError)) throw error;
+      process.stderr.write(error.message.endsWith("\n") ? error.message : `${error.message}\n`);
+      // The record reaches the caller before the ledger is touched, so a ledger
+      // failure cannot cost them the only copy of it.
+      if (error.partial != null) {
+        process.stderr.write(`${formatRecord(error.partial)}\n`);
+        // A worktree that predates the dispatch still has an owner.
+        const outcome = error.partial.checkout === "existing-worktree" ? "failed" : "orphaned";
+        writeLedger(error.partial, error.root ?? flags.repo, outcome);
+      }
+      process.exit(1);
+    }
+  });
+
 if (import.meta.main && process.argv[2] === "sessions") {
   await createSessionsCommand(spawnRunner).parseAsync(process.argv.slice(3), { from: "user" });
 } else if (import.meta.main) {
-  const argv = cli({
-    name: "dispatch",
-    help: {
-      description:
-        "Check out a branch, PR, or MR in a worktree with wt, write its local Claude settings, and start `claude --name <name> <prompt>` in a new Rex tab or herdr workspace. The repository's own checkout is never moved.",
-    },
-    flags: {
-      repo: {
-        type: String,
-        default: process.cwd(),
-        description:
-          "Repository to branch from: a path, an owner/name slug, or a GitHub URL. A missing checkout is cloned to ~/src/<upstream owner>/<name>, through your fork when you cannot push upstream",
-      },
-      branch: {
-        type: String,
-        description:
-          "Branch for the session, created when it exists nowhere, or a pr:<n>, mr:<n>, or PR/MR URL (required)",
-      },
-      prompt: { type: String, description: "File holding the prompt; reads stdin when absent" },
-      name: { type: String, description: "Session name; derived from the branch when absent" },
-      title: {
-        type: String,
-        description:
-          "Rex tab or pane label, two to four Title Case words naming the task; derived from the branch when absent",
-      },
-      keepOpen: {
-        type: Boolean,
-        default: false,
-        description: "Leave out the prompt's instruction to run dispatch:close once the PR is open",
-      },
-      base: {
-        type: String,
-        description:
-          "Ref a newly created branch starts from; defaults to the upstream remote's default branch when the checkout has one, origin/main otherwise",
-      },
-      mux: {
-        type: String,
-        description: `rex, herdr, or bg (claude --bg); ${describeMuxDefault(process.env)}`,
-      },
-      session: {
-        type: String,
-        description: "Rex session ID or label for the new tab; defaults to this pane's session",
-      },
-      split: {
-        type: Boolean,
-        default: false,
-        description:
-          "Rex only: open a pane in this tab, beside the current block at 160 columns or more and below it otherwise, instead of a new tab",
-      },
-      allow: {
-        type: [String],
-        description: "Permission rule for permissions.allow (repeatable)",
-      },
-      sandboxWrite: {
-        type: [String],
-        description: "Path for sandbox.filesystem.allowWrite (repeatable)",
-      },
-      settingsJson: {
-        type: String,
-        description: "JSON file deep-merged into the worktree's .claude/settings.local.json",
-      },
-      host: {
-        type: String,
-        description:
-          "Rex only: saved host label (`rex hosts list`) to run the session on; --repo is a path there",
-      },
-      exec: {
-        type: Boolean,
-        default: false,
-        description:
-          "Internal: the --host side. Prepare the worktree here and run claude in the foreground",
-      },
-      promptBase64: { type: String, description: "Internal: --exec prompt, base64" },
-      settingsBase64: { type: String, description: "Internal: --exec settings JSON, base64" },
-      dataDir: {
-        type: String,
-        description: "Dispatch ledger directory; defaults to the plugin data dir",
-      },
-      timeout: {
-        type: Number,
-        default: 30_000,
-        description: "Milliseconds to wait for the session to start working",
-      },
-    },
-  });
-
-  // The caller's poll reads this screen, so every failure prints its marker.
-  if (argv.flags.exec) {
-    try {
-      const { branch, name, promptBase64, settingsBase64 } = argv.flags;
-      if (branch == null || branch === "") throw new Error("--branch is required");
-      if (name == null || name === "") throw new Error("--name is required");
-      if (promptBase64 == null) throw new Error("--prompt-base64 is required");
-      const settings =
-        settingsBase64 == null
-          ? {}
-          : parseSettings(decodeArg(settingsBase64, "--settings-base64"), "--settings-base64");
-      process.exit(
-        await execSession({
-          repo: argv.flags.repo,
-          branch,
-          base: argv.flags.base,
-          timeout: argv.flags.timeout,
-          name,
-          prompt: decodeArg(promptBase64, "--prompt-base64"),
-          settings,
-        }),
-      );
-    } catch (error) {
-      process.stdout.write(
-        `dispatch failed: ${error instanceof Error ? error.message.trim() : String(error)}\n`,
-      );
-      if (error instanceof DispatchError && error.partial != null)
-        process.stdout.write(`${formatRecord(error.partial)}\n`);
-      process.exit(1);
-    }
-  }
-
-  if (argv.flags.branch == null || argv.flags.branch === "") {
-    process.stderr.write("--branch is required\n");
-    argv.showHelp();
-    process.exit(2);
-  }
-
-  if (!Number.isFinite(argv.flags.timeout) || argv.flags.timeout <= 0) {
-    process.stderr.write("--timeout must be a positive number of milliseconds\n");
-    process.exit(2);
-  }
-
-  const muxFlag = z.enum(MUXES).optional().safeParse(argv.flags.mux);
-  if (!muxFlag.success) {
-    process.stderr.write(`--mux must be one of ${MUXES.join(", ")}\n`);
-    process.exit(2);
-  }
-  let mux: Mux;
-  try {
-    mux = muxFlag.data ?? detectMux(process.env);
-  } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exit(2);
-  }
-
-  let settings: Settings;
-  try {
-    const extra =
-      argv.flags.settingsJson == null
-        ? {}
-        : parseSettings(await Bun.file(argv.flags.settingsJson).text(), argv.flags.settingsJson);
-    settings = mergeSettings(extra, settingsPatch(argv.flags.allow, argv.flags.sandboxWrite));
-  } catch (error) {
-    process.stderr.write(
-      `cannot read --settings-json: ${error instanceof Error ? error.message : String(error)}\n`,
-    );
-    process.exit(2);
-  }
-
-  const prompt = await readPrompt(argv.flags.prompt);
-  if (prompt.trim() === "") {
-    process.stderr.write("the prompt is empty; pass --prompt <file> or pipe it on stdin\n");
-    process.exit(2);
-  }
-  const sender = await readSender(process.env);
-  // This pane's session is on this machine, never the host's.
-  const rexSessionValue =
-    argv.flags.session ??
-    (argv.flags.host == null && mux === "rex"
-      ? await currentSession(process.env, spawnRunner)
-      : undefined);
-  const rexSession =
-    mux === "rex" && rexSessionValue != null && rexSessionValue !== "" && argv.flags.host == null
-      ? await resolveSessionLabel(spawnRunner, rexSessionValue)
-      : undefined;
-
-  // The session is already running and the caller needs its identifiers, so a
-  // ledger failure warns rather than failing the dispatch.
-  const writeLedger = (
-    record: DispatchRecord,
-    repo: string,
-    outcome: "dispatched" | "orphaned" | "failed",
-  ) => {
-    try {
-      const row: DispatchLedgerRow = {
-        ts: new Date().toISOString(),
-        task: taskSummary(prompt),
-        repo,
-        branch: record.branch,
-        path: record.path,
-        mux: record.mux,
-        target: record.target,
-        host: record.host,
-        name: record.name,
-        title: record.title,
-        place: record.place,
-        session: record.session,
-        sender: sender?.name ?? null,
-        outcome,
-      };
-      if (rexSession != null) row.rexSession = rexSession;
-      appendDispatch(row, resolveDataDir(argv.flags.dataDir));
-    } catch (error) {
-      process.stderr.write(
-        `warning: dispatch ledger not written: ${error instanceof Error ? error.message : String(error)}\n`,
-      );
-    }
-  };
-
-  try {
-    const { record, root } = await dispatch({
-      repo: argv.flags.repo,
-      branch: argv.flags.branch,
-      prompt: withSender(prompt, sender, !argv.flags.keepOpen && mux !== "bg"),
-      name: argv.flags.name,
-      title: argv.flags.title,
-      base: argv.flags.base,
-      timeout: argv.flags.timeout,
-      mux,
-      split: argv.flags.split,
-      rexSession: rexSessionValue,
-      host: argv.flags.host,
-      rexBlock: process.env.REX_BLOCK,
-      settings,
-    });
-
-    if (record.submoduleError != null)
-      process.stderr.write(
-        `warning: submodules in ${record.path} were not initialized: ${record.submoduleError}\n`,
-      );
-    if (record.status !== "working")
-      process.stderr.write(
-        `warning: ${record.name} is ${record.status} after ${argv.flags.timeout}ms. Read its screen with \`${inspectHint(record)}\`.\n`,
-      );
-
-    writeLedger(record, root, "dispatched");
-    process.stdout.write(`${formatRecord(record)}\n`);
-  } catch (error) {
-    if (!(error instanceof DispatchError)) throw error;
-    process.stderr.write(error.message.endsWith("\n") ? error.message : `${error.message}\n`);
-    // The record reaches the caller before the ledger is touched, so a ledger
-    // failure cannot cost them the only copy of it.
-    if (error.partial != null) {
-      process.stderr.write(`${formatRecord(error.partial)}\n`);
-      // A worktree that predates the dispatch still has an owner.
-      const outcome = error.partial.checkout === "existing-worktree" ? "failed" : "orphaned";
-      writeLedger(error.partial, error.root ?? argv.flags.repo, outcome);
-    }
-    process.exit(1);
-  }
+  await program.parseAsync();
 }

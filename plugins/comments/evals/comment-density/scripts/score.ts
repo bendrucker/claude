@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { join } from "node:path";
 import { z } from "zod";
@@ -168,31 +168,20 @@ export function scoreStoredSession(rows: StoredSessionRow[]): SessionScore {
   return sessionScore([...perFile.values()]);
 }
 
-async function main(): Promise<void> {
-  const argv = cli({
-    name: "score",
-    help: {
-      description: "Score every labeled commit and session with the current density scorer.",
-    },
-    flags: {
-      out: {
-        type: String,
-        description: "Output path for the scores JSON",
-        default: join(root, "results", "scores.json"),
-      },
-      stdout: {
-        type: Boolean,
-        description: "Print the scores JSON to stdout instead of writing --out",
-        default: false,
-      },
-      sessions: {
-        type: String,
-        description: "Stored session measurement rows (JSONL)",
-        default: join(root, "data", "sessions", "all-sessions.jsonl"),
-      },
-    },
+export const program = new Command("score")
+  .description("Score every labeled commit and session with the current density scorer.")
+  .option("--out <path>", "Output path for the scores JSON", join(root, "results", "scores.json"))
+  .option("--stdout", "Print the scores JSON to stdout instead of writing --out", false)
+  .option(
+    "--sessions <path>",
+    "Stored session measurement rows (JSONL)",
+    join(root, "data", "sessions", "all-sessions.jsonl"),
+  )
+  .action(async (flags) => {
+    await main(flags);
   });
 
+async function main(flags: { out: string; stdout: boolean; sessions: string }): Promise<void> {
   const commitLabels = await decodeFile(
     z.array(z.object({ repo: z.string(), sha: z.string() }).loose()),
     join(root, "labels", "commits.json"),
@@ -221,7 +210,7 @@ async function main(): Promise<void> {
     commits.push({ repo, sha, measurable, score });
   }
 
-  const stored = await loadStoredRows(argv.flags.sessions);
+  const stored = await loadStoredRows(flags.sessions);
   const sessions: Record<string, SessionScoreRow> = {};
   const ids = new Set([...sessionLabels.map((s) => s.id), ...complaintIds]);
   for (const id of ids) {
@@ -242,18 +231,18 @@ async function main(): Promise<void> {
 
   const scores: ScoresFile = { generatedAt: new Date().toISOString(), commits, sessions };
   const json = JSON.stringify(scores, null, 2);
-  if (argv.flags.stdout) {
+  if (flags.stdout) {
     console.log(json);
   } else {
-    await Bun.write(argv.flags.out, `${json}\n`);
+    await Bun.write(flags.out, `${json}\n`);
     const measurable = commits.filter((c) => c.measurable).length;
     const measurableSessions = Object.values(sessions).filter((s) => s.measurable).length;
     console.error(
-      `scored ${measurable}/${commits.length} commits, ${measurableSessions}/${ids.size} sessions -> ${argv.flags.out}`,
+      `scored ${measurable}/${commits.length} commits, ${measurableSessions}/${ids.size} sessions -> ${flags.out}`,
     );
   }
 }
 
 if (import.meta.main) {
-  await main();
+  await program.parseAsync();
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { Author, isBot, isReviewTarget, parseReviewers } from "./reviewers";
 
@@ -309,35 +309,17 @@ async function fetchGraphQL(
   }
 }
 
-async function main(): Promise<void> {
-  const argv = cli({
-    name: "pr-comments",
-    parameters: ["[pr]"],
-    flags: {
-      role: {
-        type: String,
-        description: "author or reviewer (default: auto-detect)",
-      },
-      since: {
-        type: String,
-        description: 'ISO date or "last-review"',
-      },
-      bots: {
-        type: Boolean,
-        description: "Only review-bot threads (plus --reviewers logins)",
-        default: false,
-      },
-      reviewers: {
-        type: String,
-        description: "Comma-separated logins --bots also matches",
-      },
-      includeResolved: {
-        type: Boolean,
-        description: "Include resolved threads (excluded by default)",
-        default: false,
-      },
-    },
-  });
+async function main(
+  target: string | undefined,
+  flags: {
+    role?: string | undefined;
+    since?: string | undefined;
+    bots: boolean;
+    reviewers?: string | undefined;
+    includeResolved: boolean;
+  },
+): Promise<void> {
+  const argv = { _: { pr: target }, flags };
 
   const { owner, repo, number } = parseUrl(await resolvePrUrl(argv._.pr));
 
@@ -414,9 +396,18 @@ async function main(): Promise<void> {
   console.log(output);
 }
 
-if (import.meta.main) {
-  main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+export const program = new Command("pr-comments")
+  .argument("[pr]")
+  .option("--role <role>", "author or reviewer (default: auto-detect)")
+  .option("--since <date>", 'ISO date or "last-review"')
+  .option("--bots", "Only review-bot threads (plus --reviewers logins)", false)
+  .option("--reviewers <logins>", "Comma-separated logins --bots also matches")
+  .option("--include-resolved", "Include resolved threads (excluded by default)", false)
+  .action(async (pr, flags) => {
+    await main(pr, flags).catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    });
   });
-}
+
+if (import.meta.main) await program.parseAsync();

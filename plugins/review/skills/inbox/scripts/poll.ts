@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { readState } from "./store";
 
@@ -45,38 +45,42 @@ export function newUrls(fetched: string[], dispatched: ReadonlySet<string>): str
   return result;
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "poll",
-    flags: {
-      dataDir: { type: String, description: "Data directory (defaults to CLAUDE_PLUGIN_DATA)" },
-      queue: {
-        type: [String],
-        description:
-          "Review-queue command emitting [{ url }] JSON; repeat once per platform source",
-      },
-    },
+function collect(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
+}
+
+export const program = new Command("poll")
+  .option("--data-dir <dir>", "Data directory (defaults to CLAUDE_PLUGIN_DATA)")
+  .option(
+    "--queue <command>",
+    "Review-queue command emitting [{ url }] JSON; repeat once per platform source",
+    collect,
+    [],
+  )
+  .action(async (flags) => {
+    const dispatched = new Set((await readState(flags.dataDir)).dispatched.map((d) => d.url));
+
+    const results = await Promise.all(flags.queue.map(fetchUrls));
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (!result) continue;
+      if (!result.ok) {
+        console.error(
+          JSON.stringify({
+            type: "source-error",
+            source: flags.queue[i],
+            detail: result.reason,
+          }),
+        );
+      }
+    }
+    const fetched = results.flatMap((r) => (r.ok ? r.urls : []));
+
+    for (const url of newUrls(fetched, dispatched)) {
+      console.log(url);
+    }
   });
 
-  const dispatched = new Set((await readState(argv.flags.dataDir)).dispatched.map((d) => d.url));
-
-  const results = await Promise.all(argv.flags.queue.map(fetchUrls));
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    if (!result) continue;
-    if (!result.ok) {
-      console.error(
-        JSON.stringify({
-          type: "source-error",
-          source: argv.flags.queue[i],
-          detail: result.reason,
-        }),
-      );
-    }
-  }
-  const fetched = results.flatMap((r) => (r.ok ? r.urls : []));
-
-  for (const url of newUrls(fetched, dispatched)) {
-    console.log(url);
-  }
+if (import.meta.main) {
+  await program.parseAsync();
 }

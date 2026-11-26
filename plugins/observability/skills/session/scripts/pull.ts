@@ -9,7 +9,7 @@ import { readdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { $ } from "bun";
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { getImportsDir, listImportedHosts } from "./db";
 
@@ -119,63 +119,65 @@ function filesUnder(dir: string): [string, number][] {
   }
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "pull",
-    flags: {
-      host: {
-        type: String,
-        description: "Imported host with an s3:// source",
-        required: true as const,
-      },
-      days: {
-        type: Number,
-        description: "Keep sessions uploaded to within this many days (matches cleanupPeriodDays)",
-        default: 90,
-      },
-    },
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+export const program = new Command("pull")
+  .option("--host <label>", "Imported host with an s3:// source")
+  .option(
+    "--days <n>",
+    "Keep sessions uploaded to within this many days (matches cleanupPeriodDays)",
+    number,
+    90,
+  )
+  .action(async (flags) => {
+    const hosts = await listImportedHosts();
+    const host = hosts.find((h) => h.label === flags.host);
+    const location = s3Location(host?.manifest.source ?? "");
+    if (host === undefined || location === undefined) {
+      const found =
+        hosts.length === 0
+          ? "none"
+          : hosts.map((h) => `${h.label} (${h.manifest.source})`).join(", ");
+      console.error(
+        `No imported host "${flags.host}" with an s3:// source in ${getImportsDir()}; found ${found}. Run import.ts first.`,
+      );
+      process.exit(1);
+    }
+    const { bucket, prefix } = location;
+    const root = join(host.root, "projects");
+    const events = join(host.root, MOD_EVENTS);
+
+    const objects = await list(bucket, prefix);
+    const localSessions = readdirSync(root, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+    const { fetch, drop } = plan(
+      objects,
+      localFiles(root, events),
+      localSessions,
+      Date.now() - flags.days * 86_400_000,
+    );
+
+    await Promise.all(
+      drop.flatMap((session) => [
+        rm(join(root, session), { recursive: true, force: true }),
+        rm(join(events, session), { recursive: true, force: true }),
+      ]),
+    );
+    for (const session of fetch) {
+      const source = `s3://${bucket}/${prefix}${session}`;
+      // oxlint-disable-next-line no-await-in-loop -- one aws process at a time
+      await $`aws s3 sync --only-show-errors --exclude ${`${MOD_EVENTS}/*`} ${source}/ ${join(root, session)}/`;
+      // oxlint-disable-next-line no-await-in-loop -- one aws process at a time
+      await $`aws s3 sync --only-show-errors ${source}/${MOD_EVENTS}/ ${join(events, session)}/`;
+    }
+    console.error(`${flags.host}: fetched ${fetch.length} session(s), dropped ${drop.length}`);
   });
 
-  const hosts = await listImportedHosts();
-  const host = hosts.find((h) => h.label === argv.flags.host);
-  const location = s3Location(host?.manifest.source ?? "");
-  if (host === undefined || location === undefined) {
-    const found =
-      hosts.length === 0
-        ? "none"
-        : hosts.map((h) => `${h.label} (${h.manifest.source})`).join(", ");
-    console.error(
-      `No imported host "${argv.flags.host}" with an s3:// source in ${getImportsDir()}; found ${found}. Run import.ts first.`,
-    );
-    process.exit(1);
-  }
-  const { bucket, prefix } = location;
-  const root = join(host.root, "projects");
-  const events = join(host.root, MOD_EVENTS);
-
-  const objects = await list(bucket, prefix);
-  const localSessions = readdirSync(root, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name);
-  const { fetch, drop } = plan(
-    objects,
-    localFiles(root, events),
-    localSessions,
-    Date.now() - argv.flags.days * 86_400_000,
-  );
-
-  await Promise.all(
-    drop.flatMap((session) => [
-      rm(join(root, session), { recursive: true, force: true }),
-      rm(join(events, session), { recursive: true, force: true }),
-    ]),
-  );
-  for (const session of fetch) {
-    const source = `s3://${bucket}/${prefix}${session}`;
-    // oxlint-disable-next-line no-await-in-loop -- one aws process at a time
-    await $`aws s3 sync --only-show-errors --exclude ${`${MOD_EVENTS}/*`} ${source}/ ${join(root, session)}/`;
-    // oxlint-disable-next-line no-await-in-loop -- one aws process at a time
-    await $`aws s3 sync --only-show-errors ${source}/${MOD_EVENTS}/ ${join(events, session)}/`;
-  }
-  console.error(`${argv.flags.host}: fetched ${fetch.length} session(s), dropped ${drop.length}`);
+if (import.meta.main) {
+  await program.parseAsync();
 }

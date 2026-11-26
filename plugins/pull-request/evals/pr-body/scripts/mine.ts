@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { decodeJson } from "../../../../../packages/decode/index";
 import { getDataDir, sessionDbPath } from "../../../../observability/skills/session/scripts/db";
@@ -167,26 +167,19 @@ async function fetchRepoPrs(repo: string): Promise<Map<number, FetchedPr>> {
   return new Map(prs.map((pr) => [pr.number, pr]));
 }
 
-async function main() {
-  const argv = cli({
-    name: "mine",
-    help: {
-      description: "Mine PR bodies opened from local Claude Code sessions into a labelable set.",
-    },
-    flags: {
-      db: {
-        type: String,
-        description: "session.duckdb path (defaults to the session skill's data dir)",
-      },
-      out: {
-        type: String,
-        default: join(import.meta.dirname, "..", "data", "samples.json"),
-        description: "Output path for the labelable sample",
-      },
-      limit: { type: Number, default: 50, description: "Max items to keep" },
-      minChars: { type: Number, default: 40, description: "Drop bodies shorter than this" },
-    },
-  });
+function parseNumber(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+async function main(flags: {
+  db?: string | undefined;
+  out: string;
+  limit: number;
+  minChars: number;
+}) {
+  const argv = { flags };
 
   const dbPath = resolveDbPath(argv.flags.db);
   if (!(await Bun.file(dbPath).exists())) {
@@ -236,4 +229,18 @@ async function main() {
   for (const [repo, n] of Object.entries(byRepo)) console.log(`  ${repo}: ${n}`);
 }
 
-if (import.meta.main) await main();
+export const program = new Command("mine")
+  .description("Mine PR bodies opened from local Claude Code sessions into a labelable set.")
+  .option("--db <path>", "session.duckdb path (defaults to the session skill's data dir)")
+  .option(
+    "--out <path>",
+    "Output path for the labelable sample",
+    join(import.meta.dirname, "..", "data", "samples.json"),
+  )
+  .option("--limit <n>", "Max items to keep", parseNumber, 50)
+  .option("--min-chars <n>", "Drop bodies shorter than this", parseNumber, 40)
+  .action(async (flags) => {
+    await main(flags);
+  });
+
+if (import.meta.main) await program.parseAsync();

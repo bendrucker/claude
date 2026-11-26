@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { type ExecSyncOptions, execSync } from "node:child_process";
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import UrlPattern from "url-pattern";
 import { z } from "zod";
 
@@ -794,38 +794,23 @@ async function watch(options: RunOptions): Promise<void> {
   }
 }
 
-async function main(): Promise<void> {
-  const argv = cli({
-    name: "watch",
-    flags: {
-      pr: { type: String, description: "PR URL (PR mode)" },
-      branch: {
-        type: String,
-        description: "Branch name (branch mode; alternative to --pr)",
-      },
-      runId: {
-        type: String,
-        description: "GitHub Actions run ID (run-id mode)",
-      },
-      repo: {
-        type: String,
-        description:
-          "Repo owner/name (branch and run-id modes; inferred from git remote if omitted)",
-      },
-      interval: { type: Number, description: "Poll interval override (seconds)" },
-      maxMinutes: { type: Number, description: "Wall-clock cap in minutes", default: 60 },
-      queuedTimeout: {
-        type: Number,
-        description: "Queued-state timeout (minutes)",
-        default: 15,
-      },
-      apiErrorThreshold: {
-        type: Number,
-        description: "Consecutive API errors before emit",
-        default: 5,
-      },
-    },
-  });
+function parseNumber(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+async function main(flags: {
+  pr?: string | undefined;
+  branch?: string | undefined;
+  runId?: string | undefined;
+  repo?: string | undefined;
+  interval?: number | undefined;
+  maxMinutes: number;
+  queuedTimeout: number;
+  apiErrorThreshold: number;
+}): Promise<void> {
+  const argv = { flags };
 
   const prUrl = argv.flags.pr;
   const branch = argv.flags.branch;
@@ -874,9 +859,23 @@ async function main(): Promise<void> {
   await watch({ mode: "branch", repo: resolveRepo(), branch, ...common });
 }
 
-if (import.meta.main) {
-  main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+export const program = new Command("watch")
+  .option("--pr <url>", "PR URL (PR mode)")
+  .option("--branch <name>", "Branch name (branch mode; alternative to --pr)")
+  .option("--run-id <id>", "GitHub Actions run ID (run-id mode)")
+  .option(
+    "--repo <owner/repo>",
+    "Repo owner/name (branch and run-id modes; inferred from git remote if omitted)",
+  )
+  .option("--interval <seconds>", "Poll interval override (seconds)", parseNumber)
+  .option("--max-minutes <n>", "Wall-clock cap in minutes", parseNumber, 60)
+  .option("--queued-timeout <n>", "Queued-state timeout (minutes)", parseNumber, 15)
+  .option("--api-error-threshold <n>", "Consecutive API errors before emit", parseNumber, 5)
+  .action(async (flags) => {
+    await main(flags).catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    });
   });
-}
+
+if (import.meta.main) await program.parseAsync();

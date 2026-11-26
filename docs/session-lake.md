@@ -117,8 +117,13 @@ That also suits S3 Intelligent-Tiering on `data/`. Readers fetch only the files 
 ## Readers
 
 ```sh
-duckdb -init "$(bun plugins/observability/skills/session/scripts/lake.ts init)" -c "<sql>"
+bun plugins/observability/skills/session/scripts/lake.ts query --param after_date=2026-10-01 \
+  "SELECT model, sum(output_tokens) FROM message_usage WHERE timestamp >= getvariable('after_date') GROUP BY 1"
 ```
+
+`lake.ts query` prices a query before it runs. It EXPLAINs the statement and passes each DuckLake scan's table, columns and filter text to `resources/lake/estimate.sql`. That query rules out files whose min and max fail a comparison with a constant, then sums the needed columns' bytes and each remaining file's footer from the catalog. The result is an upper bound, since it models neither row-group pruning nor filters a join adds at run time. A query over `--max-mb` is refused. Afterward, the command reports the GETs and bytes it actually fetched, split into catalog and data, on stderr and in its `session-index.query` event. A cloud session's events vanish with its container, so the stderr line, kept in the transcript, is how its spend reaches the index.
+
+Every query also pays for the catalog fetch, which was 5.5 to 7 MB per query on the bench snapshot whatever the window. Scripts that need the CLI can still run `duckdb -init "$(lake.ts init)"`, but those reads go unpriced.
 
 The init file carries `limits.sql`, the S3 setup in `lake/s3.sql`, and the read-only attach. Its `search_path` resolves unqualified names to the lake, so table, view and macro names match the local index. The file is written into a directory only the current user can access, named by a hash of its contents.
 

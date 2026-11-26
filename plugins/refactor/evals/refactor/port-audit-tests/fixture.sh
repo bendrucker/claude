@@ -71,6 +71,20 @@ test("cli exits 2 on bad input", () => {
   assert.equal(r.stderr, "duration: bad duration: 5w\n");
 });
 JS
+cat > legacy/duration <<'JS'
+#!/usr/bin/env node
+import { formatDuration, parseDuration } from "./duration.mjs";
+try {
+  console.log(formatDuration(parseDuration(process.argv[2] ?? "")));
+} catch (e) {
+  process.stderr.write(`duration: ${e.message}\n`);
+  process.exit(2);
+}
+JS
+chmod +x legacy/duration
+mkdir -p bin && ln -s ../legacy/duration bin/duration
+git add -A && git commit -qm "duration: parse and format durations"
+
 cat > src/duration.ts <<'TS'
 const UNITS: Record<string, number> = { ms: 1, s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
 
@@ -99,7 +113,7 @@ export function formatDuration(ms: number): string {
   return parts.join(" ");
 }
 TS
-cat > bin/duration <<'TS'
+cat > bin/duration.ts <<'TS'
 #!/usr/bin/env bun
 import { formatDuration, parseDuration } from "../src/duration.ts";
 try {
@@ -109,7 +123,9 @@ try {
   process.exit(1);
 }
 TS
-chmod +x bin/duration
+rm bin/duration
+chmod +x bin/duration.ts && mv bin/duration.ts bin/duration
+git rm -q legacy/duration.test.mjs
 cat > test/duration.test.ts <<'TS'
 import { expect, test } from "bun:test";
 import { DurationError, formatDuration, parseDuration } from "../src/duration.ts";
@@ -132,4 +148,4 @@ test("cli reports bad input", () => {
   expect(r.stderr.toString()).toContain("bad duration");
 });
 TS
-git add -A && git commit -qm "duration: port helpers and tests to TypeScript"
+git add -A && git commit -qm "duration: port to TypeScript" -m "Moves the tests to bun:test and points bin/duration at the port."

@@ -26,7 +26,7 @@ const files: Record<string, string> = {
   "plugins/q/skills/t/SKILL.md":
     '!`ctx --stack "${user_config.stack}"`\nauto: ${user_config.auto}, token: ${user_config.token}',
   "plugins/r/.claude-plugin/plugin.json": '{"name":"r","dependencies":["s","q"]}',
-  "plugins/s/.claude-plugin/plugin.json": '{"name":"s"}',
+  "plugins/s/.claude-plugin/plugin.json": '{"name":"s","dependencies":["up@elsewhere"]}',
   "plugins/bad/.claude-plugin/plugin.json": '{"name":"bad","dependencies":["missing"]}',
   "plugins/p/evals/suite/one/case.yaml": "plugins: [../../.., ../../../../q]\n",
   "plugins/p/evals/suite/one/prompt.md": "committed prompt",
@@ -85,10 +85,20 @@ describe("prepare", () => {
     const { target, evalDir } = await prepare(repo, "plugins/p/evals/suite", ref);
     expect(evalDir).toBe("p/evals/suite");
     expect(await read(join(target, "p/skills/s/SKILL.md"))).toBe(skill);
-    expect(await read(join(target, "s/.claude-plugin/plugin.json"))).toBe('{"name":"s"}');
-    expect(await read(join(target, evalDir, "one/case.yaml"))).toBe(
-      "plugins: [ ../../.., ../../../../q, ../../../../r, ../../../../s ]\n",
+    expect(await read(join(target, ".foreign/up/.claude-plugin/plugin.json"))).toBe(
+      '{"name":"up"}',
     );
+    expect(await read(join(target, evalDir, "one/case.yaml"))).toMatchInlineSnapshot(`
+      "plugins:
+        [
+          ../../..,
+          ../../../../q,
+          ../../../../r,
+          ../../../../s,
+          ../../../../.foreign/up
+        ]
+      "
+    `);
     expect(await read(join(target, evalDir, "one/prompt.md"))).toBe("working prompt");
     expect(await read(join(target, evalDir, "one/graders/fired.md"))).toBe("shared grader");
     expect(await Bun.file(join(target, evalDir, "graders/fired.md")).exists()).toBe(false);

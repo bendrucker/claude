@@ -73,11 +73,22 @@ Every open this skill makes or documents is resource-capped, because DuckDB's de
 
 The writers run sandboxed. `filesystem.allowWrite` in `user/settings.json` grants the index directory and `~/.claude/session-imports`, and the sandbox already allows `~/.claude/debug` and `~/.claude/mod-events`, which `refresh.ts` prunes. `pull.ts` also reaches S3 through the `aws` CLI, so it escapes through a `sandbox.excludedCommands` entry naming its deployed path. The legacy-index move out of `~/.claude/plugins` is the one write the sandbox still denies, and it fires only when an old index exists there.
 
+### Lake
+
+`lake.ts` publishes the index to a DuckLake on S3 that cloud readers query in place. [`docs/session-lake.md`](../../../../docs/session-lake.md) covers the design. Invariants to keep when changing it:
+
+- `resources/lake/publish.sql` does the publish in the DuckDB CLI. `lake.ts` keeps only egress checks, the catalog transfer, the attach, and the reader init.
+- The table plan comes from the index's catalog. A new view or table publishes with no change here, and one without `session_id` is replaced whole.
+- A view's `timestamp` must come from a `raw` row of the same session. A republish deletes a session's rows only from its earliest raw timestamp on, so an earlier row would stay in the lake.
+- One writer at a time, starting from the remote catalog every run.
+- The CLI's version must match `@duckdb/node-api`'s, or the catalog is unreadable.
+
 ### Callers
 
 - `db.ts`: orchestrates migration, schema, scan, per-file import, view rebuild and versioning, checkpoint, compaction.
 - `index-writer.ts`: the index lifecycle. Stamp fast path, lock retry and yield, `ensureIndex`, compaction guard, stamp write, `refresh` event, read-only opens.
 - `refresh.ts`: CLI entry point. Parses flags, runs the refresh in a detached worker, prints DB path to stdout.
+- `lake.ts`: publish to the lake and its `CHECKPOINT`, running `resources/lake/*.sql` in the DuckDB CLI, and the reader init.
 - `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly -init limits.sql` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock. `runQuery` appends a `session-index.query` event per read. Every scripted reader goes through `cliAdapter`.
 
 ### Development

@@ -1,0 +1,2 @@
+claude --bg --name add-lint-script -- <prompt>
+launch add-lint-script /tmp/eval/cwd/.worktrees/add-lint-script place=bg

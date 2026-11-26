@@ -5,10 +5,8 @@ import { $ } from "bun";
 import { BashInput, PreToolUse } from "./hook-input";
 
 /**
- * `git push -u` rewrites `branch.<name>.*` under the config lock even when the
- * values already match, and the sandbox denies every `.git/config` write, so
- * from a linked worktree the push lands and the upstream write fails. Hooks run
- * outside the sandbox, so this one records the tracking and drops the flag.
+ * A sandboxed `git push -u` can't write `.git/config` but still lands the push
+ * and exits 0. Hooks run outside the sandbox, so this one records the tracking.
  */
 
 const UPSTREAM_FLAGS = new Set(["-u", "--set-upstream"]);
@@ -36,8 +34,6 @@ const QUOTED_SPAN = /'[^']*'|"(?:[^"\\]|\\.)*"/g;
 const REDIRECTION = /^(?:\d*[<>]|&>)/;
 
 export interface UpstreamPush {
-  /** Offsets of the `-u` token in the original command. */
-  flag: { start: number; end: number };
   remote: string;
   /** The refspec's source, `HEAD` or a branch name. */
   source: string;
@@ -74,23 +70,22 @@ function segments(command: string): [number, number][] {
 }
 
 function readPush(args: Token[]): UpstreamPush | null {
-  let flag: Token | null = null;
+  let flag = false;
   const positionals: string[] = [];
   for (const arg of args) {
     if (REDIRECTION.test(arg.text)) break;
-    if (UPSTREAM_FLAGS.has(arg.text)) flag = arg;
+    if (UPSTREAM_FLAGS.has(arg.text)) flag = true;
     else if (arg.text.startsWith("--force-with-lease=")) continue;
     else if (PASSTHROUGH_FLAGS.has(arg.text)) continue;
     else if (arg.text.startsWith("-")) return null;
     else if (/^[\w./:+@-]+$/.test(arg.text)) positionals.push(arg.text);
     else return null;
   }
-  if (flag == null || positionals.length !== 2) return null;
+  if (!flag || positionals.length !== 2) return null;
 
   const [remote = "", refspec = ""] = positionals;
   const [source = "", destination] = refspec.replace(/^\+/, "").split(":", 2);
   return {
-    flag: { start: flag.start, end: flag.end },
     remote,
     source,
     destination: destination == null ? null : destination.replace(/^refs\/heads\//, ""),
@@ -115,10 +110,6 @@ export function parseUpstreamPush(command: string): UpstreamPush | null {
     return readPush(words.slice(push + 1));
   }
   return null;
-}
-
-export function dropFlag(command: string, { start, end }: UpstreamPush["flag"]): string {
-  return command.slice(0, start) + command.slice(end).replace(/^\s+/, "");
 }
 
 export interface Git {
@@ -173,8 +164,7 @@ export async function processInput(
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      updatedInput: { ...toolInput, command: dropFlag(command, push.flag) },
-      additionalContext: `The git plugin recorded ${branch}'s upstream as ${push.remote}/${destination} and removed -u from the push, because the sandbox denies the .git/config write -u makes.`,
+      additionalContext: `The git plugin recorded ${branch}'s upstream as ${push.remote}/${destination}. If this push prints "could not lock config file", the sandbox refused -u's redundant rewrite of it. The push still landed, so don't retry it or run --set-upstream-to.`,
     },
   };
 }

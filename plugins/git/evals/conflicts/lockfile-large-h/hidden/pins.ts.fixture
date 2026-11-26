@@ -1,0 +1,54 @@
+// usage: bun pins.ts <result-lock> <main-lock> <branch-lock>
+import { readFileSync } from "node:fs"
+
+type Lock = { packages: Record<string, { version?: string }> }
+
+function isLock(value: unknown): value is Lock {
+  if (typeof value !== "object" || value === null || !("packages" in value)) return false
+  const packages = value.packages
+  if (typeof packages !== "object" || packages === null) return false
+  return Object.values(packages).every(
+    (entry) =>
+      typeof entry === "object" &&
+      entry !== null &&
+      (!("version" in entry) || typeof entry.version === "string"),
+  )
+}
+
+function load(path: string): Lock {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"))
+  } catch (error) {
+    console.error(`${path} is not valid JSON: ${error}`)
+    process.exit(2)
+  }
+  if (!isLock(parsed)) {
+    console.error(`${path} is not a lockfile with a packages map`)
+    process.exit(2)
+  }
+  return parsed
+}
+
+const [resultPath, mainPath, branchPath] = process.argv.slice(2)
+const result = load(resultPath)
+const sides = [load(mainPath), load(branchPath)]
+
+const floated: string[] = []
+for (const [path, entry] of Object.entries(result.packages)) {
+  if (path === "" || entry.version === undefined) continue
+  const known = sides.flatMap((side) => {
+    const version = side.packages[path]?.version
+    return version === undefined ? [] : [version]
+  })
+  if (known.length > 0 && !known.includes(entry.version)) {
+    floated.push(`${path}: ${entry.version} (locked ${[...new Set(known)].join(" or ")})`)
+  }
+}
+
+if (floated.length > 0) {
+  console.error(`${floated.length} packages float away from both locked versions:`)
+  for (const line of floated.slice(0, 20)) console.error(`  ${line}`)
+  process.exit(1)
+}
+console.log("every pin matches main's or the branch's lockfile")

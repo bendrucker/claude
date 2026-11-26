@@ -1,0 +1,687 @@
+import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
+import {
+  collectText,
+  isProse,
+  lintMessages,
+  MCP_PROSE_GUARD,
+  messageKind,
+  pathCandidates,
+} from "./messages";
+import { report } from "./report";
+
+async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+  return report(await lintMessages(input), { event: "PreToolUse" })?.output ?? null;
+}
+
+function decisionOf(output: SyncHookJSONOutput | null): {
+  decision: string | undefined;
+  context: string | undefined;
+} {
+  const specific = output?.hookSpecificOutput;
+  if (specific?.hookEventName !== "PreToolUse") return { decision: undefined, context: undefined };
+  return { decision: specific.permissionDecision, context: specific.additionalContext };
+}
+
+function mockBash(command: string): PreToolUseHookInput {
+  return {
+    hook_event_name: "PreToolUse",
+    session_id: "test",
+    transcript_path: "/tmp/test",
+    cwd: "/tmp",
+    tool_name: "Bash",
+    tool_input: { command },
+    tool_use_id: "test",
+  };
+}
+
+function mockMcp(tool_name: string, tool_input: Record<string, unknown>): PreToolUseHookInput {
+  return { ...mockBash(""), tool_name, tool_input };
+}
+
+describe("pathCandidates", () => {
+  test.each([
+    ["tmp/body.md", ["tmp/body.md"]],
+    ["$TMPDIR/body.md", ["/tmp/body.md", "/tmp/claude-501/body.md"]],
+    ["${TMPDIR}/body.md", ["/tmp/body.md", "/tmp/claude-501/body.md"]],
+    ["$HOME/body.md", ["/home/me/body.md"]],
+  ])("expands %s", (path, expected) => {
+    expect(pathCandidates(path, { TMPDIR: "/tmp", HOME: "/home/me" }, 501)).toEqual(expected);
+  });
+});
+
+describe("collectText", () => {
+  describe("Bash commands", () => {
+    let dir: string;
+    let tmpFile: string;
+
+    beforeAll(() => {
+      dir = mkdtempSync(join(tmpdir(), "trope-test-"));
+      tmpFile = join(dir, "body.md");
+    });
+
+    afterAll(async () => {
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    it("reads --body-file content", async () => {
+      await Bun.write(tmpFile, "Body content here");
+      const texts = await collectText(mockBash(`gh pr create --body-file ${tmpFile}`));
+      expect(texts).toContain("Body content here");
+    });
+
+    it("reads --body-file= content", async () => {
+      await Bun.write(tmpFile, "Body content");
+      const texts = await collectText(mockBash(`gh pr create --body-file=${tmpFile}`));
+      expect(texts).toContain("Body content");
+    });
+
+    it("expands a shell variable in the --body-file path", async () => {
+      await Bun.write(tmpFile, "Expanded body");
+      process.env.TROPE_TEST_DIR = dir;
+      try {
+        const texts = await collectText(
+          mockBash('gh pr create --body-file "$TROPE_TEST_DIR/body.md"'),
+        );
+        expect(texts).toContain("Expanded body");
+      } finally {
+        delete process.env.TROPE_TEST_DIR;
+      }
+    });
+
+    it("extracts inline --body", async () => {
+      const texts = await collectText(mockBash('gh issue create --body "Issue description"'));
+      expect(texts).toContain("Issue description");
+    });
+
+    it("extracts inline --title", async () => {
+      const texts = await collectText(mockBash('gh issue create --title "My title"'));
+      expect(texts).toContain("My title");
+    });
+
+    it("reads gh api -F body=@file content", async () => {
+      await Bun.write(tmpFile, "Reply body");
+      const texts = await collectText(
+        mockBash(`gh api repos/x/issues/1/comments -F body=@${tmpFile}`),
+      );
+      expect(texts).toContain("Reply body");
+    });
+
+    it("reads glab api --field description=@file content", async () => {
+      await Bun.write(tmpFile, "MR description");
+      const texts = await collectText(
+        mockBash(`glab api projects/x/merge_requests --field description=@${tmpFile}`),
+      );
+      expect(texts).toContain("MR description");
+    });
+
+    it("reads shell-quoted field file paths", async () => {
+      await Bun.write(tmpFile, "Quoted body");
+      const texts = await collectText(mockBash(`gh api repos/x/y/issues -F 'body=@${tmpFile}'`));
+      expect(texts).toContain("Quoted body");
+    });
+
+    it("reads git commit -F message files", async () => {
+      await Bun.write(tmpFile, "Commit message body");
+      const texts = await collectText(mockBash(`git commit -F ${tmpFile}`));
+      expect(texts).toContain("Commit message body");
+    });
+
+    it("reads git tag --file message files", async () => {
+      await Bun.write(tmpFile, "Tag annotation");
+      const texts = await collectText(mockBash(`git tag -a v1.0.0 --file ${tmpFile}`));
+      expect(texts).toContain("Tag annotation");
+    });
+
+    describe("review command bodies", () => {
+      test.each<{ name: string; target: (path: string) => string }>([
+        { name: "a bare path", target: (path) => path },
+        { name: "a double-quoted path", target: (path) => `"${path}"` },
+        { name: "a single-quoted path", target: (path) => `'${path}'` },
+      ])("reads a stdin redirect from $name", async ({ target }) => {
+        await Bun.write(tmpFile, "Redirected note");
+        const texts = await collectText(mockBash(`glab mr note create 7 < ${target(tmpFile)}`));
+        expect(texts).toContain("Redirected note");
+      });
+
+      it("reads a stdin redirect after --reply", async () => {
+        await Bun.write(tmpFile, "Threaded reply");
+        const texts = await collectText(
+          mockBash(`glab mr note create 7 --reply abc123 <${tmpFile}`),
+        );
+        expect(texts).toContain("Threaded reply");
+      });
+
+      it("reads -m with cat substitution", async () => {
+        await Bun.write(tmpFile, "Summary via cat");
+        const texts = await collectText(
+          mockBash(`glab mr note draft publish 7 --yes -m "$(cat ${tmpFile})"`),
+        );
+        expect(texts).toEqual(["Summary via cat"]);
+      });
+
+      it("reads -m with redirect substitution", async () => {
+        await Bun.write(tmpFile, "Summary via redirect");
+        const texts = await collectText(
+          mockBash(`glab mr note draft publish 7 -m "$(< ${tmpFile})"`),
+        );
+        expect(texts).toEqual(["Summary via redirect"]);
+      });
+
+      it("reads inline -m", async () => {
+        const texts = await collectText(mockBash('glab mr note draft publish 7 -m "Ready now"'));
+        expect(texts).toEqual(["Ready now"]);
+      });
+
+      it("ignores a redirect inside a heredoc body", async () => {
+        await Bun.write(tmpFile, "Should not be read");
+        const texts = await collectText(
+          mockBash(`glab mr note create 7 <<'EOF'\nuse a < ${tmpFile} here\nEOF`),
+        );
+        expect(texts).toEqual([`use a < ${tmpFile} here\n`]);
+      });
+
+      it("ignores a redirect inside quotes", async () => {
+        await Bun.write(tmpFile, "Should not be read");
+        const texts = await collectText(mockBash(`glab mr note create 7 -m 'a < ${tmpFile}'`));
+        expect(texts).not.toContain("Should not be read");
+      });
+
+      it("ignores a redirect on a non-review command", async () => {
+        await Bun.write(tmpFile, "Should not be read");
+        expect(await collectText(mockBash(`jq . < ${tmpFile}`))).toHaveLength(0);
+      });
+
+      it("reads only the review command's redirect in a compound command", async () => {
+        const other = join(dir, "data.md");
+        await Bun.write(other, "Should not be read");
+        await Bun.write(tmpFile, "Redirected note");
+        const texts = await collectText(
+          mockBash(`jq . < ${other} && glab mr note create 7 < ${tmpFile}`),
+        );
+        expect(texts).toEqual(["Redirected note"]);
+      });
+    });
+
+    test.each<{ name: string; command: string; expected: string[] }>([
+      {
+        name: "escaped quotes inside a flag value",
+        command: String.raw`gh issue create --body "say \"hi\" now"`,
+        expected: ['say "hi" now'],
+      },
+      {
+        name: "a flag inside another command's quoted argument",
+        command: `echo "--body 'Not a body'" && git status`,
+        expected: [],
+      },
+      {
+        name: "a flag on a command chained after the body",
+        command: `gh issue create --title "Real title" && other --title`,
+        expected: ["Real title"],
+      },
+    ])("inline values: $name", async ({ command, expected }) => {
+      expect(await collectText(mockBash(command))).toEqual(expected);
+    });
+
+    it("reads a --body cat substitution", async () => {
+      await Bun.write(tmpFile, "Body via cat");
+      const texts = await collectText(mockBash(`gh pr create --body "$(cat ${tmpFile})"`));
+      expect(texts).toEqual(["Body via cat"]);
+    });
+
+    it("ignores bare -F outside git commands", async () => {
+      const texts = await collectText(mockBash("curl -F upload=/tmp/data.bin https://x"));
+      expect(texts).toHaveLength(0);
+    });
+
+    it("ignores field flags with inline values", async () => {
+      const texts = await collectText(mockBash("gh api repos/x -F state=closed"));
+      expect(texts).toHaveLength(0);
+    });
+
+    it("ignores stdin field files", async () => {
+      const texts = await collectText(mockBash("gh api repos/x -F body=@-"));
+      expect(texts).toHaveLength(0);
+    });
+
+    it("returns empty for commands without text args", async () => {
+      const texts = await collectText(mockBash("git status"));
+      expect(texts).toHaveLength(0);
+    });
+  });
+});
+
+const DASHED = "The parser \u2014 which ran last week \u2014 drops the newline.";
+
+describe("git and heredoc messages", () => {
+  test.each<{
+    name: string;
+    command: string;
+    texts: string[];
+    kind: ReturnType<typeof messageKind>;
+  }>([
+    {
+      name: "git commit -m",
+      command: "git commit -m 'fix: parser'",
+      texts: ["fix: parser"],
+      kind: "commit",
+    },
+    {
+      name: "repeated -m joined as paragraphs",
+      command: `git commit -m "fix: parser" -m "Keeps the line break." -m "Second paragraph."`,
+      texts: ["fix: parser\n\nKeeps the line break.\n\nSecond paragraph."],
+      kind: "commit",
+    },
+    {
+      name: "-m ending a short-flag cluster",
+      command: `git commit --amend -am "fix: parser"`,
+      texts: ["fix: parser"],
+      kind: "commit",
+    },
+    {
+      name: "a multi-line -m",
+      command: `git commit -m "fix: parser\n\nThe break\nsurvives."`,
+      texts: ["fix: parser\n\nThe break\nsurvives."],
+      kind: "commit",
+    },
+    {
+      name: "git tag -m",
+      command: `git tag -a v1.2.0 -m "Release notes."`,
+      texts: ["Release notes."],
+      kind: "commit",
+    },
+    {
+      name: "heredoc --body",
+      command: `gh pr create --title "Fix parser" --body "$(cat <<'EOF'\nBody text.\n\nMore.\nEOF\n)"`,
+      texts: ["Fix parser", "Body text.\n\nMore.\n"],
+      kind: "body",
+    },
+    {
+      name: "heredoc -m",
+      command: `git commit -m "$(cat <<'EOF'\nfix: parser\n\nBody.\nEOF\n)"`,
+      texts: ["fix: parser\n\nBody.\n"],
+      kind: "commit",
+    },
+    {
+      name: "git commit -F - with a heredoc",
+      command: `cd repo && git commit -F - <<EOF\nfix: parser\n\nBody for $USER.\nEOF`,
+      texts: ["fix: parser\n\nBody for $USER.\n"],
+      kind: "commit",
+    },
+    {
+      name: "review command heredoc stdin",
+      command: `glab mr note create 7 <<'EOF'\nThe retry swallows the error.\nEOF`,
+      texts: ["The retry swallows the error.\n"],
+      kind: "review",
+    },
+    { name: "-m on another CLI", command: "python -m pytest -q", texts: [], kind: "body" },
+    {
+      name: "a heredoc into a file",
+      command: `cat <<'EOF' > notes.md\nNot a message.\nEOF`,
+      texts: [],
+      kind: "body",
+    },
+    {
+      name: "a heredoc without -F -",
+      command: `git commit -m "fix: parser" <<'EOF'\nNot read.\nEOF`,
+      texts: ["fix: parser"],
+      kind: "commit",
+    },
+  ])("$name", async ({ command, texts, kind }) => {
+    expect(await collectText(mockBash(command))).toEqual(texts);
+    expect(messageKind(mockBash(command))).toBe(kind);
+  });
+
+  test.each<{ name: string; command: string }>([
+    { name: "git commit -m", command: `git commit -m "fix: parser" -m "${DASHED}"` },
+    { name: "git tag -m", command: `git tag -a v1 -m "${DASHED}"` },
+    { name: "heredoc --body", command: `gh pr create --body "$(cat <<'EOF'\n${DASHED}\nEOF\n)"` },
+    { name: "heredoc -m", command: `git commit -m "$(cat <<'EOF'\nfix: x\n\n${DASHED}\nEOF\n)"` },
+    { name: "git commit -F -", command: `git commit -F - <<'EOF'\nfix: x\n\n${DASHED}\nEOF` },
+  ])("denies an error-level phrase in $name", async ({ command }) => {
+    expect(decisionOf(await processInput(mockBash(command))).decision).toBe("deny");
+  });
+
+  test.each<string>([
+    "fix: parser",
+    "feat(writing): lint git commit -m messages",
+    "chore: bump vale to 3.9",
+    "docs: fix typo in README",
+    "refactor!: drop the legacy flag",
+  ])("a short subject stays silent: %s", async (subject) => {
+    expect(await processInput(mockBash(`git commit -m "${subject}"`))).toBeNull();
+  });
+});
+
+describe("Bash processInput", () => {
+  it("denies Bash inline arg with spaced em dash", async () => {
+    const result = await processInput(
+      mockBash(
+        'gh pr create --body "This feature \u2014 which was added last week \u2014 is broken"',
+      ),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+  });
+
+  it("flags Bash body-file with AI vocabulary as context", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trope-test-"));
+    const file = join(dir, "body.md");
+    await Bun.write(file, "This is a tool, not a framework.");
+    const result = await processInput(mockBash(`gh pr create --body-file ${file}`));
+    await rm(dir, { recursive: true, force: true });
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
+  });
+
+  it("does not deny Bash commands containing flagged tokens as literals", async () => {
+    const result = await processInput(mockBash('gh pr create --title "Rename underscore field"'));
+    if (result) {
+      expect(result.hookSpecificOutput).not.toHaveProperty("permissionDecision");
+    }
+  });
+
+  it("flags a review comment that opens with a greeting", async () => {
+    const result = await processInput(
+      mockBash(
+        `glab mr note 871 --message "Hey Dana, this fires for the entire run rather than the changed files."`,
+      ),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+
+  it("flags a body-file comment that opens with a greeting", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trope-test-"));
+    const file = join(dir, "body.md");
+    await Bun.write(file, "Hi Dana,\n\nThe retry loop swallows the error.\n");
+    const result = await processInput(mockBash(`gh pr review --body-file ${file}`));
+    await rm(dir, { recursive: true, force: true });
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+
+  it("returns null for non-text Bash commands", async () => {
+    expect(await processInput(mockBash("git push origin main"))).toBeNull();
+  });
+});
+
+describe("review payloads", () => {
+  const dense = {
+    comments: [
+      {
+        body: "Dropping `parse_error` deletes `GRAMMAR_LINE`, `extractLine`, and the `patch` fallback. The event reads only structured fields.",
+      },
+    ],
+  };
+  const light = {
+    comments: [
+      {
+        body: "Dropping the error message deletes the regexes too. The event reads only structured fields.",
+      },
+    ],
+  };
+  let dir: string;
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "review-payload-test-"));
+    await Bun.write(join(dir, "dense.json"), JSON.stringify(dense));
+    await Bun.write(join(dir, "light.json"), JSON.stringify(light));
+    await Bun.write(join(dir, "dense.md"), dense.comments[0]?.body ?? "");
+    await Bun.write(join(dir, "review draft.json"), JSON.stringify(dense));
+  });
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  const denseBody = dense.comments[0]?.body ?? "";
+
+  test.each<{ name: string; input: (dir: string) => PreToolUseHookInput; denied: boolean }>([
+    {
+      name: "a dense draft-note batch is denied",
+      input: (d) => mockBash(`bun draft-note.ts review 1 --input ${d}/dense.json`),
+      denied: true,
+    },
+    {
+      name: "a dense gh api review is denied",
+      input: (d) => mockBash(`gh api repos/o/r/pulls/1/reviews --input ${d}/dense.json`),
+      denied: true,
+    },
+    {
+      name: "a light draft-note batch passes",
+      input: (d) => mockBash(`bun draft-note.ts review 1 --input ${d}/light.json`),
+      denied: false,
+    },
+    {
+      name: "a dense batch at a quoted path with a space is denied",
+      input: (d) => mockBash(`bun draft-note.ts review 1 --input "${d}/review draft.json"`),
+      denied: true,
+    },
+    {
+      name: "a dense discussions.ts comment is denied",
+      input: (d) => mockBash(`bun discussions.ts create 1 --body-file ${d}/dense.md`),
+      denied: true,
+    },
+    {
+      name: "a dense MCP review comment is denied",
+      input: () => mockMcp("mcp__github__add_pull_request_review_comment", { body: denseBody }),
+      denied: true,
+    },
+    {
+      name: "a dense issue comment is out of scope",
+      input: () => mockMcp("mcp__claude_ai_Linear__save_comment", { body: denseBody }),
+      denied: false,
+    },
+    {
+      name: "a dense PR body is out of scope",
+      input: (d) => mockBash(`gh pr create --body-file ${d}/dense.md`),
+      denied: false,
+    },
+  ])("$name", async ({ input, denied }) => {
+    const alerts = await lintMessages(input(dir));
+    const density = alerts.filter((alert) => alert.check === "Writing.CodeDensity");
+    expect(density.map((alert) => alert.decision)).toEqual(denied ? ["deny"] : []);
+  });
+
+  it("never reads an --input payload for an unrelated command", async () => {
+    expect(await collectText(mockBash(`mytool convert --input ${dir}/dense.json`))).toEqual([]);
+  });
+
+  it("skips a payload that is not JSON", async () => {
+    const file = join(dir, "dense.md");
+    expect(await collectText(mockBash(`gh api repos/o/r/pulls/1/reviews --input ${file}`))).toEqual(
+      [],
+    );
+  });
+});
+
+describe("MCP calls", () => {
+  it("reads prose at any depth and under any field name", async () => {
+    const texts = await collectText(
+      mockMcp("mcp__any__tool", {
+        question: "Ship the fix?",
+        options: [{ label: "Ship", consequence: "The PR merges and adds no tests." }],
+        recommended: 0,
+      }),
+    );
+    expect(texts).toEqual(["The PR merges and adds no tests."]);
+  });
+
+  it("leaves a query that negates the noun alone", async () => {
+    expect(
+      await processInput(mockMcp("mcp__github__search_code", { query: "costs no extra" })),
+    ).toBeNull();
+  });
+});
+
+describe("isProse", () => {
+  it.each([
+    "The sweep ran overnight and found two stale entries.",
+    "Done. The handler now reads the cache before it calls the API.",
+    "| a | b |\n\nThe table above lists every run that timed out.",
+    "The plugin comes out of the list under `enabledPlugins`.",
+  ])("reads %p as prose", (text) => {
+    expect(isProse(text)).toBe(true);
+  });
+
+  it.each([
+    "SELECT id FROM runs WHERE state = 'done';",
+    "negation hook latency",
+    '{"type": "none", "value": "x"}',
+    "/Users/ben/tmp/negation-escapes/cand.jsonl",
+    "Run `bun test plugins/writing/hooks/messages.test.ts --timeout 15000`.",
+  ])("reads %p as not prose", (text) => {
+    expect(isProse(text)).toBe(false);
+  });
+});
+
+describe("isProse properties", () => {
+  const word = gs.text({ alphabet: "abcdefghijklmnopqrstuvwxyz", minSize: 1, maxSize: 12 });
+  const capitalized = word.map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+  const number = gs.integers({ minValue: 0, maxValue: 100_000 }).map(String);
+  const terminator = gs.sampledFrom([".", "!", "?", ":"]);
+  const separator = gs.sampledFrom([" ", "  ", "\t", " \t "]);
+  const sentence = gs.composite((tc) => {
+    const words = tc.draw(
+      gs.arrays(gs.oneOf(word, word, word, number), { minSize: 3, maxSize: 30 }),
+    );
+    let text = tc.draw(capitalized);
+    for (const w of words) text += tc.draw(separator) + w;
+    return text + tc.draw(terminator);
+  });
+  const noise = gs.text({
+    alphabet: "aZ09 _-./:;,'\"`*#>|()[]{}=<>!?$@~\t\n\\é’—",
+    maxSize: 200,
+  });
+
+  test("a capitalized run of words ending in a terminator is prose", () => {
+    hegel.test((tc) => {
+      const text = tc.draw(sentence);
+      if (!isProse(text)) throw new Error(`not prose: ${JSON.stringify(text)}`);
+    });
+  });
+
+  test("markdown list, quote, heading, and emphasis wrappers keep prose", () => {
+    hegel.test((tc) => {
+      const text = tc.draw(sentence);
+      const [open, close] = tc.draw(
+        gs.sampledFrom([
+          ["- ", ""],
+          ["* ", ""],
+          ["1. ", ""],
+          ["> ", ""],
+          ["## ", ""],
+          ["**", "**"],
+          ["_", "_"],
+          ["(", ")"],
+          ['"', '"'],
+        ]),
+      );
+      const wrapped = open + text + close;
+      if (!isProse(wrapped)) throw new Error(`not prose: ${JSON.stringify(wrapped)}`);
+    });
+  });
+
+  test("a trailing code span before the terminator keeps prose", () => {
+    hegel.test((tc) => {
+      const text = tc.draw(sentence);
+      const code = tc.draw(gs.text({ alphabet: "abc-_./ ={}$", minSize: 1, maxSize: 40 }));
+      const spanned = `${text.slice(0, -1)} \`${code}\`${text.slice(-1)}`;
+      if (!isProse(spanned)) throw new Error(`not prose: ${JSON.stringify(spanned)}`);
+    });
+  });
+
+  test("a line of anything else never hides a prose line", () => {
+    hegel.test((tc) => {
+      const text = tc.draw(sentence);
+      const other = tc.draw(noise);
+      for (const joined of [`${text}\n${other}`, `${other}\n${text}`]) {
+        if (!isProse(joined)) throw new Error(`not prose: ${JSON.stringify(joined)}`);
+      }
+    });
+  });
+
+  test("text without three separated tokens is never prose", () => {
+    hegel.test((tc) => {
+      const parts = tc.draw(
+        gs.arrays(gs.text({ alphabet: "aZ09_-./:'\"*#()!?é’", maxSize: 40 }), { maxSize: 3 }),
+      );
+      const text = parts.join(tc.draw(separator));
+      if (isProse(text)) throw new Error(`prose: ${JSON.stringify(text)}`);
+    });
+  });
+
+  test("JSON, SQL, and shell commands are never prose", () => {
+    hegel.test((tc) => {
+      const ident = gs.fromRegex("[a-z_][a-z0-9_]{0,15}");
+      const value = gs.oneOf(ident, number, gs.booleans().map(String));
+      const text = tc.draw(
+        gs.oneOf(
+          gs
+            .arrays(gs.tuples(ident, value), { maxSize: 8 })
+            .map((kv) => JSON.stringify(Object.fromEntries(kv), null, 2)),
+          gs
+            .tuples(gs.arrays(ident, { minSize: 1, maxSize: 6 }), ident, ident, value)
+            .map(
+              ([cols, table, col, v]) =>
+                `SELECT ${cols.join(", ")} FROM ${table} WHERE ${col} = '${v}' ORDER BY ${col} LIMIT 10;`,
+            ),
+          gs
+            .tuples(ident, gs.arrays(gs.tuples(ident, value), { maxSize: 6 }))
+            .map(
+              ([cmd, flags]) =>
+                `${cmd} ${flags.map(([f, v]) => `--${f}=${v}`).join(" ")} ./src/${cmd}.ts`,
+            ),
+        ),
+      );
+      if (isProse(text)) throw new Error(`prose: ${JSON.stringify(text)}`);
+    });
+  });
+
+  test("the hooks.json grep matches every call that holds prose", () => {
+    const guard = new RegExp(MCP_PROSE_GUARD);
+    hegel.test(
+      (tc) => {
+        const parts = tc.draw(gs.arrays(gs.oneOf(sentence, noise), { minSize: 1, maxSize: 4 }));
+        const text = parts.join(tc.draw(gs.sampledFrom(["", " ", "\n", "`"])));
+        const stdin = JSON.stringify({ tool_name: "mcp__x__y", tool_input: { body: text } });
+        if (isProse(text) && !guard.test(stdin)) throw new Error(`guard skips prose: ${stdin}`);
+      },
+      { testCases: 1000 },
+    );
+  });
+});
+
+describe("negated nouns", () => {
+  test.each<{ name: string; input: PreToolUseHookInput }>([
+    {
+      name: "an MR body",
+      input: mockBash(
+        `glab mr create --description "The handler reads the cache, so the event costs no extra query."`,
+      ),
+    },
+    {
+      name: "a GitHub PR body",
+      input: mockMcp("mcp__github__create_pull_request", {
+        owner: "o",
+        repo: "r",
+        title: "Cache the lookup",
+        body: "The handler reads the cache, so the event costs no extra query.",
+      }),
+    },
+    {
+      name: "a thread reply",
+      input: mockMcp("mcp__hearthbot__post_message", {
+        text: "The sweep ran, so the queue clears on its own.",
+      }),
+    },
+  ])("warns on $name without denying it", async ({ input }) => {
+    const { decision, context } = decisionOf(await processInput(input));
+    expect(decision).toBeUndefined();
+    expect(context).toContain("ai-tells.ConsequenceClause");
+  });
+});

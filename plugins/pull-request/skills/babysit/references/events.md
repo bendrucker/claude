@@ -1,47 +1,51 @@
 # Other Events
 
-Load this when the watcher emits an event other than `running`, `failing`, or `success`. [SKILL.md](../SKILL.md#event-handlers) covers those three.
+Handlers for watcher events other than `running`, `failing`, and `success`, which [SKILL.md](../SKILL.md#event-handlers) covers.
 
 #### conflicts
 
-Reproduce the conflict locally to identify the conflicting files:
+Find the conflicting files with a dry-run merge:
 
 ```
+git fetch origin <base>
 git merge origin/<base> --no-commit --no-ff
 git diff --name-only --diff-filter=U
 git merge --abort
 ```
 
-Lockfiles or generated files (`bun.lock`, etc.): regenerate per project convention (e.g. `rm bun.lock && bun install`), commit, push.
+Resolve by merging `origin/<base>` in and pushing a merge commit. A merge commit keeps the head's reviews and every checkout of the branch valid. Delegate the conflicted files to `git:conflicts`, and stash only by the SHA it records, since the stash stack is shared across worktrees.
 
-Real source conflicts: merge `origin/<base>` in (never rebase, which needs a force-push) and delegate to the `git:conflicts` skill. Resolve, commit, and push where mechanically clear. Where ambiguous or semantic, report the conflicting hunks and call `TaskStop` (this runs unattended, so never guess a merge).
+- Lockfiles and generated files (`bun.lock`, etc.): regenerate per project convention (e.g. `rm bun.lock && bun install`).
+- Additive keyed maps, where parallel PRs each add entries to one object: keep both sides' keys. In this marketplace those are `pluginConfigs` in `user/settings.json` and `userConfig` in a plugin's `plugin.json`.
+- Mechanically clear source conflicts: resolve.
+- A key both sides changed to different values, or any ambiguous or semantic conflict: report the hunks and `TaskStop`, since this runs unattended.
 
-In Merge Mode, after any push here, re-arm per [Merge Mode](../SKILL.md#merge-mode) and count it as a submit attempt.
+Commit and push. In Merge Mode, re-arm per [`merge-mode.md`](../merge-mode.md#re-arm) and count it as a submit attempt.
 
 #### mergeable-unknown
 
-The platform could not determine mergeability after its own bounded re-polling, so run the authoritative local check: `git fetch origin <base>`, then the same dry-run as [conflicts](#conflicts). Conflicting paths route through that handler. If the merge is clean, report that the PR is mergeable and keep watching.
+The platform has already re-polled and could not decide. Run the dry-run from [conflicts](#conflicts). Route conflicting paths through that handler. When the merge is clean, report the PR as mergeable and keep watching.
 
 #### queued-timeout
 
-Report the event (include `minutes`) and wait. The watcher continues polling.
+Report the event with `minutes` and keep watching.
 
 #### api-error
 
-Report the event (include `consecutive`). If consecutive errors continue past a second threshold event, call `TaskStop`.
+Report the event with `consecutive`. On a second threshold event, `TaskStop`.
 
 #### rate-limited
 
-Report `retry_after` and wait. The watcher resumes polling once the window elapses.
+Report `retry_after` and keep watching.
 
 #### pr-closed
 
-The PR closed without merging, or its source branch no longer exists. Report and stop. The watcher has already exited.
+The PR closed without merging, or its source branch is gone. Report and stop. The watcher has exited.
 
 #### merged
 
-The PR landed. In [Merge Mode](../SKILL.md#merge-mode) this is the success terminal: report the merge and the work done since the start SHA, then stop. The watcher has already exited.
+In Merge Mode this is the success terminal. Report the merge and the commits since the start SHA, then stop. The watcher has exited.
 
 #### max-time-reached
 
-Report the event (include `minutes`) and the work done since the start SHA, then stop. The watcher has already exited; do not re-arm (see [Bounds](../SKILL.md#bounds)).
+Report the event with `minutes` and the commits since the start SHA, then stop without re-arming. The watcher has exited.

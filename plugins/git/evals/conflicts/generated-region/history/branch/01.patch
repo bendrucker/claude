@@ -1,0 +1,252 @@
+diff --git a/plugins/observability/skills/session/references/catalog.md b/plugins/observability/skills/session/references/catalog.md
+index a0381c27..cbcb1b5b 100644
+--- a/plugins/observability/skills/session/references/catalog.md
++++ b/plugins/observability/skills/session/references/catalog.md
+@@ -22,6 +22,13 @@ The query listings are generated from the `-- ---` headers on `resources/queries
+   Every section but `verdict` exists only for sessions run with debug logging on, and `verdict` only where the mod was enabled. Both sources are this machine's, so every row is `local`.
+ 
+   Params: `after_date`, `before_date`, `host`.
++- `cli-health`: Bash calls grouped by the program they run, with error rates that count SQL errors a zero exit hid, latency, retries, and the top error signatures. One row per (`host`, `program`). `program` is the first command's basename after leading `cd <dir> &&` hops and `VAR=value` assignments are stripped, so `cd x && D=y; duckdb ...` reads as `duckdb`. That extraction is a heuristic: a command opening with a subshell, a loop, or a quoted path lands under whatever token comes first.
++
++  `error_pct` is the share of calls whose result carried `is_error`, a non-zero exit. `hidden_error_pct` is the share that exited 0 but printed a DuckDB `Binder`, `Parser`, `Catalog`, `Conversion`, or `IO` error, which `tool-failure-rates` cannot see because it reads `is_error` alone. A pipe into `head` or `tail` is the usual cause. `retry_pct` is the share of failed calls (either kind) followed by another call to the same program in the same agent thread within two minutes.
++
++  `p50_gap_s` and `p90_gap_s` are the gap from the call to its result. They include permission prompts and approval time, so they bound latency from above. `top_errors` lists the commonest normalized signatures with counts, digits and paths stripped and quoted identifiers kept, so a guessed column or a reserved-word alias reads straight off the signature.
++
++  Params: `min_calls` (default `30`, floor on a program's call count), `limit` (default `5`, signatures per program), `after_date`, `before_date`, `project`, `host`.
+ - `delegation`: Whether expensive orchestrator sessions push work down to cheaper models on Agent/Task spawns. One row per (parent main-model family, `path`, actual spawn-model family). `path` splits `pinned` (purpose-built agents that set a `model:` in their own definition, re-derivable from the `model` column of `bun run inventory agents` plus the built-in `claude-code-guide`) from `generic` (`general-purpose`, `Plan`, bare `claude`, `Explore`, any subagent type off that list). A purpose-built agent with no frontmatter `model:` (`review:angle`, `review:verifier`) counts as generic, because its spawn site still has to supply the model. `Explore` counts as generic, not pinned: since CLI v2.1.198 it inherits the parent model (capped at Opus) rather than pinning Haiku, so an Explore spawn under an expensive parent is a real delegation miss. Unrecognized types default to generic, so the split undercounts `pinned` rather than overstating the generic-path miss. The generic path is where delegation actually happens or fails, because a pinned agent's model is fixed by its own definition.
+ 
+   `override_rate_pct` and `cheaper_override_rate_pct` divide by every spawn in the group, so they read as how much of that group's delegation was steered. A cheaper override is an explicit `model` input naming a family cheaper than the parent's dominant model, compared via `model_output_rate`.
+@@ -69,14 +76,14 @@ The query listings are generated from the `-- ---` headers on `resources/queries
+   Params: `event` (hook_event filter), `hook` (GLOB on command/name), `after_date`, `before_date`, `project`, `host`.
+ - `index-health`: The index auditing itself. Run it first in any analysis pass, since its alerts cap what the rest can claim. Every other named query assumes the index reflects reality. This one checks the index against its own history and against the disk, surfacing the ways a query can return a confidently wrong answer with no error. One row per issue (`check_name`, `status`, `subject`, `detail`), alerts before info. It deliberately takes no date, project, or host scoping, because health is corpus-level. An empty alert set means these checks found nothing, not that the index is complete: thinking text, cloud sessions, and pre-retention history are structurally absent (see SKILL.md "Known Blind Spots").
+ 
+-  Alerts. `stream-silent` is a record kind that posted regularly and then went quiet longer than its own worst historical gap, the signature of an upstream rename or removal that leaves every query reading that kind returning stale or empty results with no staleness signal. `host-staleness` is an imported host whose newest record lags the corpus, so cross-host queries read a dead snapshot as an idle machine. `disk-not-indexed` is JSONL files on disk missing from the index, which also catches files created since the last refresh, so rerun `refresh.ts --refresh` before reading one as a refresh failure or glob drift.
++  Alerts. `stream-silent` is a record kind that posted regularly and then went quiet longer than its own worst historical gap, the signature of an upstream rename or removal that leaves every query reading that kind returning stale or empty results with no staleness signal. `host-staleness` is an imported host whose newest record lags the corpus, so cross-host queries read a dead snapshot as an idle machine. `disk-not-indexed` is JSONL files on disk missing from the index, which also catches files created since the last refresh, so rerun `refresh.ts --refresh` before reading one as a refresh failure or glob drift. `refresh-health` reads refresh.ts's own `session-index.refresh` events and alerts on a slow p90 among runs that indexed, or on any lock-yield or error run. Each run's event reaches the index on the next refresh, so the newest is absent.
+ 
+   Info. `stream-migrated` is the same silence with a registered successor field still arriving on another record type, named in `detail`, so the kind's zero is a rename rather than an absence. `stream-new` is kinds first seen recently, shipping unconsumed, each a triage prompt. `hook-deny-invisible` measures denies recovered from tool_results against the PreToolUse blocks `hook_events` actually recorded over the same window, sizing how much blocking a `hook_events`-only reading misses, and alerts when recovery exceeds what was recorded. Its detail breaks out how many were a subagent being denied. `null-timestamp-kinds` is kinds whose rows carry no timestamp, which `date_filter` excludes from every date-scoped query. `indexed-not-on-disk` is indexed files deleted from disk, dropped by the next refresh rather than retained. `corpus-window` is the span each host actually covers, the floor under any all-time claim.
+ 
+-  Params: `min_active_days` (default `5`, stream-silent eligibility), `new_days` (default `14`, stream-new window), `stale_days` (default `2`, host-staleness threshold), `deny_window_days` (default `30`, hook-deny-invisible window), `projects_glob` (default `~/.claude/projects/**/*.jsonl`, the disk check's glob, which needs the same override given to refresh.ts when CLAUDE_PROJECTS_DIR is customized).
++  Params: `min_active_days` (default `5`, stream-silent eligibility), `new_days` (default `14`, stream-new window), `stale_days` (default `2`, host-staleness threshold), `deny_window_days` (default `30`, hook-deny-invisible window), `refresh_days` (default `7`, refresh-health window), `refresh_slow_ms` (default `30000`, refresh-health p90 ceiling for runs that indexed), `projects_glob` (default `~/.claude/projects/**/*.jsonl`, the disk check's glob, which needs the same override given to refresh.ts when CLAUDE_PROJECTS_DIR is customized).
+ - `keys`: Which top-level JSON keys appear in `raw.data`, the unstructured part, with occurrence counts. Samples 500 chat rows rather than scanning the corpus, so it answers what a record carries before you reach in with `data->>'$.path'`, not how often a key occurs overall.
+ - `model-summary`: Assistant text item, message, session, and character counts per model. Reads `text_content`, so it measures prose volume rather than tokens. Use `usage-timeline` or `top-sessions` for spend. Params: `after_date`, `before_date`, `project`, `host`.
+-- `mods`: Whether each mod was live and healthy: the sessions it started in, the events it emitted, how many failed, and where the sessions were reached from. One row per (`mod`, `week`, `event_name`), read from `mod_events`, which the mod-events plugin writes for every mod that depends on it.
++- `mods`: Whether each mod was live and healthy: the sessions it started in, the events it emitted, how many failed, and where the sessions were reached from. One row per (`mod`, `week`, `event_name`), read from `mod_events`, which the mod-events plugin writes for every mod that depends on it. The `session-index` rows are this skill's own: `refresh` per refresh.ts run, with its outcome, and `query` per read through query.ts, so a failed read or a `schema-map` fallback counts under `failed`.
+ 
+   Each mod emits `<mod>.session.start` once per session it loads in, so `sessions` on that row is the mod's reach and a mod missing from a week was not loaded. `failed` counts events logged at WARN or above, and `p50_ms`/`p90_ms` come from the events that carry `duration_ms`. `surfaces` tallies the resource surface on the mod-events plugin's own heartbeat (`local`, `mosh`, or `ssh`, judged from the herdr clients attached when the session started), and is NULL on every other row. Rows outlive the JSONL they came from, which retention prunes by size, and every row is `local`.
+ 
+diff --git a/plugins/observability/skills/session/references/discovery.md b/plugins/observability/skills/session/references/discovery.md
+index 3e0854bf..c8270611 100644
+--- a/plugins/observability/skills/session/references/discovery.md
++++ b/plugins/observability/skills/session/references/discovery.md
+@@ -26,7 +26,7 @@ This table and the Tier-2 list below are generated from the `-- ---` headers on
+ | Hook blocks | `hook-block-then-retry-success` | `hook-blocks`, `hooks` |
+ | Hook coverage | `hook-config-vs-observed` | `hooks` |
+ | Permissions and sandbox | `already-allowed-still-prompting`, `sandbox-bypass-effective-command`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox` |
+-| Tool failures | `tool-failure-rates` | `errors` |
++| Tool failures | `cli-health`, `tool-failure-rates` | `errors` |
+ | Context tax | `catalog-reinjection-thrash-sessions` | `activity`, `hooks` (additionalContext) |
+ | Tokens | `delegation`, `repeat-read-waste`, `top-sessions` | `stats`, `model-summary`, `skill-activity` |
+ | Turns and compaction | `stop-hook-noop-detector` | `activity` (compactions, API errors) |
+@@ -77,6 +77,7 @@ Additional queries in `resources/queries/`, aimed at the self-improvement loop r
+ - `already-allowed-still-prompting`: Bash permission prompts whose command matches a `permissions.allow` pattern you pass as `allow_glob`.
+ - `catalog-reinjection-thrash-sessions`: Sessions re-injecting the full skill catalog and deferred-tools delta, cumulatively re-billing the same context.
+ - `classifier`: Auto-mode classifier volume and latency, the permission stall on every dispatched call, the allow rules auto mode dropped, and which calls the engine routed to the classifier.
++- `cli-health`: Bash calls grouped by the program they run, with error rates that count SQL errors a zero exit hid, latency, retries, and the top error signatures.
+ - `hook-origin-split`: Hook wall-clock split between portable shared config and arbitrary per-repo project hooks.
+ - `hook-self-timing`: Hook latency from the hooks' own clocks, read off `~/.claude/hook-metrics/*.jsonl` rather than the index.
+ - `mods`: Whether each mod was live and healthy: the sessions it started in, the events it emitted, how many failed, and where the sessions were reached from.
+diff --git a/plugins/observability/skills/session/resources/queries/cli-health.sql b/plugins/observability/skills/session/resources/queries/cli-health.sql
+new file mode 100644
+index 00000000..a6d85081
+--- /dev/null
++++ b/plugins/observability/skills/session/resources/queries/cli-health.sql
+@@ -0,0 +1,112 @@
++-- ---
++-- name: cli-health
++-- tier: 2
++-- dimensions: [tool-failures]
++-- summary: >-
++--   Bash calls grouped by the program they run, with error rates that count SQL errors a
++--   zero exit hid, latency, retries, and the top error signatures.
++-- description: >-
++--   One row per (`host`, `program`). `program` is the first command's basename after
++--   leading `cd <dir> &&` hops and `VAR=value` assignments are stripped, so `cd x && D=y;
++--   duckdb ...` reads as `duckdb`. That extraction is a heuristic: a command opening with a
++--   subshell, a loop, or a quoted path lands under whatever token comes first.
++--
++--   `error_pct` is the share of calls whose result carried `is_error`, a non-zero exit.
++--   `hidden_error_pct` is the share that exited 0 but printed a DuckDB `Binder`, `Parser`,
++--   `Catalog`, `Conversion`, or `IO` error, which `tool-failure-rates` cannot see because
++--   it reads `is_error` alone. A pipe into `head` or `tail` is the usual cause.
++--   `retry_pct` is the share of failed calls (either kind) followed by another call to the
++--   same program in the same agent thread within two minutes.
++--
++--   `p50_gap_s` and `p90_gap_s` are the gap from the call to its result. They include
++--   permission prompts and approval time, so they bound latency from above.
++--   `top_errors` lists the commonest normalized signatures with counts, digits and paths
++--   stripped and quoted identifiers kept, so a guessed column or a reserved-word alias
++--   reads straight off the signature.
++-- params:
++--   - name: min_calls
++--     default: 30
++--     meaning: floor on a program's call count
++--   - name: limit
++--     default: 5
++--     meaning: signatures per program
++--   - after_date
++--   - before_date
++--   - project
++--   - host
++-- ---
++WITH calls AS (
++  SELECT
++    tc.host, tc.session_id, tc.agent_id, tc.timestamp,
++    regexp_replace(
++      regexp_extract(
++        regexp_replace(
++          tc.command,
++          '^(\s*(cd\s+\S+\s*(&&|;)|[A-Za-z_][A-Za-z0-9_]*=(''[^'']*''|"[^"]*"|\S*)\s*;?))+\s*', ''),
++        '^\S+'),
++      '^.*/', '') AS program,
++    COALESCE(tr.is_error, FALSE) AS failed,
++    NOT COALESCE(tr.is_error, FALSE)
++      AND regexp_matches(tr.content, '(Binder|Parser|Catalog|Conversion|IO) Error') AS hidden,
++    date_diff('millisecond', tc.timestamp, tr.timestamp) / 1000.0 AS gap_s,
++    tr.content
++  FROM tool_calls tc
++  JOIN sessions s USING (host, session_id)
++  LEFT JOIN content_items tr
++    ON tr.tool_use_id = tc.tool_id AND tr.host = tc.host AND tr.type = 'tool_result'
++  WHERE tc.tool_name = 'Bash'
++    AND tc.command IS NOT NULL
++    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
++    AND project_filter(s.project_path, getvariable('project'))
++    AND host_filter(s.host, getvariable('host'))
++),
++sequenced AS (
++  SELECT *,
++    failed OR COALESCE(hidden, FALSE) AS errored,
++    LEAD(timestamp) OVER (
++      PARTITION BY host, session_id, agent_id, program ORDER BY timestamp
++    ) AS next_ts
++  FROM calls
++  WHERE program != ''
++),
++signatures AS (
++  SELECT host, program,
++    substr(trim(regexp_replace(regexp_replace(regexp_replace(
++      COALESCE(
++        NULLIF(regexp_extract(content, '\w+ Error: [^\n]*'), ''),
++        split_part(trim(content), chr(10), 1)),
++      '(~|/(Users|home|private|tmp|var|opt|Volumes))/[^\s"''`:,;()]*', '<path>', 'g'),
++      '\d+', 'N', 'g'),
++      '\s+', ' ', 'g')), 1, 100) AS signature,
++    COUNT(*) AS n
++  FROM sequenced
++  WHERE errored
++  GROUP BY ALL
++),
++top_signatures AS (
++  SELECT host, program,
++    list(signature || ' (' || n || ')' ORDER BY n DESC, signature) AS top_errors
++  FROM (
++    SELECT * FROM signatures
++    QUALIFY ROW_NUMBER() OVER (PARTITION BY host, program ORDER BY n DESC, signature)
++      <= COALESCE(TRY_CAST(getvariable('limit') AS INTEGER), 5)
++  )
++  GROUP BY host, program
++)
++SELECT
++  host,
++  program,
++  COUNT(*) AS calls,
++  COUNT(DISTINCT session_id) AS sessions,
++  ROUND(100.0 * COUNT(*) FILTER (WHERE failed) / COUNT(*), 1) AS error_pct,
++  ROUND(100.0 * COUNT(*) FILTER (WHERE hidden) / COUNT(*), 1) AS hidden_error_pct,
++  ROUND(quantile_cont(gap_s, 0.5), 1) AS p50_gap_s,
++  ROUND(quantile_cont(gap_s, 0.9), 1) AS p90_gap_s,
++  ROUND(100.0 * COUNT(*) FILTER (WHERE errored AND next_ts <= timestamp + INTERVAL 2 MINUTE)
++    / NULLIF(COUNT(*) FILTER (WHERE errored), 0), 1) AS retry_pct,
++  ANY_VALUE(t.top_errors) AS top_errors
++FROM sequenced
++LEFT JOIN top_signatures t USING (host, program)
++GROUP BY host, program
++HAVING COUNT(*) >= COALESCE(TRY_CAST(getvariable('min_calls') AS INTEGER), 30)
++ORDER BY calls DESC, host, program;
+diff --git a/plugins/observability/skills/session/resources/queries/index-health.sql b/plugins/observability/skills/session/resources/queries/index-health.sql
+index 896a2c4d..f9fc32f4 100644
+--- a/plugins/observability/skills/session/resources/queries/index-health.sql
++++ b/plugins/observability/skills/session/resources/queries/index-health.sql
+@@ -20,7 +20,9 @@
+ --   corpus, so cross-host queries read a dead snapshot as an idle machine. `disk-not-indexed`
+ --   is JSONL files on disk missing from the index, which also catches files created since
+ --   the last refresh, so rerun `refresh.ts --refresh` before reading one as a refresh
+---   failure or glob drift.
++--   failure or glob drift. `refresh-health` reads refresh.ts's own `session-index.refresh`
++--   events and alerts on a slow p90 among runs that indexed, or on any lock-yield or error
++--   run. Each run's event reaches the index on the next refresh, so the newest is absent.
+ --
+ --   Info. `stream-migrated` is the same silence with a registered successor field still
+ --   arriving on another record type, named in `detail`, so the kind's zero is a rename
+@@ -46,6 +48,12 @@
+ --   - name: deny_window_days
+ --     default: 30
+ --     meaning: hook-deny-invisible window
++--   - name: refresh_days
++--     default: 7
++--     meaning: refresh-health window
++--   - name: refresh_slow_ms
++--     default: 30000
++--     meaning: refresh-health p90 ceiling for runs that indexed
+ --   - name: projects_glob
+ --     default: '~/.claude/projects/**/*.jsonl'
+ --     meaning: >-
+@@ -307,6 +315,25 @@ disk_vanished AS (
+   WHERE d.file IS NULL
+   HAVING COUNT(*) > 0
+ ),
++refresh_health AS (
++  SELECT
++    'refresh-health' AS check_name,
++    CASE WHEN quantile_cont(duration_ms, 0.9) FILTER (WHERE outcome IN ('indexed', 'compacted'))
++              > COALESCE(TRY_CAST(getvariable('refresh_slow_ms') AS INTEGER), 30000)
++           OR COUNT(*) FILTER (WHERE outcome IN ('lock-yield', 'error')) > 0
++         THEN 'alert' ELSE 'info' END AS status,
++    COUNT(*) || ' refreshes' AS subject,
++    'indexing p90 ' || COALESCE(round(quantile_cont(duration_ms, 0.9) FILTER (WHERE outcome IN ('indexed', 'compacted')))::BIGINT || ' ms', 'n/a')
++      || '; outcomes ' || histogram(outcome)::VARCHAR
++      || COALESCE('; errors: ' || string_agg(DISTINCT attributes->>'error', ', '), '') AS detail
++  FROM (
++    SELECT attributes->>'outcome' AS outcome, duration_ms, attributes
++    FROM mod_events, corpus c
++    WHERE event_name = 'session-index.refresh'
++      AND ts >= c.max_ts - INTERVAL (COALESCE(TRY_CAST(getvariable('refresh_days') AS INTEGER), 7)) DAY
++  )
++  HAVING COUNT(*) > 0
++),
+ window_info AS (
+   SELECT
+     'corpus-window' AS check_name,
+@@ -323,6 +350,7 @@ combined AS (
+   UNION ALL SELECT * FROM deny_visibility
+   UNION ALL SELECT * FROM new_kinds
+   UNION ALL SELECT * FROM null_ts_summary
++  UNION ALL SELECT * FROM refresh_health
+   UNION ALL SELECT * FROM disk_vanished
+   UNION ALL SELECT * FROM window_info
+ )
+diff --git a/plugins/observability/skills/session/resources/queries/mods.sql b/plugins/observability/skills/session/resources/queries/mods.sql
+index 9c407b2c..f555516b 100644
+--- a/plugins/observability/skills/session/resources/queries/mods.sql
++++ b/plugins/observability/skills/session/resources/queries/mods.sql
+@@ -6,7 +6,9 @@
+ --   emitted, how many failed, and where the sessions were reached from.
+ -- description: >-
+ --   One row per (`mod`, `week`, `event_name`), read from `mod_events`, which the mod-events
+---   plugin writes for every mod that depends on it.
++--   plugin writes for every mod that depends on it. The `session-index` rows are this
++--   skill's own: `refresh` per refresh.ts run, with its outcome, and `query` per read through
++--   query.ts, so a failed read or a `schema-map` fallback counts under `failed`.
+ --
+ --   Each mod emits `<mod>.session.start` once per session it loads in, so `sessions` on that
+ --   row is the mod's reach and a mod missing from a week was not loaded. `failed` counts

@@ -1,0 +1,13 @@
+diff --git a/tools/ledgerroll/ledger.go b/tools/ledgerroll/ledger.go
+index 0f2af3b..308856e 100644
+--- a/tools/ledgerroll/ledger.go
++++ b/tools/ledgerroll/ledger.go
+@@ -30,7 +30,7 @@ func aggregate(txns []Txn) []*Group {
+ 			groups = append(groups, g)
+ 		}
+ 		g.Txns = append(g.Txns, t)
+-		sort.Slice(g.Txns, func(i, j int) bool { return g.Txns[i].At.Before(g.Txns[j].At) })
++		sort.SliceStable(g.Txns, func(i, j int) bool { return g.Txns[i].At.Before(g.Txns[j].At) })
+ 	}
+ 	sort.Slice(groups, func(i, j int) bool {
+ 		if groups[i].Account != groups[j].Account {

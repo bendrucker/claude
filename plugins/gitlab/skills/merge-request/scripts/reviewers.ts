@@ -17,7 +17,7 @@ export function parseReviewers(list = ""): Set<string> {
   return new Set(
     list
       .split(",")
-      .map((username) => username.trim().toLowerCase())
+      .map((username) => username.trim().replace(/^@/, "").toLowerCase())
       .filter(Boolean),
   );
 }

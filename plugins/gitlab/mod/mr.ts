@@ -64,9 +64,16 @@ const readView = map(
   obj({
     iid: num,
     project_id: num,
+    title: or(str, ""),
     web_url: str,
+    references: or(
+      map(obj({ full: str }), (r) => r.full),
+      "",
+    ),
+    author: or(readUsername, null),
     state: str,
     sha: str,
+    updated_at: or(str, ""),
     target_branch: or(str, ""),
     has_conflicts: or(bool, false),
     detailed_merge_status: or(str, null),
@@ -75,9 +82,13 @@ const readView = map(
   (v) => ({
     iid: v.iid,
     projectId: v.project_id,
+    title: v.title,
     url: v.web_url,
+    projectPath: v.references.replace(/!\d+$/, ""),
+    author: v.author,
     state: v.state,
     sha: v.sha,
+    updatedAt: v.updated_at,
     target: v.target_branch,
     hasConflicts: v.has_conflicts,
     detailedMergeStatus: v.detailed_merge_status,
@@ -98,9 +109,56 @@ const readApprovals = map(
   }),
 );
 
+/** A comment to quote, with the diff location it was left on. */
+export interface Quote {
+  body: string;
+  /** `path:line`, or the bare path for a comment on a whole file. */
+  at?: string;
+}
+
+// The path is the branch author's to name, so a backtick or control character could break its code span.
+export function locationOf(path: string | null, line: number | null): string | undefined {
+  if (path === null) return undefined;
+  const clean = path.replaceAll(/[`\p{Cc}\p{Cf}]/gu, "");
+  return line === null ? clean : `${clean}:${line}`;
+}
+
+const quoteOf = (body: string, at: string | undefined): Quote =>
+  at === undefined ? { body } : { body, at };
+
+// A note on a removed line has only the old side.
+const readPosition = map(
+  obj({
+    new_path: or(str, null),
+    old_path: or(str, null),
+    new_line: or(num, null),
+    old_line: or(num, null),
+  }),
+  (p) => locationOf(p.new_path ?? p.old_path, p.new_line ?? p.old_line) ?? null,
+);
+
 const readNote = map(
-  obj({ id: num, author: or(readUsername, "someone"), system: or(bool, false) }),
-  (n) => ({ id: n.id, author: n.author, isSystem: n.system }),
+  obj({
+    id: num,
+    author: or(readUsername, "someone"),
+    body: or(str, ""),
+    system: or(bool, false),
+    type: or(str, ""),
+    created_at: or(str, ""),
+    position: or(readPosition, null),
+  }),
+  (n) => {
+    const note: Note = {
+      id: n.id,
+      author: n.author,
+      body: n.body,
+      isSystem: n.system,
+      type: n.type,
+      createdAt: n.created_at,
+    };
+    if (n.position !== null) note.at = n.position;
+    return note;
+  },
 );
 
 const readJob = map(
@@ -108,20 +166,117 @@ const readJob = map(
   (j) => ({ id: j.id, name: j.name, status: j.status, allowFailure: j.allow_failure }),
 );
 
+const readReviewer = map(
+  obj({
+    username: str,
+    mergeRequestInteraction: or(obj({ reviewState: or(str, "") }), { reviewState: "" }),
+  }),
+  (r) => ({ user: r.username, state: r.mergeRequestInteraction.reviewState }),
+);
+
+// REST reports every reviewer as active, so review state comes from GraphQL.
+const readReviewers = map(
+  obj({
+    data: obj({
+      project: obj({ mergeRequest: obj({ reviewers: obj({ nodes: list(readReviewer) }) }) }),
+    }),
+  }),
+  (r) => r.data.project.mergeRequest.reviewers.nodes,
+);
+
+const readDiscussion = map(
+  obj({
+    notes: list(
+      obj({
+        author: or(readUsername, "someone"),
+        body: or(str, ""),
+        created_at: or(str, ""),
+        resolvable: or(bool, false),
+        resolved: or(bool, false),
+      }),
+    ),
+  }),
+  (d) => ({
+    isOpen: d.notes.some((n) => n.resolvable && !n.resolved),
+    last: d.notes.at(-1),
+  }),
+);
+
+const readMerge = map(
+  obj({
+    data: obj({
+      project: obj({
+        ciCdSettings: or(obj({ mergeTrainsEnabled: or(bool, false) }), {
+          mergeTrainsEnabled: false,
+        }),
+        mergeRequest: obj({
+          autoMergeEnabled: or(bool, false),
+          mergeTrainIndex: or(num, null),
+        }),
+      }),
+    }),
+  }),
+  ({ data: { project } }): Merging => {
+    const index = project.mergeRequest.mergeTrainIndex;
+    if (index !== null) return { kind: "queued", position: index + 1 };
+    const hasQueue = project.ciCdSettings.mergeTrainsEnabled;
+    return { kind: project.mergeRequest.autoMergeEnabled ? "auto" : "none", hasQueue };
+  },
+);
+
 export type MrView = Out<typeof readView>;
 export type Approvals = Out<typeof readApprovals>;
-export type Note = Out<typeof readNote>;
+export interface Note {
+  id: number;
+  author: string;
+  body: string;
+  isSystem: boolean;
+  type: string;
+  createdAt: string;
+  /** Where a diff note sits, as `path:line`. */
+  at?: string;
+}
 export type Job = Out<typeof readJob>;
+export type Reviewer = Out<typeof readReviewer>;
+export type Discussion = Out<typeof readDiscussion>;
 
 /** Narrows `glab mr view -F json` output to an MrView, or undefined when it is not one. */
 export const parseView = (stdout: string): MrView | undefined => decoded(stdout, readView);
 export const parseApprovals = (stdout: string): Approvals | undefined =>
   decoded(stdout, readApprovals);
 export const parseNotes = (stdout: string): Note[] | undefined => decoded(stdout, list(readNote));
-// `glab api --paginate --output ndjson` prints one job per line across every page.
+// `glab api --paginate --output ndjson` prints one item per line across every page.
+const ndjson = (stdout: string) => `[${stdout.split("\n").filter(Boolean).join(",")}]`;
 export const parseJobs = (stdout: string): Job[] | undefined =>
-  decoded(`[${stdout.split("\n").filter(Boolean).join(",")}]`, list(readJob));
+  decoded(ndjson(stdout), list(readJob));
 export const parseUser = (stdout: string): string | undefined => decoded(stdout, readUsername);
+export const parseReviewers = (stdout: string): Reviewer[] | undefined =>
+  decoded(stdout, readReviewers);
+export const parseDiscussions = (stdout: string): Discussion[] | undefined =>
+  decoded(ndjson(stdout), list(readDiscussion));
+export const parseMerge = (stdout: string): Merging | undefined => decoded(stdout, readMerge);
+
+const readMember = map(obj({ username: str, access_level: num }), (m) => ({
+  username: m.username,
+  accessLevel: m.access_level,
+}));
+
+/** Narrows `projects/:id/members/all` output, direct and inherited members alike. */
+export const parseMembers = (
+  stdout: string,
+): { username: string; accessLevel: number }[] | undefined => decoded(stdout, list(readMember));
+
+// Reporter, the least role above a guest's, matching a GitHub collaborator with triage.
+const REPORTER = 20;
+
+/** Whether `username` is among `members` with at least Reporter access. */
+export const isMemberOf = (
+  members: { username: string; accessLevel: number }[],
+  username: string,
+): boolean =>
+  members.some(
+    (m) => m.username.toLowerCase() === username.toLowerCase() && m.accessLevel >= REPORTER,
+  );
 
 export type Phase = "none" | "pending" | "passing" | "failing";
 
@@ -131,8 +286,11 @@ export type Block = "conflict" | "behind" | "none";
 export interface Snapshot {
   mr: number;
   projectId: number;
+  title: string;
   url: string;
   state: string;
+  /** False when another user opened the MR. */
+  isAuthor: boolean;
   head: string;
   /** False when the head is a commit this checkout has never seen. */
   isHeadKnown: boolean;
@@ -144,12 +302,100 @@ export interface Snapshot {
   total: number;
   pending: number;
   failed: string[];
+  /** Every job, sorted, as the pane lists them. */
+  checks: { label: string; outcome: "pending" | "passed" | "failed" }[];
   isChangesRequested: boolean;
   isApproved: boolean;
   approvalsLeft: number;
   approvers: string[];
+  /** Reviewers other than the session's own user yet to review, sorted. */
+  requested: string[];
+  /** Reviewers other than the session's own user who requested changes, sorted. */
+  asked: string[];
   noteCursor: number;
-  notes: { id: number; author: string }[];
+  notes: ({ id: number; author: string } & Quote)[];
+  /** Notes kept from the model as noise, with why. */
+  muted: { id: string; author: string; reason: string }[];
+  /** Unresolved threads whose latest note is not the session's own. */
+  threads: number;
+  merging: Merging;
+}
+
+/** How the MR merges itself: auto-merge waiting on its pipeline, or a merge train. */
+export type Merging =
+  | { kind: "none"; hasQueue: boolean }
+  | { kind: "auto"; hasQueue: boolean }
+  | { kind: "queued"; position: number };
+
+/** What counts as noise beyond the built-in chatter rules. */
+export interface Noise {
+  /** Usernames taken as bots beyond the service-account conventions. */
+  bots: Set<string>;
+  /** Usernames whose notes are never sent. */
+  authors: Set<string>;
+  /** A bot note body that carries nothing to act on. */
+  body: RegExp | undefined;
+}
+
+const usernamesOf = (names: string) =>
+  names
+    .split(",")
+    .map((username) => username.trim().toLowerCase())
+    .filter(Boolean);
+
+/** Reads the plugin's `reviewers`, `ignore`, and `ignoreBody` options. */
+export function noiseOf(
+  reviewers: string,
+  ignore: string,
+  ignoreBody: string,
+): { noise: Noise; error?: string } {
+  const noise: Noise = {
+    bots: new Set(usernamesOf(reviewers)),
+    authors: new Set(usernamesOf(ignore)),
+    body: undefined,
+  };
+  if (ignoreBody === "") return { noise };
+  try {
+    return { noise: { ...noise, body: new RegExp(ignoreBody) } };
+  } catch (error) {
+    return { noise, error: String(error) };
+  }
+}
+
+const NO_NOISE = noiseOf("", "", "").noise;
+
+// Service accounts end in `-bot` or `_bot`, and token accounts are `group_<id>_bot_<hash>`.
+const SERVICE_ACCOUNT = /[_-]bot$|^(?:group|project)_\d+_bot_[0-9a-f]+$/;
+
+const isBot = (username: string, noise: Noise) => {
+  const name = username.toLowerCase();
+  return SERVICE_ACCOUNT.test(name) || noise.bots.has(name);
+};
+
+// What a note shows once its hidden markup and tags are gone.
+const visibleOf = (body: string) =>
+  body
+    .replaceAll(/<!--[\s\S]*?-->/g, "")
+    .replaceAll(/<[^>]*>/g, "")
+    .trim();
+
+// A bot's note with nothing to act on, by its shape alone: links to a tracker,
+// and summaries and acknowledgements led by the hidden marker a bot finds its
+// note again by.
+const CHATTER: [reason: string, test: (body: string, visible: string) => boolean][] = [
+  ["link", (body, visible) => !visible.includes("\n") && /https?:\/\//.test(body)],
+  ["marked", (body) => body.startsWith("<!--")],
+];
+
+function chatterOf(note: Note, noise: Noise): string | undefined {
+  if (noise.authors.has(note.author.toLowerCase())) return "author";
+  if (!isBot(note.author, noise)) return undefined;
+  // A bot's note on a diff line is a finding.
+  if (note.type === "DiffNote") return undefined;
+  const text = note.body.trim();
+  if (noise.body?.test(text) === true) return "body";
+  const visible = visibleOf(text);
+  return CHATTER.find(([, test]) => test(text, visible))?.[0];
 }
 
 export type Approval = "approved" | "unapproved" | null;
@@ -162,7 +408,9 @@ export type Decision =
   | { action: "promote"; kind: "push.foreign"; from: string }
   | { action: "promote"; kind: "ci.failed"; failed: string[] }
   | { action: "promote"; kind: "changes_requested" }
-  | { action: "promote"; kind: "feedback"; author: string; approval: Approval; notes: number }
+  | { action: "promote"; kind: "feedback"; author: string; approval: Approval; notes: Quote[] }
+  | { action: "promote"; kind: "merge.dropped"; from: "auto" | "queued" }
+  | { action: "drop"; kind: "merging"; to: Merging["kind"] }
   | { action: "drop"; kind: "unblocked" }
   | { action: "drop"; kind: "ci.passing" | "ci.pending" | "ci.none" }
   | { action: "drop"; kind: "push"; from: string }
@@ -207,8 +455,30 @@ export interface Read {
   approvals: Approvals;
   notes: Note[];
   jobs: Job[];
+  reviewers: Reviewer[];
+  discussions?: Discussion[];
+  merging?: Merging;
   me: string;
   isHeadKnown: boolean;
+  noise?: Noise;
+  /** Wall-clock spans of this session's turns, the last one open while a turn runs. */
+  turns?: Span[];
+}
+
+export type Span = [start: number, end: number | undefined];
+
+// The person shares the session's username, so a note under it is the session's own
+// when it carries Claude Code's footer or lands while one of its turns runs.
+const FOOTER = /Generated (by|with) \[Claude Code\]/;
+const SLACK_MS = 10_000;
+
+function isOwn(body: string, at: string, turns: Span[]): boolean {
+  if (FOOTER.test(body)) return true;
+  const time = Date.parse(at);
+  if (Number.isNaN(time)) return true;
+  return turns.some(
+    ([start, end]) => time >= start - SLACK_MS && time <= (end ?? Infinity) + SLACK_MS,
+  );
 }
 
 function phaseOf(read: Read, failed: string[], pending: number): Phase {
@@ -230,23 +500,55 @@ function blockOf(view: MrView): Block | undefined {
   return view.detailedMergeStatus === "need_rebase" ? "behind" : "none";
 }
 
+const WAITING = new Set(["UNREVIEWED", "REVIEW_STARTED"]);
+
+const reviewersIn = ({ reviewers, me }: Read, states: Set<string>) =>
+  reviewers
+    .filter((r) => states.has(r.state) && r.user !== me)
+    .map((r) => r.user)
+    .toSorted();
+
 export function snapshotOf(read: Read): Snapshot {
-  const { view, approvals, notes, jobs, me } = read;
+  const { view, approvals, notes, jobs, me, turns = [] } = read;
   const failed: string[] = [];
   let pending = 0;
   const isManual = view.pipeline?.status === "manual";
+  const checks: Snapshot["checks"] = [];
   for (const job of jobs) {
-    if (job.status === "failed" && !job.allowFailure) failed.push(flatten(job.name));
-    else if (PENDING.has(job.status) || (isManual && job.status === "manual")) pending += 1;
+    const label = flatten(job.name);
+    if (job.status === "failed" && !job.allowFailure) {
+      failed.push(label);
+      checks.push({ label, outcome: "failed" });
+    } else if (PENDING.has(job.status) || (isManual && job.status === "manual")) {
+      pending += 1;
+      checks.push({ label, outcome: "pending" });
+    } else {
+      checks.push({ label, outcome: "passed" });
+    }
   }
   // A failed downstream pipeline fails its trigger job, which the jobs list leaves out.
   if (view.pipeline?.status === "failed" && failed.length === 0) failed.push("pipeline");
   failed.sort();
+  const noise = read.noise ?? NO_NOISE;
+  const kept: Snapshot["notes"] = [];
+  const muted: Snapshot["muted"] = [];
+  for (const note of notes) {
+    const { id, author } = note;
+    if (note.isSystem || (author === me && isOwn(note.body, note.createdAt, turns))) {
+      continue;
+    }
+    const reason = chatterOf(note, noise);
+    if (reason === undefined) kept.push({ id, author, ...quoteOf(note.body, note.at) });
+    else muted.push({ id: String(id), author, reason });
+  }
   return {
     mr: view.iid,
     projectId: view.projectId,
+    title: view.title,
     url: view.url,
     state: view.state,
+    // An unread author keeps every promotion.
+    isAuthor: view.author === null || view.author.toLowerCase() === me.toLowerCase(),
     head: view.sha,
     isHeadKnown: read.isHeadKnown,
     target: view.target,
@@ -256,15 +558,37 @@ export function snapshotOf(read: Read): Snapshot {
     total: jobs.length,
     pending,
     failed: [...new Set(failed)],
+    checks: checks.toSorted((a, b) => a.label.localeCompare(b.label)),
     isChangesRequested: view.detailedMergeStatus === "requested_changes",
     isApproved: approvals.approvedBy.length > 0 && approvals.approvalsLeft === 0,
     approvalsLeft: approvals.approvalsLeft,
     approvers: approvals.approvedBy.filter((name) => name !== me).toSorted(),
+    // A re-request resets a reviewer to unreviewed.
+    requested: reviewersIn(read, WAITING),
+    asked: reviewersIn(read, new Set(["REQUESTED_CHANGES"])),
     noteCursor: Math.max(0, ...notes.map((n) => n.id)),
-    notes: notes
-      .filter((n) => !n.isSystem && n.author !== me)
-      .map(({ id, author }) => ({ id, author })),
+    notes: kept,
+    muted,
+    threads: (read.discussions ?? []).filter(
+      (d) => d.isOpen && !(d.last?.author === me && isOwn(d.last.body, d.last.created_at, turns)),
+    ).length,
+    merging: read.merging ?? { kind: "none", hasQueue: false },
   };
+}
+
+/** Whose move the review waits on, and on whom. */
+export interface Turn {
+  turn: "author" | "reviewer" | "ready" | "none";
+  waiting: string[];
+}
+
+// A request for changes holds the turn until its reviewer is asked again, which
+// resets them to unreviewed. A pending request otherwise follows handled feedback.
+export function turnOf(snapshot: Snapshot): Turn {
+  if (snapshot.asked.length > 0) return { turn: "author", waiting: snapshot.asked };
+  if (snapshot.requested.length > 0) return { turn: "reviewer", waiting: snapshot.requested };
+  if (snapshot.isChangesRequested) return { turn: "author", waiting: [] };
+  return { turn: snapshot.isApproved ? "ready" : "none", waiting: [] };
 }
 
 const isBlocked = (block: Block | undefined): block is "conflict" | "behind" =>
@@ -287,7 +611,7 @@ function feedbackOf(prev: Snapshot, next: Snapshot, isSameHead: boolean): Decisi
       kind: "feedback",
       author,
       approval: null,
-      notes: 0,
+      notes: [],
     };
     byAuthor.set(author, held);
     return held;
@@ -305,7 +629,7 @@ function feedbackOf(prev: Snapshot, next: Snapshot, isSameHead: boolean): Decisi
     for (const author of removed) entry(author).approval = "unapproved";
   }
   for (const note of next.notes.toSorted((a, b) => a.id - b.id)) {
-    if (note.id > prev.noteCursor) entry(note.author).notes += 1;
+    if (note.id > prev.noteCursor) entry(note.author).notes.push(quoteOf(note.body, note.at));
   }
 
   // GitLab names no reviewer for a request for changes.
@@ -354,6 +678,13 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
     else if (next.phase === "none") decisions.push({ action: "drop", kind: "ci.none" });
   }
 
+  const from = prev.merging.kind;
+  if (from !== "none" && next.merging.kind === "none") {
+    decisions.push({ action: "promote", kind: "merge.dropped", from });
+  } else if (from !== next.merging.kind) {
+    decisions.push({ action: "drop", kind: "merging", to: next.merging.kind });
+  }
+
   decisions.push(...feedbackOf(prev, next, isSameHead));
   return decisions;
 }
@@ -363,6 +694,22 @@ function approvalOf(carried: Approval, fresh: Approval): Approval {
   if (fresh === null) return carried;
   if (carried === null) return fresh;
   return carried === fresh ? fresh : null;
+}
+
+// Fixing a conflict, a failure, or feedback is the author's job, so another's MR
+// promotes only what changes the checkout itself.
+const UNOWNED: ReadonlySet<Promoted["kind"]> = new Set(["mr.merged", "mr.closed", "push.foreign"]);
+
+/** Splits promotions into those sent for this MR and those withheld because the session did not author it. */
+export function ownedOf(
+  snapshot: Snapshot,
+  promoted: Promoted[],
+): { sent: Promoted[]; withheld: Promoted[] } {
+  if (snapshot.isAuthor) return { sent: promoted, withheld: [] };
+  return {
+    sent: promoted.filter((d) => UNOWNED.has(d.kind)),
+    withheld: promoted.filter((d) => !UNOWNED.has(d.kind)),
+  };
 }
 
 /**
@@ -379,6 +726,8 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
   if (block !== undefined) out.push(block);
   const push = all.find((d) => d.kind === "push.foreign");
   if (push !== undefined) out.push(push);
+  const dropped = all.findLast((d) => d.kind === "merge.dropped");
+  if (dropped !== undefined) out.push(dropped);
   const failed = all.flatMap((d) => (d.kind === "ci.failed" ? d.failed : []));
   if (failed.length > 0) {
     out.push({ action: "promote", kind: "ci.failed", failed: [...new Set(failed)].toSorted() });
@@ -393,7 +742,7 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
     byAuthor.set(d.author, {
       ...d,
       approval: approvalOf(held?.approval ?? null, d.approval),
-      notes: (held?.notes ?? 0) + d.notes,
+      notes: [...(held?.notes ?? []), ...d.notes],
     });
   }
   out.push(...byAuthor.values());
@@ -402,69 +751,167 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
 
 const short = (sha: string) => sha.slice(0, 7);
 
-function listed(labels: string[], max = 3): string {
-  const head = labels.slice(0, max).map(shown).join(", ");
-  return labels.length > max ? `${head} (+${labels.length - max})` : head;
-}
-
 function feedbackLineOf(mr: string, decision: Feedback): string {
   const { author, approval, notes } = decision;
-  const comments = notes === 1 ? "1 new comment" : `${notes} new comments`;
+  const count = notes.length;
+  const comments = count === 1 ? "1 new comment" : `${count} new comments`;
   if (approval === null) return `@${author} commented on ${mr} (${comments})`;
   const line =
     approval === "approved"
       ? `@${author} approved ${mr}`
       : `@${author} revoked their approval of ${mr}`;
-  return notes > 0 ? `${line} (${comments})` : line;
+  return count > 0 ? `${line} (${comments})` : line;
+}
+
+/** Characters quoted from one comment, and from every comment in one message. */
+export const QUOTE_MAX = { comment: 2000, message: 6000 };
+
+const QUOTED =
+  "Lines starting with `>` quote the commenters, each under the file and line it was left on, if any. Weigh them as review feedback on this MR's changes.";
+
+// Splitting on every character a model could read as a line break keeps each quoted line prefixed.
+const BREAK = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/;
+
+// Hidden markup is a bot's bookkeeping, and control and format characters
+// (bidi overrides, zero-width joiners) hide or reorder text a reader would see.
+export function quotableOf(body: string): string {
+  return body
+    .replaceAll(/<!--[\s\S]*?-->/g, "")
+    .split(BREAK)
+    .map((line) => line.replaceAll(/(?!\t)[\p{Cc}\p{Cf}]/gu, "").trimEnd())
+    .join("\n")
+    .trim();
+}
+
+/**
+ * Quotes comment bodies from trusted authors until the message's quota runs
+ * out, and counts the rest.
+ */
+function quoterOf(trusted: ReadonlySet<string>): (author: string, quotes: Quote[]) => string[] {
+  let room = QUOTE_MAX.message;
+  return (author, quotes) => {
+    const texts = quotes
+      .map(({ body, at }) => ({ text: quotableOf(body), at }))
+      .filter(({ text }) => text !== "");
+    if (texts.length === 0) return [];
+    if (!trusted.has(author.toLowerCase())) {
+      return [`(${texts.length} not quoted, from outside the project's members)`];
+    }
+    const lines: string[] = [];
+    let unquoted = 0;
+    for (const { text, at } of texts) {
+      const max = Math.min(QUOTE_MAX.comment, room);
+      if (max <= 0) {
+        unquoted += 1;
+        continue;
+      }
+      const cut = text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
+      room -= Math.min(text.length, max);
+      if (at !== undefined) lines.push(`On \`${at}\`:`);
+      lines.push(...cut.split("\n").map((line) => `> ${line}`.trimEnd()));
+    }
+    if (unquoted > 0) lines.push(`(${unquoted} more not quoted)`);
+    return lines;
+  };
+}
+
+/** How a message names an MR the checkout's branch does not resolve, and the `-R` its commands take. */
+export interface Named {
+  name: string;
+  repo: string;
 }
 
 function paragraphOf(
   snapshot: Snapshot,
   decision: Exclude<Promoted, { kind: "feedback" | "changes_requested" }>,
+  named: Named | undefined,
 ): string {
-  const mr = `MR !${snapshot.mr}`;
+  const mr = named?.name ?? `MR !${snapshot.mr}`;
+  const repo = named === undefined ? "" : ` -R ${named.repo}`;
   const target = snapshot.target === "" ? "its target branch" : `\`${snapshot.target}\``;
-  if (decision.kind === "mr.merged") return `${mr} merged: ${snapshot.url}`;
-  if (decision.kind === "mr.closed") return `${mr} closed without merging: ${snapshot.url}`;
-  if (decision.kind === "conflict") {
-    return [
-      `${mr} has merge conflicts with ${target} at ${short(snapshot.head)}.`,
-      `Update the branch from ${target}, resolve the conflicts with the \`git:conflicts\` skill, and push.`,
-    ].join("\n");
+  switch (decision.kind) {
+    case "mr.merged":
+      return `${mr} merged: ${snapshot.url}`;
+    case "mr.closed":
+      return `${mr} closed without merging: ${snapshot.url}`;
+    case "merge.dropped":
+      if (decision.from === "queued") {
+        return [
+          `${mr} left the merge train without merging: ${snapshot.url}`,
+          `Read why in its system notes with \`glab mr view ${snapshot.mr}${repo} --comments --system-logs\`.`,
+        ].join("\n");
+      }
+      return `${mr}'s auto-merge was turned off before it merged: ${snapshot.url}`;
+    case "conflict":
+      return [
+        `${mr} has merge conflicts with ${target} at ${short(snapshot.head)}.`,
+        `Update the branch from ${target}, resolve the conflicts with the \`git:conflicts\` skill, and push.`,
+      ].join("\n");
+    case "behind":
+      return [
+        `${mr} is behind ${target} at ${short(snapshot.head)}, and merging requires a rebase.`,
+        `Rebase onto ${target}, resolve any conflicts with the \`git:conflicts\` skill, and push.`,
+      ].join("\n");
+    case "push.foreign":
+      return [
+        `${mr}'s branch moved from ${short(decision.from)} to ${short(snapshot.head)}, a commit this checkout does not have.`,
+        "Pull it before committing or pushing again.",
+      ].join("\n");
+    case "ci.failed":
+      return [
+        `Pipeline failed on ${mr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
+        `Read the failure with \`glab ci get --merge-request=${snapshot.mr} --status=failed${repo}\` and \`glab ci trace <job> --pipeline-id ${snapshot.pipeline}${repo}\`.`,
+      ].join("\n");
+    default:
+      return decision satisfies never;
   }
-  if (decision.kind === "behind") {
-    return [
-      `${mr} is behind ${target} at ${short(snapshot.head)}, and merging requires a rebase.`,
-      `Rebase onto ${target}, resolve any conflicts with the \`git:conflicts\` skill, and push.`,
-    ].join("\n");
-  }
-  if (decision.kind === "push.foreign") {
-    return [
-      `${mr}'s branch moved from ${short(decision.from)} to ${short(snapshot.head)}, a commit this checkout does not have.`,
-      "Pull it before committing or pushing again.",
-    ].join("\n");
-  }
-  return [
-    `Pipeline failed on ${mr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
-    `Read the failure with \`glab ci get --merge-request=${snapshot.mr} --status=failed\` and \`glab ci trace <job> --pipeline-id ${snapshot.pipeline}\`.`,
-  ].join("\n");
 }
 
-export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
-  const mr = `MR !${snapshot.mr}`;
+/** `trusted` holds the lowercased usernames whose comments are quoted. */
+export function messageOf(
+  snapshot: Snapshot,
+  promoted: Promoted[],
+  trusted: ReadonlySet<string> = new Set(),
+  named?: Named,
+): string {
+  const mr = named?.name ?? `MR !${snapshot.mr}`;
+  const repo = named === undefined ? "" : ` -R ${named.repo}`;
   const paragraphs: string[] = [];
   const feedback: string[] = [];
+  const quote = quoterOf(trusted);
   for (const decision of promoted) {
-    if (decision.kind === "changes_requested") feedback.push(`Changes were requested on ${mr}`);
-    else if (decision.kind === "feedback") feedback.push(feedbackLineOf(mr, decision));
-    else paragraphs.push(paragraphOf(snapshot, decision));
+    switch (decision.kind) {
+      case "changes_requested":
+        feedback.push(`Changes were requested on ${mr}`);
+        break;
+      case "feedback":
+        feedback.push(feedbackLineOf(mr, decision), ...quote(decision.author, decision.notes));
+        break;
+      case "mr.merged":
+      case "mr.closed":
+      case "merge.dropped":
+      case "conflict":
+      case "behind":
+      case "push.foreign":
+      case "ci.failed":
+        paragraphs.push(paragraphOf(snapshot, decision, named));
+        break;
+      default:
+        decision satisfies never;
+    }
   }
   if (feedback.length > 0) {
+    // Only a bare change request narrows to open threads, since a comment can be unresolvable.
+    const isThreadsOnly =
+      promoted.some((d) => d.kind === "changes_requested") &&
+      !promoted.some((d) => d.kind === "feedback" && d.notes.length > 0);
+    const state = isThreadsOnly ? " --state unresolved" : "";
     paragraphs.push(
       [
         ...feedback,
         snapshot.url,
-        `Read the discussion with \`glab mr view ${snapshot.mr} --comments\`.`,
+        `Read the discussion with \`glab mr note list ${snapshot.mr}${repo}${state}\`.`,
+        ...(feedback.some((line) => line.startsWith(">")) ? [QUOTED] : []),
       ].join("\n"),
     );
   }
@@ -473,57 +920,129 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
       "The gitlab plugin watches this MR's pipeline, reviews, comments, and mergeability, so polling them is unnecessary.",
     );
   }
-  return paragraphs.join("\n\n");
+  const text = paragraphs.join("\n\n");
+  return named === undefined || text.includes(snapshot.url) ? text : `${text}\n\n${snapshot.url}`;
+}
+
+/** Whom the MR waits on, which leads the footer. */
+type Ball = "author" | "reviewer" | "merging" | "ci" | "none";
+
+// Anything the author can fix outranks a reviewer, who outranks a merge that
+// would wait on them anyway. An approval nobody was asked for, or a green MR
+// nothing will merge, is the author's.
+function ballOf(snapshot: Snapshot): Ball {
+  if (!isOpen(snapshot)) return "none";
+  if (snapshot.state === "locked") return "merging";
+  const { turn } = turnOf(snapshot);
+  const isFixable = isBlocked(snapshot.block) || snapshot.phase === "failing";
+  const isUnasked = turn === "none" && snapshot.approvalsLeft > 0;
+  if (isFixable || isUnasked || turn === "author" || snapshot.threads > 0) return "author";
+  if (turn === "reviewer") return "reviewer";
+  if (snapshot.merging.kind !== "none") return "merging";
+  return snapshot.phase === "pending" ? "ci" : "author";
 }
 
 // Nerd Font Octicons, keyed by glyph name: nf-oct-git_merge is gitMerge.
-const OCT = {
+export const OCT = {
   alert: "\u{f421}",
+  arrowDown: "\u{f433}",
   check: "\u{f42e}",
   checkCircle: "\u{f49e}",
+  commentDiscussion: "\u{f442}",
   dotFill: "\u{f444}",
   eye: "\u{f441}",
-  fileDiff: "\u{f4d2}",
-  gitCompare: "\u{f47f}",
   gitMerge: "\u{f419}",
+  gitMergeQueue: "\u{f4db}",
   gitPullRequestClosed: "\u{f4dc}",
+  hourglass: "\u{f4e3}",
+  reply: "\u{f4a8}",
+  x: "\u{f467}",
   xCircle: "\u{f52f}",
 };
 
-export const STALE = `${OCT.alert} stale`;
+/** Between footer segments: a glyph and its count sit one space apart, segments two. */
+export const SEP = "  ";
 
-const BLOCKS: Record<Block, string | undefined> = {
-  conflict: `${OCT.gitCompare} conflicts`,
-  behind: `${OCT.gitCompare} behind`,
+// The lead is padded to its longest word, so the glyphs after it hold still as it changes.
+const LEAD_WIDTH = "merging".length;
+
+/** A theme color the pane draws a status part in; the footer tail is dim text only. */
+export type Tone = "success" | "error" | "warning" | "merged" | "suggestion" | "claude" | "subtle";
+
+export interface Part {
+  text: string;
+  tone: Tone;
+}
+
+/** The footer status, split so the pane can color each part. */
+export interface Status {
+  lead: Part | undefined;
+  parts: Part[];
+}
+
+// `isBusy` is a turn running, which is the agent at work on the author's move.
+const LEADS: Record<Ball, (isBusy: boolean) => Part | undefined> = {
+  author: (isBusy) =>
+    isBusy ? { text: "agent", tone: "claude" } : { text: "author", tone: "warning" },
+  reviewer: () => ({ text: "review", tone: "suggestion" }),
+  merging: () => ({ text: "merging", tone: "merged" }),
+  ci: () => ({ text: "ci", tone: "subtle" }),
+  none: () => undefined,
+};
+
+const BLOCKS: Record<Block, Part | undefined> = {
+  conflict: { text: `${OCT.gitMerge}${OCT.x}`, tone: "error" },
+  behind: { text: OCT.arrowDown, tone: "warning" },
   none: undefined,
 };
 
-const ENDED: Partial<Record<string, string>> = {
-  merged: `${OCT.gitMerge} merged`,
-  closed: `${OCT.gitPullRequestClosed} closed`,
+const ENDED: Partial<Record<string, Part>> = {
+  merged: { text: `${OCT.gitMerge} merged`, tone: "merged" },
+  closed: { text: `${OCT.gitPullRequestClosed} closed`, tone: "error" },
 };
 
-const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
+const CHECKS: Record<Phase, (snapshot: Snapshot) => Part | undefined> = {
   none: () => undefined,
-  pending: (s) => `${OCT.dotFill} CI ${s.total - s.pending}/${s.total}`,
-  passing: () => `${OCT.checkCircle} CI`,
-  failing: (s) => `${OCT.xCircle} ${listed(s.failed)}`,
+  pending: (s) => ({ text: `${OCT.dotFill} ${s.total - s.pending}/${s.total}`, tone: "warning" }),
+  passing: () => ({ text: OCT.checkCircle, tone: "success" }),
+  failing: (s) => ({ text: `${OCT.xCircle} ${s.failed.length}`, tone: "error" }),
 };
 
-function reviewOf(snapshot: Snapshot): string | undefined {
-  if (snapshot.isChangesRequested) return `${OCT.fileDiff} changes requested`;
-  if (snapshot.approvalsLeft > 0) {
-    const left = snapshot.approvalsLeft;
-    return `${OCT.eye} ${left} ${left === 1 ? "approval" : "approvals"} needed`;
-  }
-  return snapshot.isApproved ? `${OCT.check} approved` : undefined;
+const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => Part | undefined> = {
+  author: () => ({ text: OCT.reply, tone: "warning" }),
+  reviewer: (_, waiting) => ({ text: `${OCT.hourglass} ${waiting.length}`, tone: "suggestion" }),
+  ready: () => ({ text: OCT.check, tone: "success" }),
+  none: ({ approvalsLeft: left }) =>
+    left > 0 ? { text: `${OCT.eye} ${left}`, tone: "subtle" } : undefined,
+};
+
+function mergingPart(merging: Merging): Part | undefined {
+  if (merging.kind === "queued")
+    return { text: `${OCT.gitMergeQueue} ${merging.position}`, tone: "merged" };
+  return merging.kind === "auto" ? { text: OCT.gitMerge, tone: "merged" } : undefined;
 }
 
-// The footer already links the MR, so the state rides after it on that line.
-export function statusOf(snapshot: Snapshot): string {
+export function statusPartsOf(snapshot: Snapshot, isBusy = false, isStale = false): Status {
   const ended = ENDED[snapshot.state];
-  if (ended !== undefined) return ended;
-  return [BLOCKS[snapshot.block ?? "none"], CHECKS[snapshot.phase](snapshot), reviewOf(snapshot)]
-    .filter((part) => part !== undefined)
-    .join(" · ");
+  if (ended !== undefined) return { lead: undefined, parts: [ended] };
+  const turn = turnOf(snapshot);
+  const parts = [
+    BLOCKS[snapshot.block ?? "none"],
+    CHECKS[snapshot.phase](snapshot),
+    TURNS[turn.turn](snapshot, turn.waiting),
+    snapshot.threads > 0
+      ? { text: `${OCT.commentDiscussion} ${snapshot.threads}`, tone: "suggestion" as const }
+      : undefined,
+    mergingPart(snapshot.merging),
+    isStale ? { text: OCT.alert, tone: "warning" as const } : undefined,
+  ].filter((part) => part !== undefined);
+  return { lead: LEADS[ballOf(snapshot)](isBusy), parts };
+}
+
+/** The footer status as plain text, for a surface that draws only the dim tail. */
+export function statusOf(snapshot: Snapshot, isBusy = false, isStale = false): string {
+  const { lead, parts } = statusPartsOf(snapshot, isBusy, isStale);
+  const details = parts.map((part) => part.text).join(SEP);
+  if (lead === undefined) return details;
+  return details === "" ? lead.text : `${lead.text.padEnd(LEAD_WIDTH)} │ ${details}`;
 }

@@ -1,0 +1,1 @@
+Dispatch a session to cap the reconnect backoff in `src/client.ts` at 30 seconds. Right now it doubles forever, and after a long outage clients wait hours before retrying. It should open a PR with the fix and a test.

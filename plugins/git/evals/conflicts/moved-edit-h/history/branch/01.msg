@@ -1,0 +1,1 @@
+ParseCents: trim surrounding whitespace

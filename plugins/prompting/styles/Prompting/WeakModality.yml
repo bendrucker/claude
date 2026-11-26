@@ -1,0 +1,29 @@
+# A softened instruction reads as advice, so whether it fires is left to the run.
+# evidence: the rule-precision eval scores it against commits where a human cut filler from agent-facing documents.
+# retire when: the rule-precision eval reports it unproven on 10 or more hits.
+extends: existence
+message: '"%s" softens an instruction into a suggestion. State the instruction.'
+level: error
+ignorecase: true
+scope: ~text.frontmatter
+tokens:
+  - 'try to'
+  - 'feel free to'
+  - 'if possible'
+  - 'if necessary'
+  - 'as needed'
+  - '(?:where|when|as) appropriate'
+  - 'you (?:may|might|could) want to'
+tests:
+  - name: flags a try-to instruction
+    input: |
+      Try to keep the title short.
+    contains: [Prompting.WeakModality]
+  - name: flags an as-needed instruction
+    input: |
+      Update the changelog as needed.
+    contains: [Prompting.WeakModality]
+  - name: allows an imperative
+    input: |
+      Write one-line comments.
+    absent: Prompting.WeakModality

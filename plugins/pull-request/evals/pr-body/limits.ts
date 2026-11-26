@@ -13,6 +13,7 @@ export const ROWS = {
   contrastPhrases: "contrast-phrases",
   hiddenWords: "hidden-words",
   maxItemsPerList: "list-items",
+  wallLists: "wall-lists",
 } as const satisfies Record<CheckKey, string>;
 
 export const checkKeys: CheckKey[] = [...limitKeys, ...guardKeys];

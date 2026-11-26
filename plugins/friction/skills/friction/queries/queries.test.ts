@@ -43,12 +43,12 @@ const proc = (t: number, pid: number, name: string, cpuMs: number, written: numb
 });
 
 // Cumulative CPU ticks summed over cores. Each sample adds 100 ticks, `idle` of them idle.
-const hostCpu = (idle: number) => {
+const hostCpu = (idle: number | ((t: number) => number)) => {
   let total = 0;
   let idleTicks = 0;
   return (t: number): Snapshot => {
     total += 100;
-    idleTicks += idle;
+    idleTicks += typeof idle === "number" ? idle : idle(t);
     return {
       name: "host_cpu",
       t,
@@ -97,7 +97,7 @@ afterAll(() => {
 
 async function run(source: string, query: string, vars: Record<string, string>) {
   // Cases share one in-memory instance, so drop what the last case loaded.
-  const tables = ["snaps", "pressure", "cpu", "groups", "host", "runs"];
+  const tables = ["snaps", "pressure", "cpu", "groups", "host", "host_min", "runs"];
   await conn.run(
     [
       "DROP MACRO IF EXISTS win_start",
@@ -116,7 +116,7 @@ async function run(source: string, query: string, vars: Record<string, string>) 
 }
 
 describe("osquery", () => {
-  test("saturation counts minutes with no idle sample over 5%, in the window only", async () => {
+  test("saturation counts minutes averaging under 10% idle, in the window only", async () => {
     const busy = hostCpu(2);
     const rows = await osquery(
       [
@@ -128,6 +128,16 @@ describe("osquery", () => {
     );
     // The first sample has no delta, so minute 0 is saturated from five samples.
     expect(rows).toEqual([{ day: DAY, saturated_mins: "10", min_idle_pct: 2 }]);
+  });
+
+  test("saturation averages each minute, so one idle sample neither breaks nor makes it", async () => {
+    // Minute 0 averages 8.3% around one 40% sample. Minute 1 holds at 12%.
+    const idle = (t: number) => {
+      if (t === T0 + 30) return 40;
+      return t < T0 + 60 ? 2 : 12;
+    };
+    const rows = await osquery(every10s(T0 - 10, 2, hostCpu(idle)), "saturation");
+    expect(rows).toEqual([{ day: DAY, saturated_mins: "1", min_idle_pct: 8.3 }]);
   });
 
   test("saturation spans every day in a multi-day window", async () => {
@@ -147,7 +157,7 @@ describe("osquery", () => {
       [
         ...every10s(T0, 5, hostCpu(1)),
         ...every10s(T0 + 3600, 5, hostCpu(60)),
-        proc(T0 + 60, 100, "bun", 1000, 0),
+        group(T0 + 60, "bun", 60, 1000),
       ],
       "attribution",
     );
@@ -169,20 +179,33 @@ describe("osquery", () => {
     expect(rows).toEqual([{ day: DAY, pname: "duckdb", avg_threads: 400, cpu_minutes: 1.8 }]);
   });
 
+  test("thread hogs drop a delta spanning a gap in the group's samples", async () => {
+    const rows = await osquery(
+      [
+        ...every10s(T0, 11, hostCpu(1)),
+        group(T0, "clang", 60, 0),
+        group(T0 + 600, "clang", 60, 600_000),
+        group(T0 + 610, "clang", 60, 610_000),
+      ],
+      "thread-hogs",
+    );
+    expect(rows).toEqual([{ day: DAY, pname: "clang", avg_threads: 60, cpu_minutes: 0.2 }]);
+  });
+
   test("thread hogs are empty before proc_groups exists", async () => {
     expect(await osquery(every10s(T0, 1, hostCpu(1)), "thread-hogs")).toEqual([]);
   });
 
-  test("write rate reports the top writers and their minutes over 1 GiB", async () => {
+  test("write rate reports the top writers and their minutes over 4 GiB", async () => {
     const GiB = 2 ** 30;
     const rows = await osquery(
       [
         proc(T0, 7, "bun", 0, 0),
-        proc(T0 + 60, 7, "bun", 0, GiB),
-        // Two pids under one name add up within the minute.
+        proc(T0 + 60, 7, "bun", 0, 3 * GiB),
+        // Two pids under one name add up within the minute, crossing the line together.
         proc(T0 + 60, 8, "bun", 0, 0),
-        proc(T0 + 120, 7, "bun", 0, 2 * GiB),
-        proc(T0 + 120, 8, "bun", 0, GiB / 2),
+        proc(T0 + 120, 7, "bun", 0, 6 * GiB),
+        proc(T0 + 120, 8, "bun", 0, 1.5 * GiB),
         // Quiet writers still report their peak, so a run shows how close it came.
         proc(T0, 9, "git", 0, 0),
         proc(T0 + 60, 9, "git", 0, GiB / 4),
@@ -190,7 +213,7 @@ describe("osquery", () => {
       "write-rate",
     );
     expect(rows).toEqual([
-      { day: DAY, pname: "bun", heavy_mins: "1", peak_gb_per_min: 1.5 },
+      { day: DAY, pname: "bun", heavy_mins: "1", peak_gb_per_min: 4.5 },
       { day: DAY, pname: "git", heavy_mins: "0", peak_gb_per_min: 0.25 },
     ]);
   });

@@ -2,6 +2,6 @@ export type SessionLimitAnnounced = Record<string, { band: number; resetsAt: str
 
 declare module "claude-code" {
   interface PluginState {
-    "session-limit": { announced: SessionLimitAnnounced };
+    "session-limit": { announced: SessionLimitAnnounced; muted: boolean };
   }
 }

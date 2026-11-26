@@ -6,7 +6,7 @@ description: >-
   providers and modules in the Terraform Registry.
 disable-model-invocation: true
 allowed-tools:
-  - mcp__terraform
+  - mcp__plugin_terraform_terraform__*
   - Bash(curl:*)
   - Bash(jq:*)
 ---
@@ -15,7 +15,7 @@ allowed-tools:
 
 ## Tool Selection
 
-- **MCP tools** (`mcp__terraform`): workspace listing, run management, provider/module registry lookups
+- **MCP tools** (`mcp__plugin_terraform_terraform__*`): workspace listing, run management, provider/module registry lookups
 - **curl**: plan and apply log retrieval — the MCP server does not expose these endpoints
 
 ## Run Monitoring

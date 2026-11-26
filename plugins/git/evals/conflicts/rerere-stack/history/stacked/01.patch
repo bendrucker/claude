@@ -1,0 +1,12 @@
+diff --git a/src/limits.ts b/src/limits.ts
+index 00b1e98..4d5570a 100644
+--- a/src/limits.ts
++++ b/src/limits.ts
+@@ -1,6 +1,7 @@
+ export const limits = {
+   retries: 3,
+   timeoutMs: 5000,
++  readTimeoutMs: 2000,
+   connectTimeoutMs: 1000,
+   maxBodyBytes: 1_000_000,
+ };

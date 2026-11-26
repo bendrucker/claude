@@ -68,8 +68,6 @@ export interface AuditHistory {
   shapes: ShapeRate[];
 }
 
-export const EMPTY_HISTORY: AuditHistory = { runs: 0, judged: 0, actioned: 0, shapes: [] };
-
 async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T | null> {
   const file = Bun.file(path);
   if (!(await file.exists())) return null;

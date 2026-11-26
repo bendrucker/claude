@@ -97,20 +97,23 @@ jobs:
             echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. Add the secret (from 'claude setup-token') to run native evals."
             exit 1
           fi
-          name=${SUITE_DIR#plugins/}
-          name=${name#evals/}
-          echo "SUITE=${name//\//-}" >> "$GITHUB_ENV"
 
       # Skill context injection runs scripts with bun, and the runner and
       # compare.ts need the workspace dependencies.
       - uses: ./.github/actions/bun-install
+
+      - name: Name suite
+        run: |
+          name=${SUITE_DIR#plugins/}
+          name=${name#evals/}
+          echo "SUITE=${name//\//-}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/claude-code
         with:
           sandbox: true
 
       # The adapter suite's uv stub hands every call but the run command to the real uv.
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@v10.3.3
 
       # --threshold 0 leaves the exit code to runner errors. Scores are read
       # from aggregate-result.json, where a case below 1.0 is the normal state.
@@ -123,6 +126,15 @@ jobs:
           REF: ${{ inputs.ref }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          # On Linux the runner denies Bash writes to every temp dir it finds
+          # (os.tmpdir(), $TMPDIR, /tmp, /var/tmp), yet creates each session's
+          # home and tmp under os.tmpdir(), so every write and the shell's cwd
+          # file hit a read-only bind. It drops a relative $TMPDIR from that
+          # deny list, so point it, relative, at a dir outside those and $HOME.
+          # Remove once claude plugin eval exempts its own root on Linux.
+          sudo install -d -o "$USER" /srv/claude-eval
+          TMPDIR=$(realpath --relative-to=. /srv/claude-eval)
+          export TMPDIR
           ref=()
           if [ -n "$REF" ]; then
             # git fetch takes a full SHA only, so resolve a short one, or a
@@ -137,6 +149,7 @@ jobs:
           bun evals/native/run.ts "$SUITE_DIR" "${ref[@]}" -- --no-publish --threshold 0 --concurrency 4 "${args[@]}"
 
       - name: Upload results
+        id: upload
         if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
         uses: actions/upload-artifact@v7
         with:
@@ -156,34 +169,28 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          results=("$SUITE_DIR"/results/*/aggregate-result.json)
-          result=${results[-1]}
           report="$RUNNER_TEMP/report.md"
-          title=$(jq -r '
-            # A suite whose cases all lack a without arm has no delta.
-            def pct: (. * 100 | round | tostring) + "%";
-            "score \(.aggregates.overallScore | pct)"
-              + if .aggregates.meanDelta == null then "" else ", \(.aggregates.meanDelta | pct) over no plugin" end
-          ' "$result")
-          jq -r --arg run "$RUN_URL" \
-            '"\(.aggregates.casesTotal) cases · cost $\(.costUsd * 100 | round / 100) · [run](\($run))\n"' \
-            "$result" > "$report"
-          columns=("$result")
-          labels=(--label "this run")
+          baseline=()
           if [ -n "$BASELINE" ]; then
             IFS=, read -ra ids <<< "$BASELINE"
             for id in "${ids[@]}"; do
               gh run download "$id" --dir "$RUNNER_TEMP/baseline/$id"
             done
-            pooled=$(printf '%s,' "$RUNNER_TEMP"/baseline/*/*/*/aggregate-result.json)
-            columns=("${pooled%,}" "$result")
+            baseline=(--baseline "$RUNNER_TEMP/baseline" --label "run $BASELINE")
+          fi
+          summary=$(bun evals/native/summary.ts "$SUITE_DIR" "${baseline[@]}")
+          result=$(jq -r .result <<< "$summary")
+          title=$(jq -r .title <<< "$summary")
+          jq -r --arg run "$RUN_URL" \
+            '"\(.cases) cases · cost $\(.costUsd * 100 | round / 100) · [run](\($run))\n"' \
+            <<< "$summary" > "$report"
+          columns=("$result")
+          labels=(--label "this run")
+          if [ -n "$BASELINE" ]; then
+            columns=("$(jq -r '.baseline | join(",")' <<< "$summary")" "$result")
             labels=(--label "run $BASELINE" --label "this run")
           fi
           compared=$(bun evals/native/compare.ts --markdown --suite "$SUITE_DIR" "${labels[@]}" "${columns[@]}")
-          if [ -n "$BASELINE" ]; then
-            flagged=$(sed '/<details>/q' <<< "$compared" | grep -c '^|.*\* |' || true)
-            title="$title, $flagged flagged against run $BASELINE"
-          fi
           printf '%s\n' "$compared" >> "$report"
           {
             echo "## $SUITE: $title"
@@ -199,11 +206,14 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           TITLE: ${{ steps.report.outputs.title }}
+          LINK: ${{ steps.upload.outputs.artifact-url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
         run: |
+          set -euo pipefail
+          bun evals/native/fit.ts "$RUNNER_TEMP/report.md" --link "$LINK" > "$RUNNER_TEMP/check.md"
           gh api "repos/$REPO/check-runs" --silent \
             -f name="eval / $SUITE" -f head_sha="$SHA" \
             -f status=completed -f conclusion=neutral \
-            -f "output[title]=$TITLE" -F "output[summary]=@$RUNNER_TEMP/report.md"
+            -f "output[title]=$TITLE" -F "output[summary]=@$RUNNER_TEMP/check.md"
 
       - name: Surface eval failure
         if: steps.eval.outcome == 'failure'

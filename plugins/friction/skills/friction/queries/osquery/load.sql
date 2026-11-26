@@ -35,8 +35,10 @@ WITH g AS (
     (j->>'cpu_time')::BIGINT AS cpu_ms
   FROM snaps WHERE name = 'proc_groups')
 -- A group's totals drop when a member exits, so a negative delta is unknown, not zero.
-SELECT * REPLACE (CASE WHEN dcpu >= 0 THEN dcpu END AS dcpu) FROM (
-  SELECT *, cpu_ms - lag(cpu_ms) OVER (PARTITION BY pname ORDER BY t) AS dcpu FROM g)
+-- A name missing from samples has fallen under the query's HAVING, so a delta across that gap is unknown too.
+SELECT * EXCLUDE (gap) REPLACE (CASE WHEN dcpu >= 0 AND gap <= 15 THEN dcpu END AS dcpu) FROM (
+  SELECT *, cpu_ms - lag(cpu_ms) OVER w AS dcpu, t - lag(t) OVER w AS gap
+  FROM g WINDOW w AS (PARTITION BY pname ORDER BY t))
 WHERE t >= win_start();
 
 -- Share of CPU ticks idle since the previous sample, across all cores.
@@ -49,3 +51,9 @@ SELECT t, idle_pct FROM (
     FROM snaps WHERE name = 'host_cpu')
   WINDOW w AS (ORDER BY t))
 WHERE t >= win_start();
+
+-- A minute is saturated when its samples average under 10% idle, so a lone 10 s dip doesn't count.
+CREATE TABLE host_min AS
+SELECT strftime(to_timestamp(any_value(t)), '%Y-%m-%d') AS day, t // 60 AS m, avg(idle_pct) AS idle_pct,
+  avg(idle_pct) < 10 AS saturated
+FROM host GROUP BY m;

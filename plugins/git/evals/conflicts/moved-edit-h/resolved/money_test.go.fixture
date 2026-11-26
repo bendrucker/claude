@@ -1,0 +1,9 @@
+package ledger
+
+import "testing"
+
+func TestFormatCents(t *testing.T) {
+	if got := FormatCents(-5); got != "-0.05" {
+		t.Errorf("FormatCents(-5) = %q", got)
+	}
+}

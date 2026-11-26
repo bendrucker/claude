@@ -60,7 +60,7 @@ Copy the working tree into the VM's own disk and build there. A shared host moun
 - Lima: `rsync -a -e "ssh -F ~/.lima/perf/ssh.config" <repo>/ lima-perf:<repo-name>/`. `limactl copy -r` works without `rsync`.
 - Cloud: use the launcher's copy command, or push the arms' commits to a remote the instance can clone.
 
-Keep `.git` so each arm builds from its ref with `git worktree add`, as on the Mac. Build every arm inside the VM for its architecture, since a binary built on the host for macOS does not run there.
+Keep `.git` so each arm builds from its ref with `git worktree add` and is removed when its comparison ends, as on the Mac. Build every arm inside the VM for its architecture, since a binary built on the host for macOS does not run there.
 
 - Copy the benchmark skill's `scripts/compare.ts` into the VM outside any `node_modules` tree, and run it with the same arms and flags as on the Mac. Bun resolves its imports on first run, which needs network access.
 - When `bun`, `hyperfine`, or `perf` is missing in the VM, tell the user.

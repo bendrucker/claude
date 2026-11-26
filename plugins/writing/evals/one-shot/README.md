@@ -4,7 +4,7 @@ Measures how far one rewrite moves a draft when the model gets every writing fin
 
 ## Drafts
 
-`bun scripts/mine.ts` reads the session index, keeps each session's first version of a draft at 40 words or more, scans it with `findAll` (batch rules on, message rules for tracker bodies and `tmp/` files), and keeps drafts with at least one finding. It samples up to `--per-category` drafts for each category so rare rules get coverage, and tags a stable fifth `holdout` by id. Hosts imported without `--egress` are left out, so the sample can leave the machine.
+`bun scripts/mine.ts` reads the session index, keeps each session's first version of a draft at 40 words or more, lints it with Vale (the message section for tracker bodies and `tmp/` files), and keeps drafts with at least one finding. It samples up to `--per-check` drafts for each Vale check so rare checks get coverage, and tags a stable fifth `holdout` by id. Hosts imported without `--egress` are left out, so the sample can leave the machine.
 
 Drafts land in the gitignored `data/drafts.jsonl`. `bun scripts/sync.ts push` copies them to `s3://ben-drucker-agents-eval-corpus/one-shot/data`, and `pull` brings them back.
 
@@ -14,4 +14,4 @@ Drafts land in the gitignored `data/drafts.jsonl`. `bun scripts/sync.ts push` co
 
 ## Report
 
-`bun scripts/report.ts <run>` prints, per category, the drafts it fired on, the share of its instances the rewrite fixed, the instances left, the instances it introduced into drafts that lacked it, and the share of its drafts whose rewrite lost meaning. `--base <run>` sets a base run's figures beside each, over the drafts both runs share, which is how a rule or prompt edit is judged. The lossy column counts co-occurrence: a draft with several findings charges a loss to each of them.
+`bun scripts/report.ts <run>` prints, per Vale check, the drafts it fired on, the share of its instances the rewrite fixed, the instances left, the instances it introduced into drafts that lacked it, and the share of its drafts whose rewrite lost meaning. `--base <run>` sets a base run's figures beside each, over the drafts both runs share, which is how a rule or prompt edit is judged. The lossy column counts co-occurrence: a draft with several findings charges a loss to each of them.

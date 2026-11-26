@@ -1,0 +1,12 @@
+diff --git a/src/server.ts b/src/server.ts
+index ea40917..5b02eb8 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -2,6 +2,6 @@ import { createServer, type RequestListener } from "node:http";
+ 
+ export function start(handler: RequestListener) {
+   const server = createServer(handler);
+-  server.listen(3000);
++  server.listen(3000, "127.0.0.1");
+   return server;
+ }

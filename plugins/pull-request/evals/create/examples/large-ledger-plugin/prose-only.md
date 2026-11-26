@@ -1,0 +1,7 @@
+---
+fail:
+  - structured
+---
+Title: friction: add a ledger of recurring setup friction
+
+Adds `friction`, which opens a PR mid-week only for a blocker with a small fix and lists the rest weekly. The model emits fingerprinted findings and the ledger decides.

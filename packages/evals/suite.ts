@@ -1,14 +1,15 @@
-import { globSync, readdirSync } from "node:fs";
+import { globSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
+import { listCases, RESULT_GLOB, readCase } from "./layout";
 import { siblingLinks } from "./wrap";
 
 /** Where native suites live, relative to the repo root. */
 export const SUITE_GLOBS = ["plugins/*/evals/*", "evals/user/*"];
 
 /** Where `evals/native/run.ts` writes each suite's runs, relative to the repo root. */
-export const RESULT_GLOBS = SUITE_GLOBS.map((s) => `${s}/results/*/aggregate-result.json`);
+export const RESULT_GLOBS = SUITE_GLOBS.map((s) => `${s}/${RESULT_GLOB}`);
 
 /** Optional `suite.yaml` beside the case directories. */
 export const SuiteFile = z.object({
@@ -19,6 +20,8 @@ export const SuiteFile = z.object({
   stage: z.array(z.string()).default([]),
   /** Paths in each run's working directory copied to `<output>/artifacts/<run>/`, for a `score` script. */
   collect: z.array(z.string()).default([]),
+  /** Repo paths injected at session start beside the plugins the cases load, read from the working tree. */
+  context: z.array(z.string()).default([]),
   /** Artifacts that are not a plugin, wrapped into one by `wrap.ts`. */
   wrap: z
     .object({
@@ -37,11 +40,6 @@ export const SuiteFile = z.object({
     .default({}),
 });
 export type SuiteFile = z.output<typeof SuiteFile>;
-
-const CaseFile = z.object({
-  plugins: z.array(z.string()).default([]),
-  tags: z.array(z.string()).default([]),
-});
 
 export async function readSuite(dir: string): Promise<SuiteFile> {
   const file = Bun.file(join(dir, "suite.yaml"));
@@ -69,11 +67,24 @@ export async function withDependencies(repo: string, plugins: string[]): Promise
   return [...seen].toSorted();
 }
 
-/** Repo-relative directories of the plugins one plugin declares as dependencies. */
+const Marketplace = z.object({ name: z.string() });
+
+/** The name of the marketplace the repo publishes, when it has one. */
+async function ownMarketplace(repo: string): Promise<string | undefined> {
+  const file = Bun.file(join(repo, ".claude-plugin/marketplace.json"));
+  return (await file.exists()) ? Marketplace.parse(await file.json()).name : undefined;
+}
+
+/** Repo-relative directories of the plugin's dependencies, leaving out ones from another marketplace. */
 async function dependencies(repo: string, plugin: string): Promise<string[]> {
   const manifest = Bun.file(join(repo, plugin, ".claude-plugin/plugin.json"));
   if (!(await manifest.exists())) return [];
-  const { dependencies: names } = PluginManifest.parse(await manifest.json());
+  const { dependencies: declared } = PluginManifest.parse(await manifest.json());
+  const own = await ownMarketplace(repo);
+  const names = declared.flatMap((dep) => {
+    const [name = dep, marketplace] = dep.split("@");
+    return marketplace === undefined || marketplace === own ? [name] : [];
+  });
   return Promise.all(
     names.map(async (name) => {
       const dep = join(dirname(plugin), name);
@@ -85,29 +96,25 @@ async function dependencies(repo: string, plugin: string): Promise<string[]> {
 }
 
 /** Repo-relative plugin directories a case lists, as written in its `case.yaml`. */
-export async function listedPlugins(repo: string, suite: string, file: string): Promise<string[]> {
-  const { plugins } = CaseFile.parse(parse(await Bun.file(join(repo, suite, file)).text()));
-  return plugins.map((p) => normalize(join(suite, dirname(file), p)));
+export async function listedPlugins(repo: string, suite: string, name: string): Promise<string[]> {
+  const { plugins } = await readCase(join(repo, suite), name);
+  return plugins.map((p) => normalize(join(suite, name, p)));
 }
 
 /** Repo-relative plugin directories the suite's cases load, with their dependencies. */
 export async function casePlugins(repo: string, suite: string): Promise<string[]> {
-  const files = globSync("*/case.yaml", { cwd: join(repo, suite) });
-  const lists = await Promise.all(files.map((file) => listedPlugins(repo, suite, file)));
+  const names = await listCases(join(repo, suite));
+  const lists = await Promise.all(names.map((n) => listedPlugins(repo, suite, n)));
   return withDependencies(repo, [...new Set(lists.flat())]);
 }
 
 /** Maps each case in a suite directory to the tags its case.yaml declares. */
 export async function loadTags(suite: string): Promise<Map<string, string[]>> {
-  const cases = readdirSync(suite, { withFileTypes: true }).filter((e) => e.isDirectory());
+  const names = await listCases(suite);
   const entries = await Promise.all(
-    cases.map(async ({ name }) => {
-      const file = Bun.file(join(suite, name, "case.yaml"));
-      if (!(await file.exists())) return undefined;
-      return [name, CaseFile.parse(parse(await file.text())).tags] as const;
-    }),
+    names.map(async (name) => [name, (await readCase(suite, name)).tags] as const),
   );
-  return new Map(entries.filter((e) => e !== undefined));
+  return new Map(entries);
 }
 
 export interface Suite {
@@ -154,7 +161,7 @@ async function skillSiblings(repo: string, skill: string): Promise<string[]> {
 
 /** Repo paths a suite's scores depend on: the suite, the plugins its cases load, and what it wraps. */
 export async function suiteInputs(repo: string, suite: string): Promise<string[]> {
-  const { wrap } = await readSuite(join(repo, suite));
+  const { wrap, context } = await readSuite(join(repo, suite));
   const wrapped =
     wrap === undefined
       ? []
@@ -164,7 +171,7 @@ export async function suiteInputs(repo: string, suite: string): Promise<string[]
           ...wrap.agents,
           ...wrap.context,
         ];
-  return [...new Set([suite, ...(await casePlugins(repo, suite)), ...wrapped])];
+  return [...new Set([suite, ...(await casePlugins(repo, suite)), ...wrapped, ...context])];
 }
 
 const within = (path: string, input: string) => path === input || path.startsWith(`${input}/`);

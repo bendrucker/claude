@@ -66,7 +66,7 @@ const JobArgsFile = z.looseObject({
 
 const Scope = z.looseObject({ mr: z.string().nullish() });
 
-/** The shards preflight wrote, from the args it handed the workflow. */
+/** The shards preflight wrote, from its `job-args.json` manifest. */
 async function readShardRefs(jobDir: string): Promise<ShardRef[]> {
   const argsPath = join(jobDir, "job-args.json");
   if (!(await Bun.file(argsPath).exists())) {
@@ -75,7 +75,7 @@ async function readShardRefs(jobDir: string): Promise<ShardRef[]> {
   return (await readJson(argsPath, JobArgsFile)).shards;
 }
 
-/** The shard contents preflight wrote, read back through the refs it handed the workflow. */
+/** The shard contents preflight wrote, read back through the manifest's refs. */
 async function readShards(jobDir: string): Promise<JobShard[]> {
   const refs = await readShardRefs(jobDir);
   return Promise.all(refs.map((ref) => readShard(ref.path)));
@@ -102,7 +102,7 @@ async function readVerdicts(jobDir: string, shards: JobShard[]): Promise<Map<str
   const missing = files.filter((_, i) => !present[i]).map((file) => file.id);
   if (missing.length > 0) {
     throw new AuditError(
-      `No verdicts for shard(s) ${missing.join(", ")} in ${verdictsDir}. Run the judge workflow first.`,
+      `No verdicts for shard(s) ${missing.join(", ")} in ${verdictsDir}. Run the judge agents first.`,
     );
   }
   const contents = await Promise.all(files.map((file) => readJson(file.path, z.unknown())));
@@ -112,7 +112,7 @@ async function readVerdicts(jobDir: string, shards: JobShard[]): Promise<Map<str
   });
   if (unjudged.length > 0) {
     throw new AuditError(
-      `Verdicts in ${verdictsDir} omit ${unjudged.length} judged comment(s): ${unjudged.join(", ")}. Rerun the judge workflow.`,
+      `Verdicts in ${verdictsDir} omit ${unjudged.length} judged comment(s): ${unjudged.join(", ")}. Rerun the judge agents.`,
     );
   }
   return collectVerdicts(contents);

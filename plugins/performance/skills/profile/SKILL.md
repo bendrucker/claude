@@ -4,6 +4,16 @@ description: >-
   Use when asked why a program, script, or web page is slow or memory-heavy,
   or what dominates its runtime, before deciding what to change.
 argument-hint: "<command | url>"
+allowed-tools:
+  - Bash(samply --version)
+  - Bash(hyperfine --version)
+  - Bash(bun --version)
+  - Bash(node --version)
+  - Bash(agent-browser --version)
+  - Bash(py-spy --version)
+  - Bash(command -v malloc_history)
+  - Bash(heaptrack --version)
+  - Bash(echo:*)
 ---
 
 # Profile

@@ -10,57 +10,39 @@ allowed-tools:
 
 # Things JXA
 
-Read and query Things 3 data via JXA.
-
 ## Running JXA
 
-To run JXA, use the Skill tool to invoke `mac:jxa-run`. Do NOT run `bun` or `osascript` directly.
+Run every JXA script and expression through the `mac:jxa-run` skill, which validates the `Application("Things3")` scope and runs outside the sandbox.
 
-#### Script file
+- Script: `Skill(mac:jxa-run, args: "Things3 ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-list.js TMTodayListSource")`
+- Expression: `Skill(mac:jxa-run, args: "Things3 -e 'var app = Application(\"Things3\"); JSON.stringify(app.lists.byId(\"TMTodayListSource\").toDos().length)'")`
 
-Invoke via: `Skill(mac:jxa-run, args: "Things3 ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-list.js TMTodayListSource")`
+For a table, pipe the returned JSON through `echo '<json>' | bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts [--json] [--columns name,status]`.
 
-#### Inline expression
-
-Invoke via: `Skill(mac:jxa-run, args: "Things3 -e 'var app = Application(\"Things3\"); JSON.stringify(app.lists.byId(\"TMTodayListSource\").toDos().length)'")`
-
-#### Formatting output
-
-Pipe the returned JSON through the formatter for table display:
-
-```bash
-echo '<json>' | bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts [--json] [--columns name,status]
-```
+When Things is not running (`Error: Application can't be found.`), launch it with `open -g -a "Things3"`.
 
 ## Scripts
 
+In `${CLAUDE_PLUGIN_ROOT}/scripts/jxa/` unless noted:
+
 | Script | Usage | Description |
 |--------|-------|-------------|
-| `find-todos.js` | `<tag\|project> <name> [--logbook]` | Find todos by tag (across Inbox/Today/Anytime/Upcoming/Someday) or project |
-| `query-list.js` | `<list-id>` | Query todos from any built-in list |
-| `query-logbook.js` | `<start-iso> <end-iso> [--notes-contains <substring>]` | Query logbook with early termination. Full scans of 10k+ items are slow. `--notes-contains` filters by notes substring and includes `notes` in output (e.g. to find `Discovery:` markers). |
-| `query-metadata.js` | `<projects\|areas\|tags>` | List projects, areas, or tags (tags omit todoCount for performance) |
-| `export-markdown.js` | `[list-id]` | Export a list to markdown checklist |
+| `find-todos.js` | `<tag\|project> <name> [--logbook]` | Todos by tag (across Inbox/Today/Anytime/Upcoming/Someday) or project |
+| `search-todos.js` | `<text> [--field name\|notes\|both] [--limit <n>]` | Text search with notes previews |
+| `get-todo.js` | `<id>` | Full detail for one todo (no checklist items) |
+| `query-list.js` | `<list-id>` | Todos in a built-in list |
+| `query-logbook.js` | `<start-iso> <end-iso> [--notes-contains <substring>]` | Logbook in a date range, with early termination. `--notes-contains` adds `notes` to the output (e.g. to find `Discovery:` markers) |
+| `query-metadata.js` | `<projects\|areas\|tags>` | Projects, areas, or tags (tags omit `todoCount`) |
+| `export-markdown.js` | `[list-id]` | A list as a markdown checklist. Lives in `${CLAUDE_SKILL_DIR}/scripts/` |
+
+Bound logbook reads by date. A full scan covers 10k+ items.
 
 ## Built-in List IDs
 
 `TMInboxListSource` (Inbox), `TMTodayListSource` (Today), `TMNextListSource` (Anytime), `TMCalendarListSource` (Upcoming), `TMSomedayListSource` (Someday), `TMLogbookListSource` (Logbook)
 
-## Repeating Tasks
-
-Detect via midnight heuristic: `creationDate` at `T00:00:00` local time = repeating instance. Templates have `activationDate: null`. See [troubleshooting.md](troubleshooting.md) for examples.
-
-## Status Values
-
-`open`, `completed`, `canceled`
-
 ## Reference
 
-- [jxa.md](jxa.md): Object model and API
-- [setup.md](setup.md): Development setup
-- [troubleshooting.md](troubleshooting.md): Common issues
-
-## Tips
-
-- Use `properties()` for batch reads instead of individual getters
-- `open -g -a "Things3"` to launch Things if not running
+- [jxa.md](jxa.md): object model, syntax quirks, and status values, for writing an inline expression
+- [setup.md](setup.md): script structure and type definitions, for writing a new script
+- [troubleshooting.md](troubleshooting.md): sandbox errors, URL-scheme update failures, error messages, and repeating-task detection (a repeating instance has `creationDate` at local midnight)

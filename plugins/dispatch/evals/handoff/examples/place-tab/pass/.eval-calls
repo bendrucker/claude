@@ -1,0 +1,2 @@
+rex window new -s session:eval Service Metrics -c /tmp/eval/cwd/.worktrees/add-metrics --focus=false --json -- claude --name add-metrics -- <prompt>
+launch add-metrics /tmp/eval/cwd/.worktrees/add-metrics place=tab title=Service Metrics

@@ -109,7 +109,7 @@ export function tfs(params: SearchParams): string {
     );
   }
   message.push(0x70, 0x01);
-  message.push(0x82, 0x01, 0x0b, 0x08, ...Array<number>(9).fill(0xff), 0x01);
+  message.push(0x82, 0x01, 0x0b, 0x08, ...Array.from({ length: 9 }, () => 0xff), 0x01);
   message.push(0x98, 0x01, legs.length > 1 ? ROUND_TRIP : ONE_WAY);
   if (noBasic) message.push(0xc8, 0x01, 0x01);
 

@@ -26,9 +26,9 @@ The with arm loads the plugin. The without arm doesn't.
 
 `gather-ticket` and `gather-brief` leave the commands to the model. Their prompts name literal extensions (`.ts`, `.vue`) and ask for one pass with separators, which draws a chain of unquoted `--include=*.ext` flags. Naming the languages in words doesn't. `gather-brief` runs under a subagent-style system prompt, where real sessions hit the habit most.
 
-The `replay-*` cases and `pasted-command` hand the model a command shaped like real failures mined from the session index, one per rewrite rule, to run as written. The habit is present in every run. These cases therefore pin each rule. In `replay-find`, the model often probes with `ls *.yaml` first, which zsh rejects with the same error. The plugin notes that glob without rewriting it, so the case grades only the reply.
+The `replay-*` cases and `pasted-command` hand the model a command shaped like real failures mined from the session index, one per habit, to run as written. The habit is present in every run. These cases therefore pin `nomatch` and `equals` off. In `replay-find`, the model often probes with `ls *.yaml` first, which `ls` answers with a missing-file error, so the case grades only the reply.
 
-`replay-probe` and `gather-config` pin `cshnullglob`. The probe names several candidate files at once. Without the option, zsh skips the whole command when any one candidate is missing.
+`replay-probe` and `gather-config` pin the multi-glob probe. The probe names several candidate files at once. Under the default `nomatch`, zsh skips the whole command when any one candidate is missing.
 
 `missing-glob` and `heredoc-untouched` guard ordinary work. The plugin notes a glob that doesn't match any file and leaves heredoc bodies as written.
 

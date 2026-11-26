@@ -65,8 +65,13 @@ const WRITER_CONFIG = {
   storage_compatibility_version: STORAGE_VERSION,
 };
 
-async function createDatabase(dbPath: string): Promise<Database> {
-  const instance = await DuckDBInstance.create(dbPath, WRITER_CONFIG);
+const READER_CONFIG = { access_mode: "READ_ONLY", memory_limit: "1GiB", threads: "2" };
+
+async function createDatabase(
+  dbPath: string,
+  config: Record<string, string> = WRITER_CONFIG,
+): Promise<Database> {
+  const instance = await DuckDBInstance.create(dbPath, config);
   const connection = await instance.connect();
 
   return {
@@ -124,7 +129,12 @@ export function getImportsDir(importsDir?: string): string {
   return join(process.env.HOME, ".claude", "session-imports");
 }
 
+export function isHostLabel(label: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(label);
+}
+
 export function importRoot(label: string, importsDir?: string): string {
+  if (!isHostLabel(label)) throw new Error(`Invalid host label "${label}"`);
   return join(getImportsDir(importsDir), label);
 }
 
@@ -459,6 +469,10 @@ export async function getDb(dataDir: string): Promise<Database> {
   return createDatabase(sessionDbPath(dataDir));
 }
 
+export function getReadOnlyDb(dataDir: string): Promise<Database> {
+  return createDatabase(sessionDbPath(dataDir), READER_CONFIG);
+}
+
 // Returns whether raw's projected columns were re-derived, which invalidates the tables
 // views.sql builds from it.
 export async function ensureSchema(db: Database): Promise<boolean> {
@@ -641,7 +655,8 @@ export async function ensureIndex(
   // reconcilePinned already cleared the fingerprint when it rewrote raw.
   let derivedInvalidated = pinnedRederived;
 
-  for (const entry of await enumerateHosts(options)) {
+  const hosts = await enumerateHosts(options);
+  for (const entry of hosts) {
     const source = transcripts(entry.host, entry.root, importSql);
     // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
     const diff = await diffSource(db, source);
@@ -666,7 +681,13 @@ export async function ensureIndex(
     lap("import");
   }
 
-  const telemetryChanged = await ensureTelemetry(db, getLocalRoot(options.projectsDir), LOCAL_HOST);
+  // An imported host's telemetry sits beside its projects/ as `local`'s does, so a pulled
+  // cloud session's mod events index under that host.
+  let telemetryChanged = 0;
+  for (const entry of hosts) {
+    // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh.
+    telemetryChanged += await ensureTelemetry(db, entry.root, entry.host);
+  }
   lap("telemetry");
 
   // A stale views_hash, a re-derived raw, or a missing table rebuilds content_items in

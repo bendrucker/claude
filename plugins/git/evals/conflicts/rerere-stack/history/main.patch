@@ -1,0 +1,22 @@
+diff --git a/src/client.ts b/src/client.ts
+index f591321..e6a7696 100644
+--- a/src/client.ts
++++ b/src/client.ts
+@@ -2,5 +2,5 @@ import { open } from "./socket";
+ import { limits } from "./limits";
+ 
+ export function connect(host: string) {
+-  return open(host, limits.timeoutMs);
++  return open(host, limits.requestTimeoutMs);
+ }
+diff --git a/src/limits.ts b/src/limits.ts
+index 94c0f29..e8a1ae4 100644
+--- a/src/limits.ts
++++ b/src/limits.ts
+@@ -1,5 +1,5 @@
+ export const limits = {
+   retries: 3,
+-  timeoutMs: 5000,
++  requestTimeoutMs: 5000,
+   maxBodyBytes: 1_000_000,
+ };

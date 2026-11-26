@@ -1,8 +1,12 @@
 import { describe, expect, mock, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import {
+  CLOSED,
   clearArgs,
+  eventsPath,
   currentPane,
   docOpenArgs,
   docPanePath,
@@ -23,7 +27,12 @@ import {
   recordedDocPanes,
   reviewGlyph,
   reviewrOpenArgs,
+  rexReviewArgs,
+  type RexReview,
+  sessionHost,
+  type Host,
   surfaceState,
+  tailEvents,
   type ReviewrLookup,
   type SurfaceState,
 } from "./attention";
@@ -221,6 +230,142 @@ describe("currentPane", () => {
     ["herdr env with an empty pane", { HERDR_ENV: "1", HERDR_PANE_ID: "" }, null],
   ])("%s", (_name, env, expected) => {
     expect(currentPane(env)).toBe(expected);
+  });
+});
+
+describe("sessionHost", () => {
+  test.each<[string, Record<string, string | undefined>, Host]>([
+    ["herdr", { HERDR_ENV: "1", HERDR_PANE_ID: "wE5:p1" }, { kind: "herdr", pane: "wE5:p1" }],
+    ["Rex", { REX_BLOCK: "block:01a1" }, { kind: "rex", block: "block:01a1" }],
+    [
+      "herdr inside Rex",
+      { HERDR_ENV: "1", HERDR_PANE_ID: "wE5:p1", REX_BLOCK: "block:01a1" },
+      { kind: "herdr", pane: "wE5:p1" },
+    ],
+    [
+      "a stale herdr pane id inside Rex",
+      { HERDR_PANE_ID: "wE5:p1", REX_BLOCK: "block:01a1" },
+      { kind: "rex", block: "block:01a1" },
+    ],
+    ["an empty Rex block", { REX_BLOCK: "" }, { kind: "none" }],
+    ["a bare terminal", {}, { kind: "none" }],
+  ])("%s", (_name, env, expected) => {
+    expect(sessionHost(env)).toEqual(expected);
+  });
+});
+
+describe("rexReviewArgs", () => {
+  test.each<{ name: string; review: RexReview; expected: string[] }>([
+    { name: "working diff", review: {}, expected: [] },
+    { name: "empty base", review: { base: "" }, expected: [] },
+    {
+      name: "against a base",
+      review: { base: "origin/main" },
+      expected: ["base=origin/main"],
+    },
+    { name: "plannotator ignores batch", review: { batch: true }, expected: [] },
+    { name: "Hunk diff live", review: { app: "hunk" }, expected: ["app=hunk", "mode=live"] },
+    {
+      name: "Hunk diff in batch",
+      review: { app: "hunk", batch: true },
+      expected: ["app=hunk", "mode=batch"],
+    },
+    {
+      name: "a document passes its absolute path and drops diff options",
+      review: { doc: "/repo/tmp/pr-body.md", base: "origin/main", app: "hunk" },
+      expected: ["doc=/repo/tmp/pr-body.md"],
+    },
+  ])("$name", ({ review, expected }) => {
+    expect(rexReviewArgs("block:01a1", review)).toEqual([
+      "do",
+      "review_changes",
+      "block=block:01a1",
+      ...expected,
+    ]);
+  });
+
+  test("a relative document resolves against the working directory", () => {
+    expect(rexReviewArgs("block:01a1", { doc: "design.md" })).toContain(
+      `doc=${join(process.cwd(), "design.md")}`,
+    );
+  });
+});
+
+describe("tailEvents", () => {
+  const A = "[review: comment] a.ts:1 (id x) | one";
+  const B = "[review: comment] b.ts:2 (id y) | two";
+  const OLD = "[review: comment] old.ts:1 (id o) | before the watch";
+
+  // Runs the tail against a scratch file, applying each write after the tail starts.
+  async function tail(
+    initial: string | undefined,
+    writes: ((path: string) => Promise<void>)[],
+  ): Promise<string[]> {
+    const path = join(await mkdtemp(join(tmpdir(), "events-")), "block.events");
+    if (initial !== undefined) await Bun.write(path, initial);
+    const lines: string[] = [];
+    const done = tailEvents(
+      path,
+      (line) => {
+        lines.push(line);
+      },
+      { pollMs: 5, graceMs: 100 },
+    );
+    for (const change of writes) {
+      // oxlint-disable-next-line no-await-in-loop -- each write lands after the tail has read the last.
+      await Bun.sleep(20).then(() => change(path));
+    }
+    await done;
+    return lines;
+  }
+
+  const write = (text: string) => async (path: string) => {
+    await Bun.write(path, text);
+  };
+
+  test.each<{ name: string; initial?: string; writes: string[]; expected: string[] }>([
+    {
+      name: "notes after the start arrive in order and the closed line ends the tail",
+      initial: `${OLD}\n`,
+      writes: [`${OLD}\n${A}\n`, `${OLD}\n${A}\n${B}\n${CLOSED} approved\n`],
+      expected: [A, B, `${CLOSED} approved`],
+    },
+    {
+      name: "a partial line waits for its newline",
+      initial: "",
+      writes: [A.slice(0, 10), `${A}\n${CLOSED} closed\n`],
+      expected: [A, `${CLOSED} closed`],
+    },
+    {
+      name: "a file that appears during the grace period is read from the top",
+      writes: [`${A}\n${CLOSED} dismissed\n`],
+      expected: [A, `${CLOSED} dismissed`],
+    },
+    {
+      name: "a truncated file is a new review read from the top",
+      initial: `${OLD}\n${OLD}\n`,
+      writes: [`${B}\n${CLOSED} approved\n`],
+      expected: [B, `${CLOSED} approved`],
+    },
+    { name: "a missing file reports closed", writes: [], expected: [CLOSED] },
+    {
+      name: "a file ending in a closed line is a finished review",
+      initial: `${OLD}\n${CLOSED} approved\n`,
+      writes: [],
+      expected: [CLOSED],
+    },
+  ])("$name", async ({ initial, writes, expected }) => {
+    expect(await tail(initial, writes.map(write))).toEqual(expected);
+  });
+
+  test("a deleted file reports closed", async () => {
+    expect(await tail("", [write(`${A}\n`), (path) => rm(path)])).toEqual([A, CLOSED]);
+  });
+
+  test("eventsPath sits beside the block's review pointer", () => {
+    expect(eventsPath("block:01a1", "/home")).toBe(
+      "/home/.local/state/rex-review/blocks/block:01a1.events",
+    );
   });
 });
 

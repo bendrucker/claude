@@ -85,7 +85,7 @@ const matcher = (patterns: string[]) => {
 };
 
 /** The list holding the most planted items, preferring a ranked list, then the later one. */
-export function candidateList(blocks: Block[], truth: Truth): string[] {
+function candidateList(blocks: Block[], truth: Truth): string[] {
   const named = matcher(truth.items.flatMap((i) => i.patterns));
   let best: Block | undefined;
   let bestKey = -1;

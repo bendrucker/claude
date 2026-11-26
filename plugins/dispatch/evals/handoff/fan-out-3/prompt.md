@@ -1,0 +1,1 @@
+Three separate fixes for `src/client.ts`, each its own PR with a test, each in its own session: (1) cap the reconnect delay at 30 seconds, (2) add random jitter to the delay so clients don't retry in lockstep, (3) stop after 10 failed attempts and throw.

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Verdict } from "../judge/schema";
 import { type ReportItem, renderReport, summarize } from "./report";
 
-const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+const ANSI = new RegExp(`${String.fromCodePoint(27)}\\[[0-9;]*m`, "g");
 const strip = (s: string) => s.replace(ANSI, "");
 
 function verdict(over: Partial<Verdict> = {}): Verdict {

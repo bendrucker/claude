@@ -1,0 +1,1036 @@
+diff --git a/bun.lock b/bun.lock
+index d0add31c..8209a537 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -17,7 +17,7 @@
+         "@anthropic-ai/claude-agent-sdk": "^0.3.284",
+         "@ast-grep/napi": "^0.45.3",
+         "@hegeldev/hegel": "^0.4.7",
+-        "@oxlint/plugins": "1.81.0",
++        "@oxlint/plugins": "1.87.0",
+         "@types/bun": "^1.3.12",
+         "@types/mdast": "^4.0.4",
+         "@types/seedrandom": "^3.0.8",
+@@ -25,7 +25,7 @@
+         "ajv-formats": "^3.0.1",
+         "gray-matter": "^4.0.3",
+         "mdast-util-from-markdown": "^2.0.2",
+-        "oxfmt": "^0.70.0",
++        "oxfmt": "^0.72.0",
+         "oxlint": "^1.78.0",
+         "oxlint-tsgolint": "^7.0.2001",
+         "seedrandom": "^3.0.5",
+@@ -61,7 +61,7 @@
+     "packages/oxlint-rules": {
+       "name": "@bendrucker/claude-oxlint-rules",
+       "dependencies": {
+-        "@oxlint/plugins": "1.81.0",
++        "@oxlint/plugins": "1.87.0",
+         "zod": "^4.4.3",
+       },
+     },
+@@ -201,7 +201,7 @@
+       "dependencies": {
+         "cleye": "^2.2.1",
+         "jsdom": "^30.0.0",
+-        "mermaid": "^11.4.0",
++        "mermaid": "^12.0.0",
+         "zod": "^4.4.3",
+       },
+       "devDependencies": {
+@@ -303,7 +303,16 @@
+       "name": "pr-body-eval",
+       "dependencies": {
+         "@anthropic-ai/sdk": "^0.129.0",
++        "@commander-js/extra-typings": "^15.0.0",
++        "@types/mdast": "^4.0.4",
+         "cleye": "^2.2.1",
++        "commander": "^15.0.0",
++        "mdast-util-from-markdown": "^2.1.0",
++        "mdast-util-gfm": "^3.1.0",
++        "mdast-util-to-string": "^4.0.0",
++        "micromark-extension-gfm": "^3.0.0",
++        "table": "^6.9.0",
++        "unist-util-visit": "^5.1.0",
+         "zod": "^4.4.3",
+       },
+       "devDependencies": {
+@@ -497,7 +506,15 @@
+ 
+     "@bramus/specificity": ["@bramus/specificity@2.4.2", "", { "dependencies": { "css-tree": "^3.0.0" }, "bin": { "specificity": "bin/cli.js" } }, "sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw=="],
+ 
+-    "@chevrotain/types": ["@chevrotain/types@11.1.2", "", {}, "sha512-U+HFai5+zmJCkK86QsaJtoITlboZHBqrVketcO2ROv865xfCMSFpELQoz1GkX5GzME8pTa+3kbKrZHQtI0gdbw=="],
++    "@chevrotain/cst-dts-gen": ["@chevrotain/cst-dts-gen@13.2.0", "", { "dependencies": { "@chevrotain/gast": "13.2.0", "@chevrotain/types": "13.2.0" } }, "sha512-bA9dvWlhAUcHkNwU+8w9yiUxJPlj/Lm3VqS7MD+NbIR/7LmpNLuK/AWNFdCo/T3SK5ND0/UHf3IJvl/Jn/i6yg=="],
++
++    "@chevrotain/gast": ["@chevrotain/gast@13.2.0", "", { "dependencies": { "@chevrotain/types": "13.2.0" } }, "sha512-bCARdAsG+eEbOveSXcOAC7pVxA04I1ionzeMOwIYf5NX7SaS7zgn4Dgug2BSqoL+iyKeMNSorQjsFSHJHsCNwg=="],
++
++    "@chevrotain/regexp-to-ast": ["@chevrotain/regexp-to-ast@13.2.0", "", {}, "sha512-kxpUkLtiaK09ph+dib+Yvm+3sWSnuwlo25gqfKRgTPNmF6H7uW4gVkMjaRdtnN783S9sM6vUNWh9CsxYX4QwKw=="],
++
++    "@chevrotain/types": ["@chevrotain/types@13.2.0", "", {}, "sha512-7qrYHRlKfWf2AvBfJi5eVOrKAkbxvMFsy/iIHTGIiApNcEecCaVIdR+mIQhyCBsTDJxBz4JWXHMo6krbhR9hVg=="],
++
++    "@chevrotain/utils": ["@chevrotain/utils@13.2.0", "", {}, "sha512-SzKYY68rseOrb9KILVzPsl6SjkQtdWw01SRGB5aCVI5kFcHltQsOYV3JB0Ffst72DgkvHCyDQ0NLwxtmCCf97Q=="],
+ 
+     "@commander-js/extra-typings": ["@commander-js/extra-typings@15.0.0", "", { "peerDependencies": { "commander": "~15.0.0" } }, "sha512-yeJlba62xqmkgELUsn7356MEnzLLu/fw2x4lofFqGnXh6YysRdEs2BaLeLtg1+KU0AXvMeqQvTTp+3hBEBK+EA=="],
+ 
+@@ -705,7 +722,7 @@
+ 
+     "@koromix/koffi-win32-x64": ["@koromix/koffi-win32-x64@3.3.1", "", { "os": "win32", "cpu": "x64" }, "sha512-LYoO19cTIA7xjl+3s4VeGagCAO38VNXZ969DNszb1wTwJUjrHLrAbHFkk8fYkXineM3HJkFwElW0VLmZqXcfRg=="],
+ 
+-    "@mermaid-js/parser": ["@mermaid-js/parser@1.1.1", "", { "dependencies": { "@chevrotain/types": "~11.1.1" } }, "sha512-VuHdsYMK1bT6X2JbcAaWAhugTRvRBRyuZgd+c22swUeI9g/ntaxF7CY7dYarhZovofCbUNO0G7JesfmNtjYOCw=="],
++    "@mermaid-js/parser": ["@mermaid-js/parser@2.0.1", "", { "dependencies": { "@chevrotain/types": "~13.2.0" } }, "sha512-j37dj/h6p6pots1L7pLPPNuABEEu9WP4OYg9pW1g+nYG331j0+3canE9OagtYdytYvdSAMG+2fKU5cxep6LgjA=="],
+ 
+     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.30.0", "", { "dependencies": { "@hono/node-server": "^1.19.9 || ^2.0.5", "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.2.1", "express-rate-limit": "^8.2.1", "hono": "^4.11.4", "jose": "^6.1.3", "json-schema-typed": "^8.0.2", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.1" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA=="],
+ 
+@@ -737,43 +754,43 @@
+ 
+     "@nodable/entities": ["@nodable/entities@2.2.0", "", {}, "sha512-9uGyhaQavEUMC8AIddIjau4NsnsXhou+j5sBAGojCM1oxmQpVKTWR/9JxABD6UAv12vpIms55fPZKFQEhG6uBg=="],
+ 
+-    "@oxfmt/binding-android-arm-eabi": ["@oxfmt/binding-android-arm-eabi@0.70.0", "", { "os": "android", "cpu": "arm" }, "sha512-Xd7YO4/T2axEj6FTLcj4Why3mTBqFMg+x24xtorT4Lb2+1g82090GH0a/4U1m0pABGYiix2bq1pqkYrmV3f0Sw=="],
++    "@oxfmt/binding-android-arm-eabi": ["@oxfmt/binding-android-arm-eabi@0.72.0", "", { "os": "android", "cpu": "arm" }, "sha512-u4U1uaDOVBuorGNC/07NLm48nECHOiJJka002YGML16Md2DRvf38RGBt01lH60EOGvNlFVmbLoksQedNBoZHKw=="],
+ 
+-    "@oxfmt/binding-android-arm64": ["@oxfmt/binding-android-arm64@0.70.0", "", { "os": "android", "cpu": "arm64" }, "sha512-x9rlMYyKXdgKdYyUJzGsK1ZV8P4di/J32ipzcS6Jet6p9r9UAh28neXIMtdlSaJJycdi61Z4YkcLKLpk8ueFjg=="],
++    "@oxfmt/binding-android-arm64": ["@oxfmt/binding-android-arm64@0.72.0", "", { "os": "android", "cpu": "arm64" }, "sha512-GCnM+Ae2mWOKC+92y3FOb6eZJeVnBAVz82e3lITUUg+kxukYKzBNAvJ/hhHIfa2A0md55SYYhdWPddSSy3KPVA=="],
+ 
+-    "@oxfmt/binding-darwin-arm64": ["@oxfmt/binding-darwin-arm64@0.70.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-IUTUPvrBVYy7POh4stXzRdz4IVC/1QSaviCWoyenSlOhGu0X9j5K07vCTM9biLjAA2Zs31l0Rj5vvRpj9n95wA=="],
++    "@oxfmt/binding-darwin-arm64": ["@oxfmt/binding-darwin-arm64@0.72.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-LjQ8tlevdtwraFlWC6AnQ1Forzde0clRmnsP3QmK+ydSElDt/J+5Jc+m+//Ly1G97aP7WCNUw110QMIUw2K7xA=="],
+ 
+-    "@oxfmt/binding-darwin-x64": ["@oxfmt/binding-darwin-x64@0.70.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-vw745q870oTd6J517O24asoX4/E+eK0nxYIFoedSLqgJ+nI5En7+ZS82iZSHZ69zevQrnOXiyHP01dA+t8xD8w=="],
++    "@oxfmt/binding-darwin-x64": ["@oxfmt/binding-darwin-x64@0.72.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-+ZbcxhB1C34RQR5IldSyY6Z/yalJIxHXhP36PGE4sEq0f/lgL5jCLmOKoDeVm8dqd9gFGDsd1bNWHSGCAwdSkw=="],
+ 
+-    "@oxfmt/binding-freebsd-x64": ["@oxfmt/binding-freebsd-x64@0.70.0", "", { "os": "freebsd", "cpu": "x64" }, "sha512-NO14EgSM9dFkcg+MfGPxvsKqXYs9LKaxPrOKXpv1R0rLokGGFDcCq6dBMq18dE4wlpFOovX0UZY2uh1P30O7QA=="],
++    "@oxfmt/binding-freebsd-x64": ["@oxfmt/binding-freebsd-x64@0.72.0", "", { "os": "freebsd", "cpu": "x64" }, "sha512-yGPhA8sePEBFV9iGcprhyOk3Bz3fZshswMH3DpYIPZFLT1DG5LjiZ0j6AJQpSueaL6bUK0av1K+5+fe+ldy5EQ=="],
+ 
+-    "@oxfmt/binding-linux-arm-gnueabihf": ["@oxfmt/binding-linux-arm-gnueabihf@0.70.0", "", { "os": "linux", "cpu": "arm" }, "sha512-139OEhHarj9CYoJ/i9gXlPv4KLBGtLj2toseOWYFf09QwlhklaZk+wW3aOvlqoeZtuayvkoSNVWra7WJ21s3VQ=="],
++    "@oxfmt/binding-linux-arm-gnueabihf": ["@oxfmt/binding-linux-arm-gnueabihf@0.72.0", "", { "os": "linux", "cpu": "arm" }, "sha512-/g5axuqFMcAtoQrFLR5EJEMDjR5Ea4GuzpdDmMpPWAgrF1DmL4kD1NPNVlpXEOxpFJnD6lPvLKYj1lzdlrfifA=="],
+ 
+-    "@oxfmt/binding-linux-arm-musleabihf": ["@oxfmt/binding-linux-arm-musleabihf@0.70.0", "", { "os": "linux", "cpu": "arm" }, "sha512-GEh2PY3IWTE0M24eNhTduountANSbWyDmMnzFSQE/nGg/bjPugbUgiGuFu+xdqcQSd/HKSwH80/F2yVVD48yhA=="],
++    "@oxfmt/binding-linux-arm-musleabihf": ["@oxfmt/binding-linux-arm-musleabihf@0.72.0", "", { "os": "linux", "cpu": "arm" }, "sha512-InVitdHbS09PM+w+WinIiyX37rC9R3L7lUP9mKy9uKTEDSUFaLjWsLoreRIxKivnv7Ndqc6Trvi+K+b6ZzhiJg=="],
+ 
+-    "@oxfmt/binding-linux-arm64-gnu": ["@oxfmt/binding-linux-arm64-gnu@0.70.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-En5i+UJmZSPxuSf47F2Hl5YOzKB0bicQLnGQkeTCMQ35cWLtbrSwACJKfiLqRZrk05DwSnsJkhBRaM3OURtIaA=="],
++    "@oxfmt/binding-linux-arm64-gnu": ["@oxfmt/binding-linux-arm64-gnu@0.72.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-WKjlyRAxpPjXoqeuwFBim5LscgvY+RNEiZ971C9JlRQZONhJTsXDki/oHFYQE+fzzRpzXh3owZvOdT3kNL2g+g=="],
+ 
+-    "@oxfmt/binding-linux-arm64-musl": ["@oxfmt/binding-linux-arm64-musl@0.70.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-WWOoV5W9Im3flVwOVrWn/2DUlOF8v5vcCip+kcNuaMpulRCh6nzzt1Su2vcL2F908YJIXNV3HvegbBHuyLwKHg=="],
++    "@oxfmt/binding-linux-arm64-musl": ["@oxfmt/binding-linux-arm64-musl@0.72.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-poafnbsPpJhR+5Mbwpf8CscugTyiRAzjTOxRVn8ra3X2jnURs2xL5Du2xl5g2iW85lICMglpmLf8jDjZEbNgzQ=="],
+ 
+-    "@oxfmt/binding-linux-ppc64-gnu": ["@oxfmt/binding-linux-ppc64-gnu@0.70.0", "", { "os": "linux", "cpu": "ppc64" }, "sha512-YUouneIqW+5n7aE8xx/zeZ6/utr/KH7oykcGoFyd8Uz8uh591T1oKlnoWA3BsRq/ZR42oY1w4MUYvS/0e/MQOA=="],
++    "@oxfmt/binding-linux-ppc64-gnu": ["@oxfmt/binding-linux-ppc64-gnu@0.72.0", "", { "os": "linux", "cpu": "ppc64" }, "sha512-zNUi0gKRsO7S3IfPzsTbnm88OedPuX32hmZFWZRWHvWJlAoZRwVbeO6Nb3hng4vDgL7qUKp4TGqzPz1mhsycYg=="],
+ 
+-    "@oxfmt/binding-linux-riscv64-gnu": ["@oxfmt/binding-linux-riscv64-gnu@0.70.0", "", { "os": "linux", "cpu": "none" }, "sha512-iEnMf21S5aGVa4hViDGY8sAQ/AHyCu2JPyrQF8P06wtHhSkD1YJBeT4m/KiGewgf7+a5XCYSCRIPcRQa1xwEoQ=="],
++    "@oxfmt/binding-linux-riscv64-gnu": ["@oxfmt/binding-linux-riscv64-gnu@0.72.0", "", { "os": "linux", "cpu": "none" }, "sha512-qTY7z/iyF/rWI2HWwWMevXqZW5PZUOofUy2afK7v6rseXnpld3yjgyIk6pCux3DqWQ0lB+f5atvLJNBwzLvFsw=="],
+ 
+-    "@oxfmt/binding-linux-riscv64-musl": ["@oxfmt/binding-linux-riscv64-musl@0.70.0", "", { "os": "linux", "cpu": "none" }, "sha512-91Sdniaj20fQzyMeCxMDzTP4c9s4RB8dGQ308xHhDR0n6U7+1Xq7N9klE7mfXq8iV3lRmIGSXi5X23Hn/0XX/g=="],
++    "@oxfmt/binding-linux-riscv64-musl": ["@oxfmt/binding-linux-riscv64-musl@0.72.0", "", { "os": "linux", "cpu": "none" }, "sha512-w18qfo8vEMD6EKEHtzTvjc6jH8yCyXIT1Bn7PFWJd0PpZyzH/VQDx4xvjCh0LGz6GRzqiezbisTdG9AoXtpkZQ=="],
+ 
+-    "@oxfmt/binding-linux-s390x-gnu": ["@oxfmt/binding-linux-s390x-gnu@0.70.0", "", { "os": "linux", "cpu": "s390x" }, "sha512-uUV30M6E+2TKKGMaKiwfeL4RZrviHXlUxsrYJ/jFBb+1EZy+pnFT+hF73eeWdzh5NqPOAnw0iiMAIqjqiLZPFg=="],
++    "@oxfmt/binding-linux-s390x-gnu": ["@oxfmt/binding-linux-s390x-gnu@0.72.0", "", { "os": "linux", "cpu": "s390x" }, "sha512-grW8HwEir+vK7fCcq1ZgL3NHQCfZ1PidiERE9Hbf+24xGys+DoDaoqTht4ccfn0PcBwbViLkwkda/KNpJu2KRQ=="],
+ 
+-    "@oxfmt/binding-linux-x64-gnu": ["@oxfmt/binding-linux-x64-gnu@0.70.0", "", { "os": "linux", "cpu": "x64" }, "sha512-ivMcX6kNDPhqtbOaBt/ItFlLlTlXNHLgRuNmxP6Na6UuYXRT10llpJcAPbGeRgjjb3Qzv4jwPp3fB0hui50WNQ=="],
++    "@oxfmt/binding-linux-x64-gnu": ["@oxfmt/binding-linux-x64-gnu@0.72.0", "", { "os": "linux", "cpu": "x64" }, "sha512-wQJRQfWBRIn88Pkr449EUViwRayrYUScg7ty+Ihiem21mQ9BUA6S9e/4RAgyNk9lMag0KBouyKskjq61rOC0WQ=="],
+ 
+-    "@oxfmt/binding-linux-x64-musl": ["@oxfmt/binding-linux-x64-musl@0.70.0", "", { "os": "linux", "cpu": "x64" }, "sha512-w+S+fERxYmlZSyZlJK/U292FjyBoH8cCEj21/tYJX6atX5kNSn+HDkhlFQKT2zcMwUW0uAtUL/bOrlwJZwqRdA=="],
++    "@oxfmt/binding-linux-x64-musl": ["@oxfmt/binding-linux-x64-musl@0.72.0", "", { "os": "linux", "cpu": "x64" }, "sha512-T1B0uQzafxuGPjjaPrZJ497nxoi1BiI65JfsYc56nNpmev3msfb/iaTmH2kQuNFqa8PKxpMlf3GhWrWBvBPORQ=="],
+ 
+-    "@oxfmt/binding-openharmony-arm64": ["@oxfmt/binding-openharmony-arm64@0.70.0", "", { "os": "none", "cpu": "arm64" }, "sha512-Zlom1Xkx257R8bk4ZI4zJsrGno2opknz1+5v5baka3nn4FPyvNSdh8JUL4CdN1S1OWRMvJ9UJQ+RfIqGGCUEfA=="],
++    "@oxfmt/binding-openharmony-arm64": ["@oxfmt/binding-openharmony-arm64@0.72.0", "", { "os": "none", "cpu": "arm64" }, "sha512-OKxxgTurl7+hypVplO8QRAbbQlwEs0j1Y6FZv+ZN2qNbdxQk2muMlzuJNBGTCWwxQ0rkkOD1uK/DW1fvzoUSJA=="],
+ 
+-    "@oxfmt/binding-win32-arm64-msvc": ["@oxfmt/binding-win32-arm64-msvc@0.70.0", "", { "os": "win32", "cpu": "arm64" }, "sha512-FQgPW5R17vzt7cgrJ8eG/dqX00o2xHsqFeLfw4xzA9FRHpN/DjFo9YDonvIIXGxiEuS9F/jZPnGO+KHNKuCo4Q=="],
++    "@oxfmt/binding-win32-arm64-msvc": ["@oxfmt/binding-win32-arm64-msvc@0.72.0", "", { "os": "win32", "cpu": "arm64" }, "sha512-L78TKzURqvjuZOCo88ixMbPXf/RP7u31Y0cmjJ/KEmrHmfYhmhEvsDaTYPiyTRne64jUgCbADfY0YeoQk4/Xyw=="],
+ 
+-    "@oxfmt/binding-win32-ia32-msvc": ["@oxfmt/binding-win32-ia32-msvc@0.70.0", "", { "os": "win32", "cpu": "ia32" }, "sha512-ZfZublNhZ+XBndMiXhkiLlPE+XyGRDa0CweeTL6t1fZypfCh1LTg7e5CvnOeTBunq15MskOcRempumSPGAaCQA=="],
++    "@oxfmt/binding-win32-ia32-msvc": ["@oxfmt/binding-win32-ia32-msvc@0.72.0", "", { "os": "win32", "cpu": "ia32" }, "sha512-gQtFW+Ii8BWgtJTAD17TY/WsdNS5gUfAPov8iI1jeq4r9lRRYImmxPL08UU00/RLaCfBJwh2UgINnDY0iOiZ+A=="],
+ 
+-    "@oxfmt/binding-win32-x64-msvc": ["@oxfmt/binding-win32-x64-msvc@0.70.0", "", { "os": "win32", "cpu": "x64" }, "sha512-HlIZEn+WzLQL0DszNzldiRl/DPRCX5R0Vkt6qeUPR1YHwy52hZZo4x6HoTOVmKRP2wUiwPGtKsihNY/f8KRaBg=="],
++    "@oxfmt/binding-win32-x64-msvc": ["@oxfmt/binding-win32-x64-msvc@0.72.0", "", { "os": "win32", "cpu": "x64" }, "sha512-uhooIN+DCzWX5uH7mQkSVCsODqsGluGJ4n3ch4+mITtWKpESMDjUJUSDBAVFuYQDwqY2McPDKdKJbM0oZVW/Qw=="],
+ 
+     "@oxlint-tsgolint/darwin-arm64": ["@oxlint-tsgolint/darwin-arm64@7.0.2001", "", { "os": "darwin", "cpu": "arm64" }, "sha512-CUJEdbSZ54+Xy9OXqOhWLTKZKV0BBiV7C2i/ygyVmXtkUNXx5YCzN8DpSSshTAKktoL7S+tnQ/ftFG/i7X896w=="],
+ 
+@@ -825,7 +842,7 @@
+ 
+     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.78.0", "", { "os": "win32", "cpu": "x64" }, "sha512-Sb5ocmLSuYeOuXd+CFOToGKp/gjXUEWDnvIGwhnh8aq8wY4TMmEnKnvbogSW7RdMZv77JSARduS7/gv+khYEjA=="],
+ 
+-    "@oxlint/plugins": ["@oxlint/plugins@1.81.0", "", {}, "sha512-HhD8kd3r6XpelZkhxhRty/po8V6yK1VV63Eq4kSsOS2IoHUywG3DV2EX+z/ZHw46aLI74Y6aA604NRiAqLKW9w=="],
++    "@oxlint/plugins": ["@oxlint/plugins@1.87.0", "", {}, "sha512-OtSZ6NxNkS7bkVy7zk9zGnajz2hVIu0uRPP/dJvJesGRaXtimpA4lpxap7FaIJndG2UIoKhnBU4DxyDQIWv6yg=="],
+ 
+     "@redis/bloom": ["@redis/bloom@5.12.1", "", { "peerDependencies": { "@redis/client": "^5.12.1" } }, "sha512-PUUfv+ms7jgPSBVoo/DN4AkPHj4D5TZSd6SbJX7egzBplkYUcKmHRE8RKia7UtZ8bSQbLguLvxVO+asKtQfZWA=="],
+ 
+@@ -1073,6 +1090,8 @@
+ 
+     "character-entities-legacy": ["character-entities-legacy@3.0.0", "", {}, "sha512-RpPp0asT/6ufRm//AJVwpViZbGM/MkjQFxJccQRHmISF/22NBtsHqAWmL+/pmkPWoIUJdWyeVleTl1wydHATVQ=="],
+ 
++    "chevrotain": ["chevrotain@13.2.0", "", { "dependencies": { "@chevrotain/cst-dts-gen": "13.2.0", "@chevrotain/gast": "13.2.0", "@chevrotain/regexp-to-ast": "13.2.0", "@chevrotain/types": "13.2.0", "@chevrotain/utils": "13.2.0" } }, "sha512-GTouk5YzgBxlTPCaDn5q0q2EJKkrYmnPF+HmF8v0Qo4r3iyPG7HJivkN1wthCXZcm3sIcZFpGTRovLPNdJNRCA=="],
++
+     "cleye": ["cleye@2.6.0", "", { "dependencies": { "terminal-columns": "^2.0.0", "type-flag": "^4.1.0" } }, "sha512-u0SQCsega/ox+2GSuUlG6wvA9c2FtH8sPmv9G9Q3JRTs7FK6+LtaziRAQgx7lrJ1J7bOd3palhwgZKMg8R6JbQ=="],
+ 
+     "cli-color": ["cli-color@1.4.0", "", { "dependencies": { "ansi-regex": "^2.1.1", "d": "1", "es5-ext": "^0.10.46", "es6-iterator": "^2.0.3", "memoizee": "^0.4.14", "timers-ext": "^0.1.5" } }, "sha512-xu6RvQqqrWEo6MPR1eixqGPywhYBHRs653F9jfXB2Hx4jdM/3WxiNE1vppRmxtMIfl16SFYTpYlrnqH/HsK/2w=="],
+@@ -1205,7 +1224,7 @@
+ 
+     "devlop": ["devlop@1.1.0", "", { "dependencies": { "dequal": "^2.0.0" } }, "sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA=="],
+ 
+-    "dompurify": ["dompurify@3.4.7", "", { "optionalDependencies": { "@types/trusted-types": "^2.0.7" } }, "sha512-2jBxDJY4RR06tQNy4w5FlFH7kfxsQZlufd0sbv+chfHCxeJwrFw2baUDsSwvBISD4K4RDbd0PTfy3uNXsR6siA=="],
++    "dompurify": ["dompurify@3.4.17", "", { "optionalDependencies": { "@types/trusted-types": "^2.0.7" } }, "sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w=="],
+ 
+     "dotenv": ["dotenv@17.4.2", "", {}, "sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw=="],
+ 
+@@ -1215,6 +1234,8 @@
+ 
+     "efrt": ["efrt@2.7.0", "", {}, "sha512-/RInbCy1d4P6Zdfa+TMVsf/ufZVotat5hCw3QXmWtjU+3pFEOvOQ7ibo3aIxyCJw2leIeAMjmPj+1SLJiCpdrQ=="],
+ 
++    "elkjs": ["elkjs@0.9.3", "", {}, "sha512-f/ZeWvW/BCXbhGEf1Ujp29EASo/lk1FDnETgNKwJrsVvGZhUWCZyg3xLJjAsxfOmt8KjswHmI5EwCQcPMpOYhQ=="],
++
+     "emoji-regex": ["emoji-regex@8.0.0", "", {}, "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A=="],
+ 
+     "encodeurl": ["encodeurl@2.0.0", "", {}, "sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg=="],
+@@ -1405,7 +1426,7 @@
+ 
+     "kareem": ["kareem@3.3.0", "", {}, "sha512-kpSuLD3/7RenBnjnJdOHXCKC8dTd1JzeOiJhN0necWWci6cC+qX+VuwPnMVgb+a4+KNJSfgqahpnfWaeDXCimw=="],
+ 
+-    "katex": ["katex@0.16.47", "", { "dependencies": { "commander": "^8.3.0" }, "bin": { "katex": "cli.js" } }, "sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg=="],
++    "katex": ["katex@0.18.11", "", { "dependencies": { "commander": "^15.0.0" }, "bin": { "katex": "cli.js" } }, "sha512-yvyz/2VMKqoho/35Hat5w37wIEdWJ5ElVMidTAlWrxr5uW4aBGsEpveTmKh18/zw08v/7lGswCPon4OhqmqrTA=="],
+ 
+     "khroma": ["khroma@2.1.0", "", {}, "sha512-Ls993zuzfayK269Svk9hzpeGUKob/sIgZzyHYdjQoAdQetRKpOLj+k/QQQ/6Qi0Yz65mlROrfd+Ev+1+7dz9Kw=="],
+ 
+@@ -1439,14 +1460,30 @@
+ 
+     "map-obj": ["map-obj@4.3.0", "", {}, "sha512-hdN1wVrZbb29eBGiGjJbeP8JbKjq1urkHJ/LIP/NY48MZ1QVXUsQBV1G1zvYFHn1XE06cwjBsOI2K3Ulnj1YXQ=="],
+ 
++    "markdown-table": ["markdown-table@3.0.4", "", {}, "sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw=="],
++
+     "marked": ["marked@16.4.2", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-TI3V8YYWvkVf3KJe1dRkpnjs68JUPyEa5vjKrp1XEEJUAOaQc+Qj+L1qWbPd0SJuAdQkFU0h73sXXqwDYxsiDA=="],
+ 
+     "math-intrinsics": ["math-intrinsics@1.1.0", "", {}, "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g=="],
+ 
++    "mdast-util-find-and-replace": ["mdast-util-find-and-replace@3.0.3", "", { "dependencies": { "@types/mdast": "^4.0.0", "escape-string-regexp": "^5.0.0", "unist-util-is": "^6.0.0", "unist-util-visit-parents": "^6.0.0" } }, "sha512-xPgpDNl0/OXHsI7TlaIs22lWnH3KlpvZdXG1ET/m/YT2Hhdkx8lJV4kLphE6l9simyM4KPDFBwas08BgEob6Jw=="],
++
+     "mdast-util-from-markdown": ["mdast-util-from-markdown@2.0.3", "", { "dependencies": { "@types/mdast": "^4.0.0", "@types/unist": "^3.0.0", "decode-named-character-reference": "^1.0.0", "devlop": "^1.0.0", "mdast-util-to-string": "^4.0.0", "micromark": "^4.0.0", "micromark-util-decode-numeric-character-reference": "^2.0.0", "micromark-util-decode-string": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0", "unist-util-stringify-position": "^4.0.0" } }, "sha512-W4mAWTvSlKvf8L6J+VN9yLSqQ9AOAAvHuoDAmPkz4dHf553m5gVj2ejadHJhoJmcmxEnOv6Pa8XJhpxE93kb8Q=="],
+ 
+     "mdast-util-frontmatter": ["mdast-util-frontmatter@2.0.1", "", { "dependencies": { "@types/mdast": "^4.0.0", "devlop": "^1.0.0", "escape-string-regexp": "^5.0.0", "mdast-util-from-markdown": "^2.0.0", "mdast-util-to-markdown": "^2.0.0", "micromark-extension-frontmatter": "^2.0.0" } }, "sha512-LRqI9+wdgC25P0URIJY9vwocIzCcksduHQ9OF2joxQoyTNVduwLAFUzjoopuRJbJAReaKrNQKAZKL3uCMugWJA=="],
+ 
++    "mdast-util-gfm": ["mdast-util-gfm@3.1.0", "", { "dependencies": { "mdast-util-from-markdown": "^2.0.0", "mdast-util-gfm-autolink-literal": "^2.0.0", "mdast-util-gfm-footnote": "^2.0.0", "mdast-util-gfm-strikethrough": "^2.0.0", "mdast-util-gfm-table": "^2.0.0", "mdast-util-gfm-task-list-item": "^2.0.0", "mdast-util-to-markdown": "^2.0.0" } }, "sha512-0ulfdQOM3ysHhCJ1p06l0b0VKlhU0wuQs3thxZQagjcjPrlFRqY215uZGHHJan9GEAXd9MbfPjFJz+qMkVR6zQ=="],
++
++    "mdast-util-gfm-autolink-literal": ["mdast-util-gfm-autolink-literal@2.0.1", "", { "dependencies": { "@types/mdast": "^4.0.0", "ccount": "^2.0.0", "devlop": "^1.0.0", "mdast-util-find-and-replace": "^3.0.0", "micromark-util-character": "^2.0.0" } }, "sha512-5HVP2MKaP6L+G6YaxPNjuL0BPrq9orG3TsrZ9YXbA3vDw/ACI4MEsnoDpn6ZNm7GnZgtAcONJyPhOP8tNJQavQ=="],
++
++    "mdast-util-gfm-footnote": ["mdast-util-gfm-footnote@2.1.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "devlop": "^1.1.0", "mdast-util-from-markdown": "^2.0.0", "mdast-util-to-markdown": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0" } }, "sha512-sqpDWlsHn7Ac9GNZQMeUzPQSMzR6Wv0WKRNvQRg0KqHh02fpTz69Qc1QSseNX29bhz1ROIyNyxExfawVKTm1GQ=="],
++
++    "mdast-util-gfm-strikethrough": ["mdast-util-gfm-strikethrough@2.0.1", "", { "dependencies": { "@types/mdast": "^4.0.0", "mdast-util-from-markdown": "^2.0.0", "mdast-util-to-markdown": "^2.0.0" } }, "sha512-OuJHqvr455pwu2OaOrir7dbzqs4jlWKOtlu9L6GjcIjjQwNyw02VntQsr/Ek6/A13vgnXfUhBekWRUP1OkNivw=="],
++
++    "mdast-util-gfm-table": ["mdast-util-gfm-table@2.0.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "devlop": "^1.0.0", "markdown-table": "^3.0.0", "mdast-util-from-markdown": "^2.0.0", "mdast-util-to-markdown": "^2.0.0" } }, "sha512-78UEvebzz/rJIxLvE7ZtDd/vIQ0RHv+3Mh5DR96p7cS7HsBhYIICDBCu8csTNWNO6tBWfqXPWekRuj2FNOGOZg=="],
++
++    "mdast-util-gfm-task-list-item": ["mdast-util-gfm-task-list-item@2.0.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "devlop": "^1.0.0", "mdast-util-from-markdown": "^2.0.0", "mdast-util-to-markdown": "^2.0.0" } }, "sha512-IrtvNvjxC1o06taBAVJznEnkiHxLFTzgonUdy8hzFVeDun0uTjxxrRGVaNFqkU1wJR3RBPEfsxmU6jDWPofrTQ=="],
++
+     "mdast-util-phrasing": ["mdast-util-phrasing@4.1.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "unist-util-is": "^6.0.0" } }, "sha512-TqICwyvJJpBwvGAMZjj4J2n0X8QWp21b9l0o7eXyVJ25YNWYbJDVIyD1bZXE6WtV6RmKJVYmQAKWa0zWOABz2w=="],
+ 
+     "mdast-util-to-hast": ["mdast-util-to-hast@13.2.1", "", { "dependencies": { "@types/hast": "^3.0.0", "@types/mdast": "^4.0.0", "@ungap/structured-clone": "^1.0.0", "devlop": "^1.0.0", "micromark-util-sanitize-uri": "^2.0.0", "trim-lines": "^3.0.0", "unist-util-position": "^5.0.0", "unist-util-visit": "^5.0.0", "vfile": "^6.0.0" } }, "sha512-cctsq2wp5vTsLIcaymblUriiTcZd0CwWtCbLvrOzYCDZoWyMNV8sZ7krj09FSnsiJi3WVsHLM4k6Dq/yaPyCXA=="],
+@@ -1471,7 +1508,7 @@
+ 
+     "merge-descriptors": ["merge-descriptors@2.0.0", "", {}, "sha512-Snk314V5ayFLhp3fkUREub6WtjBfPdCPY1Ln8/8munuLuiYhsABgBVWsozAG+MWMbVEvcdcpbi9R7ww22l9Q3g=="],
+ 
+-    "mermaid": ["mermaid@11.15.0", "", { "dependencies": { "@braintree/sanitize-url": "^7.1.1", "@iconify/utils": "^3.0.2", "@mermaid-js/parser": "^1.1.1", "@types/d3": "^7.4.3", "@upsetjs/venn.js": "^2.0.0", "cytoscape": "^3.33.1", "cytoscape-cose-bilkent": "^4.1.0", "cytoscape-fcose": "^2.2.0", "d3": "^7.9.0", "d3-sankey": "^0.12.3", "dagre-d3-es": "7.0.14", "dayjs": "^1.11.19", "dompurify": "^3.3.1", "es-toolkit": "^1.45.1", "katex": "^0.16.25", "khroma": "^2.1.0", "marked": "^16.3.0", "roughjs": "^4.6.6", "stylis": "^4.3.6", "ts-dedent": "^2.2.0", "uuid": "^11.1.0 || ^12 || ^13 || ^14.0.0" } }, "sha512-pTMbcf3rWdtLiYGpmoTjHEpeY8seiy6sR+9nD7LOs8KfUbHE4lOUAprTRqRAcWSQ6MQpdX+YEsxShtGsINtPtw=="],
++    "mermaid": ["mermaid@12.2.0", "", { "dependencies": { "@braintree/sanitize-url": "^7.1.2", "@iconify/utils": "^3.0.2", "@mermaid-js/parser": "^2.0.1", "@types/d3": "^7.4.3", "@upsetjs/venn.js": "^2.0.0", "chevrotain": "~13.2.0", "cytoscape": "^3.34.0", "cytoscape-cose-bilkent": "^4.1.0", "cytoscape-fcose": "^2.2.0", "d3": "^7.9.0", "d3-sankey": "^0.12.3", "dagre-d3-es": "7.0.14", "dayjs": "^1.11.21", "dompurify": "^3.4.12", "elkjs": "^0.9.3", "es-toolkit": "^1.45.1", "katex": "^0.18.0", "khroma": "^2.1.0", "marked": "^16.3.0", "roughjs": "^4.6.6", "stylis": "^4.3.6", "ts-dedent": "^2.2.0", "uuid": "^11.1.0 || ^12 || ^13 || ^14.0.0" } }, "sha512-w7nr/SFrLO7BaVTs3dQTvYSV6nYSBj0Yy9DjBhsIJtAcHqRzXSq4Pg32ujHZ/AdWsAMNEvvhbm5dt9E2tOiHzw=="],
+ 
+     "micromark": ["micromark@4.0.2", "", { "dependencies": { "@types/debug": "^4.0.0", "debug": "^4.0.0", "decode-named-character-reference": "^1.0.0", "devlop": "^1.0.0", "micromark-core-commonmark": "^2.0.0", "micromark-factory-space": "^2.0.0", "micromark-util-character": "^2.0.0", "micromark-util-chunked": "^2.0.0", "micromark-util-combine-extensions": "^2.0.0", "micromark-util-decode-numeric-character-reference": "^2.0.0", "micromark-util-encode": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0", "micromark-util-resolve-all": "^2.0.0", "micromark-util-sanitize-uri": "^2.0.0", "micromark-util-subtokenize": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-zpe98Q6kvavpCr1NPVSCMebCKfD7CA2NqZ+rykeNhONIJBpc1tFKt9hucLGwha3jNTNI8lHpctWJWoimVF4PfA=="],
+ 
+@@ -1479,6 +1516,20 @@
+ 
+     "micromark-extension-frontmatter": ["micromark-extension-frontmatter@2.0.0", "", { "dependencies": { "fault": "^2.0.0", "micromark-util-character": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-C4AkuM3dA58cgZha7zVnuVxBhDsbttIMiytjgsM2XbHAB2faRVaHRle40558FBN+DJcrLNCoqG5mlrpdU4cRtg=="],
+ 
++    "micromark-extension-gfm": ["micromark-extension-gfm@3.0.0", "", { "dependencies": { "micromark-extension-gfm-autolink-literal": "^2.0.0", "micromark-extension-gfm-footnote": "^2.0.0", "micromark-extension-gfm-strikethrough": "^2.0.0", "micromark-extension-gfm-table": "^2.0.0", "micromark-extension-gfm-tagfilter": "^2.0.0", "micromark-extension-gfm-task-list-item": "^2.0.0", "micromark-util-combine-extensions": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-vsKArQsicm7t0z2GugkCKtZehqUm31oeGBV/KVSorWSy8ZlNAv7ytjFhvaryUiCUJYqs+NoE6AFhpQvBTM6Q4w=="],
++
++    "micromark-extension-gfm-autolink-literal": ["micromark-extension-gfm-autolink-literal@2.1.0", "", { "dependencies": { "micromark-util-character": "^2.0.0", "micromark-util-sanitize-uri": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-oOg7knzhicgQ3t4QCjCWgTmfNhvQbDDnJeVu9v81r7NltNCVmhPy1fJRX27pISafdjL+SVc4d3l48Gb6pbRypw=="],
++
++    "micromark-extension-gfm-footnote": ["micromark-extension-gfm-footnote@2.1.0", "", { "dependencies": { "devlop": "^1.0.0", "micromark-core-commonmark": "^2.0.0", "micromark-factory-space": "^2.0.0", "micromark-util-character": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0", "micromark-util-sanitize-uri": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-/yPhxI1ntnDNsiHtzLKYnE3vf9JZ6cAisqVDauhp4CEHxlb4uoOTxOCJ+9s51bIB8U1N1FJ1RXOKTIlD5B/gqw=="],
++
++    "micromark-extension-gfm-strikethrough": ["micromark-extension-gfm-strikethrough@2.1.0", "", { "dependencies": { "devlop": "^1.0.0", "micromark-util-chunked": "^2.0.0", "micromark-util-classify-character": "^2.0.0", "micromark-util-resolve-all": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-ADVjpOOkjz1hhkZLlBiYA9cR2Anf8F4HqZUO6e5eDcPQd0Txw5fxLzzxnEkSkfnD0wziSGiv7sYhk/ktvbf1uw=="],
++
++    "micromark-extension-gfm-table": ["micromark-extension-gfm-table@2.1.2", "", { "dependencies": { "devlop": "^1.0.0", "micromark-factory-space": "^2.0.0", "micromark-util-character": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-pRzm4kDTu0MjlmBkxmS9yYhw60nncfcEwu9NNdPFSQEFXS95ZKyIIyTSHu/o3ReBUrLKYEq+7YaXCRn/bPB4MA=="],
++
++    "micromark-extension-gfm-tagfilter": ["micromark-extension-gfm-tagfilter@2.0.0", "", { "dependencies": { "micromark-util-types": "^2.0.0" } }, "sha512-xHlTOmuCSotIA8TW1mDIM6X2O1SiX5P9IuDtqGonFhEK0qgRI4yeC6vMxEV2dgyr2TiD+2PQ10o+cOhdVAcwfg=="],
++
++    "micromark-extension-gfm-task-list-item": ["micromark-extension-gfm-task-list-item@2.1.0", "", { "dependencies": { "devlop": "^1.0.0", "micromark-factory-space": "^2.0.0", "micromark-util-character": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-qIBZhqxqI6fjLDYFTBIa4eivDMnP+OZqsNwmQ3xNLE4Cxwc+zfQEfbs6tzAo2Hjq+bh6q5F+Z8/cksrLFYWQQw=="],
++
+     "micromark-factory-destination": ["micromark-factory-destination@2.0.1", "", { "dependencies": { "micromark-util-character": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-Xe6rDdJlkmbFRExpTOmRj9N3MaWmbAgdpSrBQvCFqhezUn4AHqJHbaEnfbVYYiexVSs//tqOdY/DxhjdCiJnIA=="],
+ 
+     "micromark-factory-label": ["micromark-factory-label@2.0.1", "", { "dependencies": { "devlop": "^1.0.0", "micromark-util-character": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0" } }, "sha512-VFMekyQExqIW7xIChcXn4ok29YE3rnuyveW3wZQWWqF4Nv9Wk5rgJ99KzPvHjkmPXF93FXIbBp6YdW3t71/7Vg=="],
+@@ -1573,7 +1624,7 @@
+ 
+     "ono": ["ono@4.0.11", "", { "dependencies": { "format-util": "^1.0.3" } }, "sha512-jQ31cORBFE6td25deYeD80wxKBMj+zBmHTrVxnc6CKhx8gho6ipmWM5zj/oeoqioZ99yqBls9Z/9Nss7J26G2g=="],
+ 
+-    "oxfmt": ["oxfmt@0.70.0", "", { "dependencies": { "tinypool": "2.1.2" }, "optionalDependencies": { "@oxfmt/binding-android-arm-eabi": "0.70.0", "@oxfmt/binding-android-arm64": "0.70.0", "@oxfmt/binding-darwin-arm64": "0.70.0", "@oxfmt/binding-darwin-x64": "0.70.0", "@oxfmt/binding-freebsd-x64": "0.70.0", "@oxfmt/binding-linux-arm-gnueabihf": "0.70.0", "@oxfmt/binding-linux-arm-musleabihf": "0.70.0", "@oxfmt/binding-linux-arm64-gnu": "0.70.0", "@oxfmt/binding-linux-arm64-musl": "0.70.0", "@oxfmt/binding-linux-ppc64-gnu": "0.70.0", "@oxfmt/binding-linux-riscv64-gnu": "0.70.0", "@oxfmt/binding-linux-riscv64-musl": "0.70.0", "@oxfmt/binding-linux-s390x-gnu": "0.70.0", "@oxfmt/binding-linux-x64-gnu": "0.70.0", "@oxfmt/binding-linux-x64-musl": "0.70.0", "@oxfmt/binding-openharmony-arm64": "0.70.0", "@oxfmt/binding-win32-arm64-msvc": "0.70.0", "@oxfmt/binding-win32-ia32-msvc": "0.70.0", "@oxfmt/binding-win32-x64-msvc": "0.70.0" }, "peerDependencies": { "svelte": "^5.0.0", "vite-plus": "*" }, "optionalPeers": ["svelte", "vite-plus"], "bin": { "oxfmt": "bin/oxfmt" } }, "sha512-IsHxZ4y0wQLLMhnrJblBJgZsLDzfULrJnAw5j/QqsTlMa/m3AqsbToi+W71uhBGaqlqq/PbbjvHc09TJwdv3Tw=="],
++    "oxfmt": ["oxfmt@0.72.0", "", { "dependencies": { "tinypool": "2.2.0" }, "optionalDependencies": { "@oxfmt/binding-android-arm-eabi": "0.72.0", "@oxfmt/binding-android-arm64": "0.72.0", "@oxfmt/binding-darwin-arm64": "0.72.0", "@oxfmt/binding-darwin-x64": "0.72.0", "@oxfmt/binding-freebsd-x64": "0.72.0", "@oxfmt/binding-linux-arm-gnueabihf": "0.72.0", "@oxfmt/binding-linux-arm-musleabihf": "0.72.0", "@oxfmt/binding-linux-arm64-gnu": "0.72.0", "@oxfmt/binding-linux-arm64-musl": "0.72.0", "@oxfmt/binding-linux-ppc64-gnu": "0.72.0", "@oxfmt/binding-linux-riscv64-gnu": "0.72.0", "@oxfmt/binding-linux-riscv64-musl": "0.72.0", "@oxfmt/binding-linux-s390x-gnu": "0.72.0", "@oxfmt/binding-linux-x64-gnu": "0.72.0", "@oxfmt/binding-linux-x64-musl": "0.72.0", "@oxfmt/binding-openharmony-arm64": "0.72.0", "@oxfmt/binding-win32-arm64-msvc": "0.72.0", "@oxfmt/binding-win32-ia32-msvc": "0.72.0", "@oxfmt/binding-win32-x64-msvc": "0.72.0" }, "peerDependencies": { "svelte": "^5.0.0", "vite-plus": "*" }, "optionalPeers": ["svelte", "vite-plus"], "bin": { "oxfmt": "bin/oxfmt" } }, "sha512-16OQeL0uhPZbfmT9S9WWM0Nv9+BmVi8Ra1uTYaSKj/qSCs6FB30KOhz9JoNYw6thT+K5bVxsk/tSEOu497i34g=="],
+ 
+     "oxlint": ["oxlint@1.78.0", "", { "optionalDependencies": { "@oxlint/binding-android-arm-eabi": "1.78.0", "@oxlint/binding-android-arm64": "1.78.0", "@oxlint/binding-darwin-arm64": "1.78.0", "@oxlint/binding-darwin-x64": "1.78.0", "@oxlint/binding-freebsd-x64": "1.78.0", "@oxlint/binding-linux-arm-gnueabihf": "1.78.0", "@oxlint/binding-linux-arm-musleabihf": "1.78.0", "@oxlint/binding-linux-arm64-gnu": "1.78.0", "@oxlint/binding-linux-arm64-musl": "1.78.0", "@oxlint/binding-linux-ppc64-gnu": "1.78.0", "@oxlint/binding-linux-riscv64-gnu": "1.78.0", "@oxlint/binding-linux-riscv64-musl": "1.78.0", "@oxlint/binding-linux-s390x-gnu": "1.78.0", "@oxlint/binding-linux-x64-gnu": "1.78.0", "@oxlint/binding-linux-x64-musl": "1.78.0", "@oxlint/binding-openharmony-arm64": "1.78.0", "@oxlint/binding-win32-arm64-msvc": "1.78.0", "@oxlint/binding-win32-ia32-msvc": "1.78.0", "@oxlint/binding-win32-x64-msvc": "1.78.0" }, "peerDependencies": { "oxlint-tsgolint": ">=7.0.2001", "vite-plus": "*" }, "optionalPeers": ["oxlint-tsgolint", "vite-plus"], "bin": { "oxlint": "bin/oxlint" } }, "sha512-QgQePuxIqKOzo1KSjG2EnITEeWvWnKAm77eq8nrMtf6AGoA+zyGc4PFYtDNJSD25g/ibOwfQ851hZ4/SPkMVoA=="],
+ 
+@@ -1815,7 +1866,7 @@
+ 
+     "tinyexec": ["tinyexec@1.2.4", "", {}, "sha512-SHf/r48b7vOrjve9PxJo3MN5v5yuyjHvdUcrQffT3WXMUfnGmHDVbC4k3sHJaJTgZCwpUplIaAo5ANtMyp3YHg=="],
+ 
+-    "tinypool": ["tinypool@2.1.2", "", {}, "sha512-9YodfrxS9g9IbFr/KOjE5bAeJ0p61n3bW6mqvy0jtoeKd1kTW1Cxm0oulm6KX2lyM9Gl6WIe8nEbY7LWv5ZJww=="],
++    "tinypool": ["tinypool@2.2.0", "", {}, "sha512-jBrmx4lYmaC9k/mgPbylxs7kBUxHtD8256up+HjLaDFfXScKJQyil+SWXSvhAtT7XHo+yTVlpB81PGmHP8oLSQ=="],
+ 
+     "tldts": ["tldts@7.4.2", "", { "dependencies": { "tldts-core": "^7.4.2" }, "bin": { "tldts": "bin/cli.js" } }, "sha512-kCwffuaH8ntKtygnWe1b4BJKWiCUH30n5KfoTr6IchcXOwR7chAOFJxFrH3vjANafUYrIA4a7SDL+nn7SiR4Sw=="],
+ 
+@@ -1947,10 +1998,18 @@
+ 
+     "json-schema-to-typescript/@types/node": ["@types/node@10.17.60", "", {}, "sha512-F0KIgDJfy2nA3zMLmWGKxcH2ZVEtCZXHHdOQs2gSaQ27+lNeEfGxzkIw90aXswATX7AZ33tahPbzy6KAfUreVw=="],
+ 
+-    "katex/commander": ["commander@8.3.0", "", {}, "sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww=="],
+-
+     "macos-version/semver": ["semver@5.7.2", "", { "bin": { "semver": "bin/semver" } }, "sha512-cBznnQ9KjJqU67B52RMC65CMarK2600WFnbkcaiwWq3xy/5haFJlshgnpjovMVJ+Hff49d8GEn0b87C5pDQ10g=="],
+ 
++    "mdast-util-gfm/mdast-util-from-markdown": ["mdast-util-from-markdown@2.1.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "@types/unist": "^3.0.0", "decode-named-character-reference": "^1.0.0", "devlop": "^1.0.0", "mdast-util-to-string": "^4.0.0", "micromark": "^4.0.0", "micromark-util-decode-numeric-character-reference": "^2.0.0", "micromark-util-decode-string": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0", "unist-util-stringify-position": "^4.0.0" } }, "sha512-KRLgmPaP2H1ul2bpoJkOS+9pAcDAAj9Nu1mqLnh8NLeJG5tlvj42TH80PIGBpROWlRXLk0lDrWNuZCFy/tsB4A=="],
++
++    "mdast-util-gfm-footnote/mdast-util-from-markdown": ["mdast-util-from-markdown@2.1.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "@types/unist": "^3.0.0", "decode-named-character-reference": "^1.0.0", "devlop": "^1.0.0", "mdast-util-to-string": "^4.0.0", "micromark": "^4.0.0", "micromark-util-decode-numeric-character-reference": "^2.0.0", "micromark-util-decode-string": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0", "unist-util-stringify-position": "^4.0.0" } }, "sha512-KRLgmPaP2H1ul2bpoJkOS+9pAcDAAj9Nu1mqLnh8NLeJG5tlvj42TH80PIGBpROWlRXLk0lDrWNuZCFy/tsB4A=="],
++
++    "mdast-util-gfm-strikethrough/mdast-util-from-markdown": ["mdast-util-from-markdown@2.1.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "@types/unist": "^3.0.0", "decode-named-character-reference": "^1.0.0", "devlop": "^1.0.0", "mdast-util-to-string": "^4.0.0", "micromark": "^4.0.0", "micromark-util-decode-numeric-character-reference": "^2.0.0", "micromark-util-decode-string": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0", "unist-util-stringify-position": "^4.0.0" } }, "sha512-KRLgmPaP2H1ul2bpoJkOS+9pAcDAAj9Nu1mqLnh8NLeJG5tlvj42TH80PIGBpROWlRXLk0lDrWNuZCFy/tsB4A=="],
++
++    "mdast-util-gfm-table/mdast-util-from-markdown": ["mdast-util-from-markdown@2.1.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "@types/unist": "^3.0.0", "decode-named-character-reference": "^1.0.0", "devlop": "^1.0.0", "mdast-util-to-string": "^4.0.0", "micromark": "^4.0.0", "micromark-util-decode-numeric-character-reference": "^2.0.0", "micromark-util-decode-string": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0", "unist-util-stringify-position": "^4.0.0" } }, "sha512-KRLgmPaP2H1ul2bpoJkOS+9pAcDAAj9Nu1mqLnh8NLeJG5tlvj42TH80PIGBpROWlRXLk0lDrWNuZCFy/tsB4A=="],
++
++    "mdast-util-gfm-task-list-item/mdast-util-from-markdown": ["mdast-util-from-markdown@2.1.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "@types/unist": "^3.0.0", "decode-named-character-reference": "^1.0.0", "devlop": "^1.0.0", "mdast-util-to-string": "^4.0.0", "micromark": "^4.0.0", "micromark-util-decode-numeric-character-reference": "^2.0.0", "micromark-util-decode-string": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0", "unist-util-stringify-position": "^4.0.0" } }, "sha512-KRLgmPaP2H1ul2bpoJkOS+9pAcDAAj9Nu1mqLnh8NLeJG5tlvj42TH80PIGBpROWlRXLk0lDrWNuZCFy/tsB4A=="],
++
+     "memoizee/is-promise": ["is-promise@2.2.2", "", {}, "sha512-+lP4/6lKUBfQjZ2pdxThZvLUAafmZb8OAxFb8XXtiQmS35INgr85hdOGoEs124ez1FCnZJt6jau/T+alh58QFQ=="],
+ 
+     "mongodb-connection-string-url/whatwg-url": ["whatwg-url@14.2.0", "", { "dependencies": { "tr46": "^5.1.0", "webidl-conversions": "^7.0.0" } }, "sha512-De72GdQZzNTUBBChsXueQUnPKDkg/5A5zp7pFDuQAj5UFoENpiACU0wlCvzpAGnTkj++ihpKwKyYewn/XNUbKw=="],
+@@ -1961,6 +2020,8 @@
+ 
+     "npm-run-path/path-key": ["path-key@2.0.1", "", {}, "sha512-fEHGKCSmUSDPv4uoj8AlD+joPlq3peND+HRYyxFz4KPw4z926S/b8rIuFs2FYJg3BwsxJf6A9/3eIdLaYC+9Dw=="],
+ 
++    "pr-body-eval/mdast-util-from-markdown": ["mdast-util-from-markdown@2.1.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "@types/unist": "^3.0.0", "decode-named-character-reference": "^1.0.0", "devlop": "^1.0.0", "mdast-util-to-string": "^4.0.0", "micromark": "^4.0.0", "micromark-util-decode-numeric-character-reference": "^2.0.0", "micromark-util-decode-string": "^2.0.0", "micromark-util-normalize-identifier": "^2.0.0", "micromark-util-symbol": "^2.0.0", "micromark-util-types": "^2.0.0", "unist-util-stringify-position": "^4.0.0" } }, "sha512-KRLgmPaP2H1ul2bpoJkOS+9pAcDAAj9Nu1mqLnh8NLeJG5tlvj42TH80PIGBpROWlRXLk0lDrWNuZCFy/tsB4A=="],
++
+     "read-pkg/normalize-package-data": ["normalize-package-data@2.5.0", "", { "dependencies": { "hosted-git-info": "^2.1.4", "resolve": "^1.10.0", "semver": "2 || 3 || 4 || 5", "validate-npm-package-license": "^3.0.1" } }, "sha512-/5CMN3T0R4XTj4DcGaexo+roZSdSFW/0AOOTROrjxzCG1wrWXEsGbRKevjlIL+ZDE4sZlJr5ED4YW0yqmkK+eA=="],
+ 
+     "read-pkg/type-fest": ["type-fest@0.6.0", "", {}, "sha512-q+MB8nYR1KDLrgr4G5yemftpMC7/QLqVndBmEEdqzmNj5dcFOO4Oo8qlwZE3ULT3+Zim1F8Kq4cBnikNhlCMlg=="],
+diff --git a/plugins/pull-request/evals/pr-body/README.md b/plugins/pull-request/evals/pr-body/README.md
+index 9b1245db..819a89b3 100644
+--- a/plugins/pull-request/evals/pr-body/README.md
++++ b/plugins/pull-request/evals/pr-body/README.md
+@@ -8,6 +8,35 @@ The loop: mine real bodies, label them, turn the labels into a mechanical score,
+ 
+ The session index includes an imported `work` host marked block-egress, and work PR bodies live on private hosts anyway. `scripts/mine.ts` hardcodes `host = 'local'` and `repository LIKE 'bendrucker/%'` in its SQL, so only public personal PRs are ever mined. Keep those filters if you touch the query. `data/`, `feedback/`, and `results/` are gitignored regardless.
+ 
++## Fixtures
++
++Data mined from real PRs and sessions stays out of this public repo. It lives in `s3://ben-drucker-agents-eval-corpus/pr-body/` (the `agents` account) and syncs into gitignored local copies:
++
++- `fixtures/`: `labels.json` and `scenarios/`, at `pr-body/fixtures/`
++- `data/revisions/`: Claude-drafted bodies paired with Ben's revisions (`work.jsonl`, `github.jsonl`), his pre-AI PRs (`handwritten.jsonl`), and his feedback on PR bodies (`feedback.jsonl`), at `pr-body/data/revisions/`
++- [`../create-scenarios/`](../create-scenarios/): the scenario case directories and their `examples/`, at `pr-body/create-scenarios/`
++
++```bash
++bun plugins/pull-request/evals/pr-body/scripts/sync.ts pull   # --profile agents
++bun plugins/pull-request/evals/pr-body/scripts/sync.ts push   # --profile agents-admin
++```
++
++`--dry-run` lists the changes without copying. `calibrate.ts`, `run-eval.ts`, and `judge.ts` read `fixtures/` and exit with a pointer to `pull` when it is missing.
++
++## Structure Limits
++
++`structure.ts` parses a body to mdast and measures what a reader sees without expanding anything: prose outside fenced code and `<details>`. `LIMITS` holds three one-sided limits: 120 visible words, 40 words in the longest paragraph or bullet, and 6 inline code spans in paragraphs and list items (`proseCodeSpans`, excluding tables, fenced code, and `<details>`). A body fails only by exceeding one, so collapsing data or writing less never costs anything. The output should be a baseline Ben adds to, shorter than what he writes himself.
++
++`scripts/limits.ts <results-dir>...` scores each run's PR body against the limits as `visible-words`, `max-block`, and `prose-code-spans` rows and writes `<results-dir>-limits/` for `compare.ts`. Run it before `compare.ts`. The `work-*` cases in `create-scenarios` come from edited work MRs, described in summary with no source. Their fixtures run `create-scenarios/stubs.sh`, which puts stand-in `glab` and `gh` on `PATH` so the body-rules hook fires on the create call and `limits.ts` reads the body the stand-in printed.
++
++`scripts/fit.ts` checks a metric against `data/revisions/`: how often a revision moves it down, and with `--human`, how well it separates plugin drafts from Ben's writing (AUC).
++
++```bash
++bun plugins/pull-request/evals/pr-body/scripts/fit.ts data/revisions/work.jsonl data/revisions/github.jsonl --via-skill --human data/revisions/handwritten.jsonl
++```
++
++On the 2026-10 corpus, 2-4% of plugin drafts pass both limits, against 65% of Ben's pre-AI PRs. Diff size predicts the length of Ben's edits only weakly (Spearman 0.30), so the budget is flat.
++
+ ## Mining
+ 
+ Build the session index first if it is stale (the `observability:session` skill owns it):
+@@ -42,11 +71,11 @@ The UI is copied from `plugins/issue/evals/issue-refine/label/` and adapted. Cop
+ 
+ ## Scenario Cases
+ 
+-The eight `scenarios/` run as native cases in the [`create`](../create/) suite, named `scenario-<id>` and tagged `scenario`. Each `prompt.md` carries the scenario's repository, audience tier, diff summary, and session notes, and asks for the PR through `pull-request:create`. `originalBody` never reaches a case, so the session cannot copy the shipped text. Each `fixture.sh` builds a git repo on the scenario's branch with the scenario's remote and one empty commit named for the change, so every `!` context command in the skill succeeds while the diff itself reaches the model through the summary.
++The eight `fixtures/scenarios/` run as native cases in the local-only [`create-scenarios`](../create-scenarios/) suite, named `scenario-<id>` and tagged `scenario`. Each `prompt.md` carries the scenario's repository, audience tier, diff summary, and session notes, and asks for the PR through `pull-request:create`. `originalBody` never reaches a case, so the session cannot copy the shipped text. Each `fixture.sh` builds a git repo on the scenario's branch with the scenario's remote and one empty commit named for the change, so every `!` context command in the skill succeeds while the diff itself reaches the model through the summary.
+ 
+ ```bash
+-bun evals/native/run.ts plugins/pull-request/evals/create -- --runs 2 --case 'scenario-*'
+-bun evals/native/run.ts plugins/pull-request/evals/create --ref main -- --runs 2 --case 'scenario-*'
++bun evals/native/run.ts plugins/pull-request/evals/create-scenarios -- --runs 2
++bun evals/native/run.ts plugins/pull-request/evals/create-scenarios --ref main -- --runs 2
+ ```
+ 
+ The second line grades the skill as it stands at `main` with the same cases. [`compare.ts`](../../../../evals/native/compare.ts) then compares the two results directories row by row, which replaces the old two-arm A/B: the base ref is the current arm and the working tree is the revision. No preference grader picks between arms, since `compare.ts` across refs answers the same question per grader.
+@@ -61,13 +90,13 @@ Each scenario case grades:
+ 
+ The judge sees only the final reply, one criterion at a time, and answers with one word. `narration-leak` judges sentences only, since `generic-heading` settles the heading half of the old rubric deterministically. The rubrics this suite replaced scored an isolated slip near the middle of a scale. A native verdict is binary, so `narration-leak` and `self-contained` pass a single slip in an otherwise clean body and fail on a pattern.
+ 
+-The three heading regexes split the classifier's signals into sentence case, question-shaped or sentence-terminated headings, and comma or parenthetical clauses. Against `labels.json` they reach 100% precision and 76.8% recall together (sentence case alone 55.1% recall, the other two 21.7% each). The classifier itself reaches 87.0% recall, so the regexes trade recall on predicate verbs and short parentheticals for zero false positives. `bun evals/native/check.ts plugins/pull-request/evals/create` checks each case's regex graders against `examples/scenario-<id>/`, where `shipped.md` is the PR body that actually merged.
++The three heading regexes split the classifier's signals into sentence case, question-shaped or sentence-terminated headings, and comma or parenthetical clauses. Against `fixtures/labels.json` they reach 100% precision and 76.8% recall together (sentence case alone 55.1% recall, the other two 21.7% each). The classifier itself reaches 87.0% recall, so the regexes trade recall on predicate verbs and short parentheticals for zero false positives. `bun evals/native/check.ts plugins/pull-request/evals/create-scenarios` checks each case's regex graders against `examples/scenario-<id>/`, where `shipped.md` is the PR body that actually merged.
+ 
+ ## Calibration
+ 
+ `classifier.ts` is the lexical sentence-heading screen ported from the `pr-headings` harness. `classifyPrHeading(heading)` returns `{ flagged, signals }`, where each signal names the tell that fired (trailing punctuation, interrogative opener, predicate verb, sentence case, length). `score.ts` uses it for the headings dimension, and the scenario cases' heading regexes approximate it.
+ 
+-`calibrate.ts` scores the classifier against `labels.json`, 102 headings hand-labeled good or bad:
++`calibrate.ts` scores the classifier against `fixtures/labels.json`, 102 headings hand-labeled good or bad:
+ 
+ ```bash
+ bun plugins/pull-request/evals/pr-body/calibrate.ts
+@@ -85,7 +114,7 @@ bun plugins/pull-request/evals/pr-body/scripts/run-eval.ts --arm-a <current-guid
+ 
+ Arm A is the current guidance text, arm B the revision under test. Each scenario runs twice per arm (two seeds) to separate a real effect from sampling noise. Generation runs on Opus, matching the model that writes bodies in practice. Judging runs on Sonnet via `scripts/judge.ts` and `judge-prompt.md`, blinded to which arm produced which body. Both steps need `ANTHROPIC_API_KEY`.
+ 
+-Scenarios live in `scenarios/<id>.json`, one file per real PR, with the shipped body kept for reference and baseline scoring:
++Scenarios live in `fixtures/scenarios/<id>.json`, one file per real PR, with the shipped body kept for reference and baseline scoring:
+ 
+ ```json
+ {
+@@ -102,18 +131,17 @@ Scenarios live in `scenarios/<id>.json`, one file per real PR, with the shipped
+ 
+ ## Ground Truth
+ 
+-Hand-made artifacts stay tracked. Everything bulky regenerates.
+-
+-- `labels.json`: 102 labeled headings, the calibration target
+-- `scenarios/`: curated generation scenarios with the shipped body for reference, the source of the `scenario-*` cases in `../create/`
+-- `judge-prompt.md`: the judge rubric
++- `fixtures/labels.json`: 102 labeled headings, the calibration target, in the bucket
++- `fixtures/scenarios/`: curated generation scenarios with the shipped body for reference, the source of the `scenario-*` cases in `../create-scenarios/`, in the bucket
++- `judge-prompt.md`: the judge rubric, tracked
+ - `data/`, `feedback/`, `results/`: gitignored, rebuilt by the miner, the labeler, and the runners
+ 
+ ## Layout
+ 
+ - `scripts/mine.ts`: builds `data/samples.json` from `pr_links` plus `gh pr list`
+ - `scripts/score.ts`: mechanical rubric, one JSON row per body
+-- `scripts/run-eval.ts`: legacy two-arm generation over `scenarios/`
++- `scripts/run-eval.ts`: legacy two-arm generation over `fixtures/scenarios/`
+ - `scripts/judge.ts`, `judge-prompt.md`: the legacy blinded LLM judge
+ - `label/server.ts`, `label/index.html`: the review UI
+-- `classifier.ts`, `labels.json`, `calibrate.ts`: the heading screen and its calibration
++- `classifier.ts`, `calibrate.ts`: the heading screen and its calibration
++- `scripts/sync.ts`: pulls and pushes `fixtures/` and the `create-scenarios` cases
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.test.ts b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+new file mode 100644
+index 00000000..747c6ca0
+--- /dev/null
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+@@ -0,0 +1,116 @@
++import { expect, test } from "bun:test";
++import { mkdtempSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { Result } from "../../../../../evals/native/regrade";
++import { applyLimits, type Body, bodyOf, render } from "./limits";
++
++const long = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
++const spans = (n: number) => Array.from({ length: n }, (_, i) => `\`c${i}\``).join(" ");
++
++const grader = (name: string, passed: boolean) => ({
++  name,
++  passed,
++  weight: 1,
++  scored: true,
++  withOnly: false,
++});
++
++const jsonl = (lines: object[]) => lines.map((l) => JSON.stringify(l)).join("\n");
++
++const toolResult = (content: unknown) => ({
++  type: "user",
++  message: { content: [{ type: "tool_result", tool_use_id: "t", content }] },
++});
++
++const stubTrace = (body: string) =>
++  jsonl([
++    toolResult([{ type: "text", text: `PR-BODY-BEGIN\n${body}\nPR-BODY-END\n` }]),
++    { type: "result", result: "Opened it." },
++  ]);
++
++const replyTrace = (reply: string) => jsonl([{ type: "result", result: reply }]);
++
++test("scores the stub body when a tool result carries one and the reply otherwise", async () => {
++  const dir = mkdtempSync(join(tmpdir(), "limits-"));
++  const results = join(dir, "run");
++  const out = join(dir, "run-limits");
++  const run = (score: number) => ({ score, graders: [grader("fact", true)] });
++  await Promise.all([
++    Bun.write(
++      join(results, "aggregate-result.json"),
++      JSON.stringify({
++        aggregates: { overallScore: 1 },
++        cases: [{ name: "one", arms: { with: [run(1), run(1), run(1)], without: [run(1)] } }],
++      }),
++    ),
++    Bun.write(join(results, "traces/one-with-0.jsonl"), stubTrace(`${long(10)} ${spans(7)}`)),
++    Bun.write(
++      join(results, "traces/one-with-1.jsonl"),
++      replyTrace(`Title: Fix it\n\n${long(130)}`),
++    ),
++    Bun.write(join(results, "traces/one-without-0.jsonl"), stubTrace(long(10))),
++  ]);
++
++  const counts = await applyLimits(results, out);
++  const written = Result.parse(await Bun.file(join(out, "aggregate-result.json")).json());
++  expect(written.aggregates).toBeUndefined();
++  const rows = (arm: string, i: number) =>
++    written.cases[0]?.arms[arm]?.[i]?.graders.map((g) => [g.name, g.passed]);
++  expect(rows("with", 0)).toEqual([
++    ["fact", true],
++    ["visible-words", true],
++    ["max-block", true],
++    ["prose-code-spans", false],
++  ]);
++  expect(rows("with", 1)).toEqual([
++    ["fact", true],
++    ["visible-words", false],
++    ["max-block", false],
++    ["prose-code-spans", true],
++  ]);
++  expect(written.cases[0]?.arms.with?.[0]?.graders.at(-1)?.explanation).toContain("from stub");
++  expect(written.cases[0]?.arms.with?.[1]?.graders.at(-1)?.explanation).toContain("from reply");
++  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([3 / 4, 2 / 4, 1]);
++  expect(written.cases[0]?.arms.without?.[0]?.score).toBe(1);
++  expect(await Bun.file(join(out, "traces/one-with-1.jsonl")).exists()).toBe(true);
++  expect(render(counts)).toMatchInlineSnapshot(`
++    "╔══════╤════════════════════╤════════════════╤═══════════════════════╤═══════════════════════╤═══════════════════╤══════════════════════════╗
++    ║ case │ with visible-words │ with max-block │ with prose-code-spans │ without visible-words │ without max-block │ without prose-code-spans ║
++    ╟──────┼────────────────────┼────────────────┼───────────────────────┼───────────────────────┼───────────────────┼──────────────────────────╢
++    ║ one  │ 1/2                │ 1/2            │ 1/2                   │ 1/1                   │ 1/1               │ 1/1                      ║
++    ╚══════╧════════════════════╧════════════════╧═══════════════════════╧═══════════════════════╧═══════════════════╧══════════════════════════╝
++    "
++  `);
++});
++
++test.each<{ name: string; trace: string; body: string | undefined; source?: Body["source"] }>([
++  {
++    name: "string tool_result content",
++    trace: jsonl([toolResult("noise\nPR-BODY-BEGIN\nHello\nPR-BODY-END")]),
++    body: "Hello",
++    source: "stub",
++  },
++  {
++    name: "last stub block wins",
++    trace: jsonl([
++      toolResult("PR-BODY-BEGIN\nfirst\nPR-BODY-END"),
++      toolResult("PR-BODY-BEGIN\nsecond\nPR-BODY-END"),
++    ]),
++    body: "second",
++    source: "stub",
++  },
++  {
++    name: "stub beats the reply",
++    trace: jsonl([
++      toolResult("PR-BODY-BEGIN\nstub\nPR-BODY-END"),
++      { type: "result", result: "Title: T\n\nreply" },
++    ]),
++    body: "stub",
++    source: "stub",
++  },
++  { name: "reply without a Title line", trace: replyTrace("Just prose."), body: undefined },
++])("bodyOf: $name", ({ trace, body, source }) => {
++  expect(bodyOf(trace)?.text).toBe(body);
++  expect(bodyOf(trace)?.source).toEqual(source);
++});
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.ts b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+new file mode 100644
+index 00000000..d0902295
+--- /dev/null
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+@@ -0,0 +1,162 @@
++#!/usr/bin/env bun
++import { basename, join } from "node:path";
++import { Command } from "@commander-js/extra-typings";
++import { $ } from "bun";
++import { table } from "table";
++import { z } from "zod";
++import { traceReply } from "../../../../../evals/native/load";
++import { type Run, Result, score } from "../../../../../evals/native/regrade";
++import { LIMITS, type LimitKey, limitKeys, measureStructure } from "../structure";
++
++// Scores a results directory against the PR-body structure limits, so changing
++// a limit doesn't require new sessions.
++
++const ToolResult = z.object({
++  type: z.literal("tool_result"),
++  content: z.union([
++    z.string(),
++    z.array(z.looseObject({ type: z.string(), text: z.string().optional() })),
++  ]),
++});
++const TraceLine = z.looseObject({
++  message: z.looseObject({ content: z.unknown() }).optional(),
++});
++
++const ROWS = {
++  visibleWords: "visible-words",
++  maxBlockWords: "max-block",
++  proseCodeSpans: "prose-code-spans",
++} as const satisfies Record<LimitKey, string>;
++
++const STUB_BLOCK = /^PR-BODY-BEGIN[^\S\n]*\n([\s\S]*?)\n?^PR-BODY-END[^\S\n]*$/gm;
++
++export interface Body {
++  text: string;
++  source: "stub" | "reply";
++}
++
++function toolResultTexts(trace: string): string[] {
++  return trace
++    .split("\n")
++    .filter((l) => l.trim() !== "")
++    .flatMap((l) => {
++      const line = TraceLine.safeParse(JSON.parse(l));
++      const content = line.success ? line.data.message?.content : undefined;
++      if (!Array.isArray(content)) return [];
++      return content.flatMap((block: unknown) => {
++        const result = ToolResult.safeParse(block);
++        if (!result.success) return [];
++        const { content: c } = result.data;
++        return typeof c === "string" ? [c] : [c.map((p) => p.text ?? "").join("")];
++      });
++    });
++}
++
++/** The PR body a run produced: the last stub block in a tool result, else the reply after its `Title:` line. */
++export function bodyOf(trace: string): Body | undefined {
++  const blocks = toolResultTexts(trace).flatMap((t) => t.matchAll(STUB_BLOCK).toArray());
++  const stub = blocks.at(-1)?.[1];
++  if (stub !== undefined) return { text: stub, source: "stub" };
++  const reply = traceReply(trace);
++  const title = reply === undefined ? null : /^Title:.*$/m.exec(reply);
++  if (reply === undefined || title === null) return undefined;
++  return { text: reply.slice(title.index + title[0].length).trim(), source: "reply" };
++}
++
++export function limitRows(body: Body): Run["graders"] {
++  const s = measureStructure(body.text);
++  return limitKeys.map((key) => ({
++    name: ROWS[key],
++    passed: s[key] <= LIMITS[key],
++    weight: 1,
++    scored: true,
++    withOnly: false,
++    explanation: `${key} ${s[key]} against limit ${LIMITS[key]} (body from ${body.source})`,
++  }));
++}
++
++export function limitRun(run: Run, arm: string, trace: string): Run {
++  const body = bodyOf(trace);
++  if (body === undefined) return run;
++  const names = new Set<string>(Object.values(ROWS));
++  const next = {
++    ...run,
++    graders: [...run.graders.filter((g) => !names.has(g.name)), ...limitRows(body)],
++  };
++  return run.score === null ? next : { ...next, score: score(next, arm) };
++}
++
++export type Counts = Map<string, Map<string, [passed: number, total: number]>>;
++
++/** Writes `<out>` with the limit rows added to every run that has a body, and returns per-case pass counts. */
++export async function applyLimits(results: string, out: string): Promise<Counts> {
++  const result = Result.parse(await Bun.file(join(results, "aggregate-result.json")).json());
++  const counts: Counts = new Map();
++  const names = new Set<string>(Object.values(ROWS));
++  const cases = await Promise.all(
++    result.cases.map(async (c) => {
++      const perCase = new Map<string, [number, number]>();
++      counts.set(c.name, perCase);
++      const arms = await Promise.all(
++        Object.entries(c.arms).map(async ([arm, runs]) => {
++          const next = await Promise.all(
++            runs.map(async (run, i) => {
++              const file = Bun.file(join(results, "traces", `${c.name}-${arm}-${i}.jsonl`));
++              if (!(await file.exists())) return run;
++              const limited = limitRun(run, arm, await file.text());
++              for (const g of limited.graders.filter((x) => names.has(x.name))) {
++                const key = `${arm}/${g.name}`;
++                const [passed, total] = perCase.get(key) ?? [0, 0];
++                perCase.set(key, [passed + (g.passed ? 1 : 0), total + 1]);
++              }
++              return limited;
++            }),
++          );
++          return [arm, next] as const;
++        }),
++      );
++      return { ...c, arms: Object.fromEntries(arms) };
++    }),
++  );
++  // The aggregates summarize the recorded scores, so a rescored result drops them.
++  const { aggregates: _, ...rest } = result;
++  await Bun.write(join(out, "aggregate-result.json"), JSON.stringify({ ...rest, cases }, null, 2));
++  await $`cp -R ${join(results, "traces")} ${out}/`.quiet().nothrow();
++  return counts;
++}
++
++const armOf = (key: string) => key.split("/")[0] ?? "";
++
++function cell(m: Map<string, [number, number]>, arm: string, row: string): string {
++  const c = m.get(`${arm}/${row}`);
++  return c === undefined ? "-" : `${c[0]}/${c[1]}`;
++}
++
++export function render(counts: Counts): string {
++  const seen = new Set<string>();
++  for (const m of counts.values()) for (const key of m.keys()) seen.add(armOf(key));
++  const arms = [...seen].toSorted();
++  const names = Object.values(ROWS);
++  const header = ["case"];
++  for (const a of arms) for (const r of names) header.push(`${a} ${r}`);
++  const rows: string[][] = [];
++  for (const [name, m] of counts) {
++    const row = [name];
++    for (const a of arms) for (const r of names) row.push(cell(m, a, r));
++    rows.push(row);
++  }
++  return table([header, ...rows]);
++}
++
++const program = new Command()
++  .description(
++    "Add visible-words, max-block, and prose-code-spans rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
++  )
++  .argument("<results-dir...>", "results directories holding aggregate-result.json and traces/")
++  .action(async (dirs) => {
++    const outs = dirs.map((dir) => join(dir, "..", `${basename(dir)}-limits`));
++    const all = await Promise.all(dirs.map((dir, i) => applyLimits(dir, outs[i] ?? "")));
++    for (const [i, counts] of all.entries()) console.log(`${outs[i]}\n${render(counts)}`);
++  });
++
++if (import.meta.main) await program.parseAsync();
+diff --git a/plugins/pull-request/evals/pr-body/structure.test.ts b/plugins/pull-request/evals/pr-body/structure.test.ts
+new file mode 100644
+index 00000000..7e12658d
+--- /dev/null
++++ b/plugins/pull-request/evals/pr-body/structure.test.ts
+@@ -0,0 +1,67 @@
++import { describe, expect, test } from "bun:test";
++import { measureStructure, overLimits } from "./structure";
++
++const long = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
++
++const codeSpans = (n: number) => Array.from({ length: n }, (_, i) => `\`c${i}\``).join(" ");
++
++describe("measureStructure", () => {
++  test.each([
++    [
++      "blank line after summary",
++      `Lead.\n\n<details>\n<summary>Data</summary>\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n${long(50)}\n\n</details>\n`,
++    ],
++    ["glued to summary", `Lead.\n\n<details><summary>Data</summary>\n${long(50)}\n</details>\n`],
++  ])("excludes <details> content from visible words (%s)", (_, body) => {
++    const s = measureStructure(body);
++    expect(s.visibleWords).toBe(1);
++    expect(s.visibleTables).toBe(0);
++    expect(s.collapsedBlocks).toBe(1);
++    expect(s.collapsedWords).toBeGreaterThanOrEqual(50);
++  });
++
++  test("measures paragraphs and bullets as blocks, excluding nested items", () => {
++    const s = measureStructure(`${long(12)}\n\n- ${long(30)}\n  - ${long(5)}\n- one two\n`);
++    expect(s).toMatchObject({
++      paragraphs: 1,
++      bullets: 3,
++      maxBlockWords: 30,
++      maxWordsPerBullet: 30,
++      blocksOver30: 0,
++    });
++  });
++
++  test("ignores fenced code", () => {
++    expect(measureStructure(`Fix.\n\n\`\`\`\n${long(200)}\n\`\`\`\n`)).toMatchObject({
++      visibleWords: 1,
++      visibleCodeLines: 1,
++    });
++  });
++});
++
++describe("proseCodeSpans", () => {
++  test("counts spans in paragraphs and list items only", () => {
++    const body = [
++      "Use `a` and `b`.",
++      "- item `c`\n  - nested `d`",
++      "| h |\n|---|\n| `t` |",
++      "```\n`fenced`\n```",
++      "<details>\n\nhidden `e`\n\n</details>",
++    ].join("\n\n");
++    expect(measureStructure(body).proseCodeSpans).toBe(4);
++  });
++});
++
++describe("overLimits", () => {
++  const cases: [string, ReturnType<typeof overLimits>][] = [
++    [long(20), []],
++    [long(41), ["maxBlockWords"]],
++    [Array.from({ length: 5 }, () => long(30)).join("\n\n"), ["visibleWords"]],
++    [codeSpans(7), ["proseCodeSpans"]],
++    [codeSpans(6), []],
++    [`${long(41)} ${codeSpans(7)}`, ["maxBlockWords", "proseCodeSpans"]],
++  ];
++  test.each(cases)("%#", (body, expected) => {
++    expect(overLimits(measureStructure(body))).toEqual(expected);
++  });
++});
+diff --git a/plugins/pull-request/evals/pr-body/structure.ts b/plugins/pull-request/evals/pr-body/structure.ts
+new file mode 100644
+index 00000000..77bd8c0a
+--- /dev/null
++++ b/plugins/pull-request/evals/pr-body/structure.ts
+@@ -0,0 +1,262 @@
++import type { List, ListItem, Nodes, RootContent } from "mdast";
++import { fromMarkdown } from "mdast-util-from-markdown";
++import { gfmFromMarkdown } from "mdast-util-gfm";
++import { toString } from "mdast-util-to-string";
++import { gfm } from "micromark-extension-gfm";
++
++// Structural measurements of a PR body. "Visible" means what a reader sees
++// without expanding anything: outside fenced code and outside <details>.
++
++export interface Structure {
++  visibleWords: number;
++  collapsedWords: number;
++  leadWords: number;
++  paragraphs: number;
++  maxParagraphWords: number;
++  meanParagraphWords: number;
++  paragraphsOver40: number;
++  maxBlockWords: number;
++  blocksOver30: number;
++  maxSentencesPerParagraph: number;
++  meanSentenceWords: number;
++  bullets: number;
++  lists: number;
++  maxItemsPerList: number;
++  meanWordsPerBullet: number;
++  maxWordsPerBullet: number;
++  bulletsOver20: number;
++  multiSentenceBullets: number;
++  listShare: number;
++  headings: number;
++  headingsPer100: number;
++  visibleTables: number;
++  visibleImages: number;
++  visibleCodeLines: number;
++  collapsedBlocks: number;
++  checkboxes: number;
++  semicolons: number;
++  dashes: number;
++  inlineCodePer100: number;
++  proseCodeSpans: number;
++}
++
++const wordSeg = new Intl.Segmenter("en", { granularity: "word" });
++const sentenceSeg = new Intl.Segmenter("en", { granularity: "sentence" });
++
++export function countWords(text: string): number {
++  let n = 0;
++  for (const s of wordSeg.segment(text)) if (s.isWordLike) n++;
++  return n;
++}
++
++export function sentences(text: string): string[] {
++  return [...sentenceSeg.segment(text)].map((s) => s.segment.trim()).filter(Boolean);
++}
++
++const DETAILS_OPEN = /<details[\s>]/gi;
++const DETAILS_CLOSE = /<\/details>/gi;
++
++function detailsDelta(html: string): { opens: number; delta: number } {
++  const opens = (html.match(DETAILS_OPEN) ?? []).length;
++  return { opens, delta: opens - (html.match(DETAILS_CLOSE) ?? []).length };
++}
++
++function ownText(item: ListItem): string {
++  return item.children
++    .filter((c) => c.type !== "list")
++    .map((c) => toString(c))
++    .join(" ");
++}
++
++interface Acc {
++  paragraphWords: number[];
++  sentenceWords: number[];
++  sentencesPerParagraph: number[];
++  bulletWords: number[];
++  bulletSentences: number[];
++  listSizes: number[];
++  visibleWords: number;
++  collapsedWords: number;
++  listWords: number;
++  headings: number;
++  visibleTables: number;
++  visibleImages: number;
++  visibleCodeLines: number;
++  collapsedBlocks: number;
++  checkboxes: number;
++  inlineCode: number;
++  proseText: string[];
++}
++
++function countImages(node: Nodes): number {
++  if (node.type === "image" || node.type === "imageReference") return 1;
++  if (node.type === "html" && /<img\s/i.test(node.value)) return 1;
++  return "children" in node ? node.children.reduce((n, c) => n + countImages(c), 0) : 0;
++}
++
++function countInlineCode(node: Nodes): number {
++  if (node.type === "inlineCode") return 1;
++  return "children" in node ? node.children.reduce((n, c) => n + countInlineCode(c), 0) : 0;
++}
++
++function visitList(list: List, acc: Acc): void {
++  acc.listSizes.push(list.children.length);
++  for (const item of list.children) {
++    if (item.checked !== null && item.checked !== undefined) acc.checkboxes++;
++    const text = ownText(item);
++    const words = countWords(text);
++    acc.bulletWords.push(words);
++    acc.bulletSentences.push(sentences(text).length);
++    acc.listWords += words;
++    acc.visibleWords += words;
++    acc.inlineCode += item.children
++      .filter((c) => c.type !== "list")
++      .reduce((n, c) => n + countInlineCode(c), 0);
++    acc.visibleImages += countImages(item);
++    acc.proseText.push(text);
++    for (const child of item.children) if (child.type === "list") visitList(child, acc);
++  }
++}
++
++function visitChildren(children: RootContent[], acc: Acc, collapsed: boolean): void {
++  let depth = 0;
++  for (const node of children) {
++    if (node.type === "html") {
++      const { opens, delta } = detailsDelta(node.value);
++      if (opens > 0 && depth === 0 && !collapsed) acc.collapsedBlocks++;
++      // A <details> glued to its body without a blank line stays one html node.
++      if (opens > 0 && delta === 0) {
++        acc.collapsedWords += countWords(node.value.replaceAll(/<[^>]+>/g, " "));
++      } else if (!collapsed && depth === 0) {
++        acc.visibleImages += countImages(node);
++      }
++      depth = Math.max(0, depth + delta);
++      continue;
++    }
++    const hidden = collapsed || depth > 0;
++    if (hidden) {
++      acc.collapsedWords += node.type === "code" ? 0 : countWords(toString(node));
++      continue;
++    }
++    // oxlint-disable-next-line typescript/switch-exhaustiveness-check -- other block types carry no prose
++    switch (node.type) {
++      case "heading":
++        acc.headings++;
++        acc.visibleWords += countWords(toString(node));
++        break;
++      case "paragraph": {
++        const text = toString(node);
++        const words = countWords(text);
++        if (words === 0) {
++          acc.visibleImages += countImages(node);
++          break;
++        }
++        const ss = sentences(text);
++        acc.paragraphWords.push(words);
++        acc.sentencesPerParagraph.push(ss.length);
++        for (const s of ss) acc.sentenceWords.push(countWords(s));
++        acc.visibleWords += words;
++        acc.visibleImages += countImages(node);
++        acc.inlineCode += countInlineCode(node);
++        acc.proseText.push(text);
++        break;
++      }
++      case "list":
++        visitList(node, acc);
++        break;
++      case "table":
++        acc.visibleTables++;
++        acc.visibleImages += countImages(node);
++        break;
++      case "code":
++        acc.visibleCodeLines += node.value.split("\n").length;
++        break;
++      case "blockquote":
++        visitChildren(node.children, acc, false);
++        break;
++      default:
++        break;
++    }
++  }
++}
++
++const max = (xs: number[]) => (xs.length > 0 ? Math.max(...xs) : 0);
++const mean = (xs: number[]) => (xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
++const per100 = (n: number, words: number) => (words > 0 ? (100 * n) / words : 0);
++
++export function measureStructure(body: string): Structure {
++  const root = fromMarkdown(body, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
++  const acc: Acc = {
++    paragraphWords: [],
++    sentenceWords: [],
++    sentencesPerParagraph: [],
++    bulletWords: [],
++    bulletSentences: [],
++    listSizes: [],
++    visibleWords: 0,
++    collapsedWords: 0,
++    listWords: 0,
++    headings: 0,
++    visibleTables: 0,
++    visibleImages: 0,
++    visibleCodeLines: 0,
++    collapsedBlocks: 0,
++    checkboxes: 0,
++    inlineCode: 0,
++    proseText: [],
++  };
++  visitChildren(root.children, acc, false);
++  const firstParagraph = root.children.find((n) => n.type === "paragraph");
++  const prose = acc.proseText.join("\n");
++  const v = acc.visibleWords;
++  return {
++    visibleWords: v,
++    collapsedWords: acc.collapsedWords,
++    leadWords: firstParagraph ? countWords(toString(firstParagraph)) : 0,
++    paragraphs: acc.paragraphWords.length,
++    maxParagraphWords: max(acc.paragraphWords),
++    meanParagraphWords: mean(acc.paragraphWords),
++    paragraphsOver40: acc.paragraphWords.filter((w) => w > 40).length,
++    maxBlockWords: max([...acc.paragraphWords, ...acc.bulletWords]),
++    blocksOver30: [...acc.paragraphWords, ...acc.bulletWords].filter((w) => w > 30).length,
++    maxSentencesPerParagraph: max(acc.sentencesPerParagraph),
++    meanSentenceWords: mean([...acc.sentenceWords, ...acc.bulletWords.filter(Boolean)]),
++    bullets: acc.bulletWords.length,
++    lists: acc.listSizes.length,
++    maxItemsPerList: max(acc.listSizes),
++    meanWordsPerBullet: mean(acc.bulletWords),
++    maxWordsPerBullet: max(acc.bulletWords),
++    bulletsOver20: acc.bulletWords.filter((w) => w > 20).length,
++    multiSentenceBullets: acc.bulletSentences.filter((n) => n > 1).length,
++    listShare: v > 0 ? acc.listWords / v : 0,
++    headings: acc.headings,
++    headingsPer100: per100(acc.headings, v),
++    visibleTables: acc.visibleTables,
++    visibleImages: acc.visibleImages,
++    visibleCodeLines: acc.visibleCodeLines,
++    collapsedBlocks: acc.collapsedBlocks,
++    checkboxes: acc.checkboxes,
++    semicolons: per100((prose.match(/;/g) ?? []).length, v),
++    dashes: per100((prose.match(/\s[—–]\s|—/g) ?? []).length, v),
++    inlineCodePer100: per100(acc.inlineCode, v),
++    proseCodeSpans: acc.inlineCode,
++  };
++}
++
++// One-sided limits fitted against Ben's edits and hand-written PRs: a body
++// fails only by exceeding them, so terseness is never penalized.
++export const LIMITS = {
++  visibleWords: 120,
++  maxBlockWords: 40,
++  proseCodeSpans: 6,
++} as const satisfies Partial<Structure>;
++
++export type LimitKey = keyof typeof LIMITS;
++
++const isLimitKey = (k: string): k is LimitKey => k in LIMITS;
++
++export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
++
++export function overLimits(s: Structure): LimitKey[] {
++  return limitKeys.filter((k) => s[k] > LIMITS[k]);
++}

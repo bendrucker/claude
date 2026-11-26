@@ -7,6 +7,8 @@
   "fallbackModel": ["sonnet"],
   "prependPlugins": [],
   "enabledPlugins": {
+    "github@bendrucker": true,
+    "gitlab@bendrucker": true,
     "herdr@bendrucker": true,
     "load@bendrucker": true,
     "mod-events@bendrucker": true,
@@ -98,7 +100,8 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
-    "CLAUDE_CODE_SEND_FEEDBACK": "0"
+    "CLAUDE_CODE_SEND_FEEDBACK": "0",
+    "PLANNOTATOR_PLAN_REVIEW": "false"
   },
   "hooks": {
     "WorktreeRemove": [

@@ -8,6 +8,7 @@ import {
   formatThreads,
   isBotThread,
   parseUrl,
+  prViewArgs,
   type Review,
   type Role,
   type Thread,
@@ -62,6 +63,15 @@ describe("parseUrl", () => {
 
   it("throws on malformed URL", () => {
     expect(() => parseUrl("not-a-url")).toThrow();
+  });
+});
+
+describe("prViewArgs", () => {
+  test.each<[string | undefined, string[]]>([
+    ["2049", ["gh", "pr", "view", "2049", "--json", "url", "--jq", ".url"]],
+    [undefined, ["gh", "pr", "view", "--json", "url", "--jq", ".url"]],
+  ])("resolves %p through gh pr view", (target, expected) => {
+    expect(prViewArgs(target)).toEqual(expected);
   });
 });
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { globSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import seedrandom from "seedrandom";
 import { mean } from "simple-statistics";
@@ -16,17 +16,16 @@ import {
   promptHash as hashPrompt,
   structured,
 } from "../../../../../packages/eval-judge/index";
+import { listTraces } from "../../../../../packages/evals/layout";
 import { mapPool } from "../../../../../packages/evals/pool";
 import { signFlipPValue, wilson } from "../../../../../packages/evals/stats";
 import { loadTags } from "../../../../../packages/evals/suite";
 import { traceReply } from "../../../../../packages/evals/trace";
 import { Judgment, Key, Label, Pair, Pick, SURFACES, Surface, Verdict } from "./pairs";
 
-const OUT_TAG = /<out>([\s\S]*?)<\/out>/;
-
-/** The final reply's `<out>...</out>` block, trimmed. */
-export function extractOut(reply: string): string | undefined {
-  return OUT_TAG.exec(reply)?.[1]?.trim();
+/** The final reply's `<tag>...</tag>` block, trimmed. */
+export function extractOut(reply: string, tag = "out"): string | undefined {
+  return new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(reply)?.[1]?.trim();
 }
 
 const AssistantLine = z.object({
@@ -93,10 +92,11 @@ export function extractDeliverable(
   trace: string,
   filePath?: string,
   seed?: string,
+  tag?: string,
 ): string | undefined {
   if (filePath !== undefined) return extractWrite(trace, filePath, seed);
   const reply = traceReply(trace);
-  return reply === undefined ? undefined : extractOut(reply);
+  return reply === undefined ? undefined : extractOut(reply, tag);
 }
 
 interface TraceFile {
@@ -106,15 +106,9 @@ interface TraceFile {
 }
 
 function traceFiles(dir: string, arm: string): TraceFile[] {
-  const pattern = new RegExp(`^(.+)-${arm}-(\\d+)\\.jsonl$`);
-  return globSync(`traces/*-${arm}-*.jsonl`, { cwd: dir })
-    .flatMap((file) => {
-      const match = pattern.exec(basename(file));
-      return match?.[1] === undefined || match[2] === undefined
-        ? []
-        : [{ case: match[1], run: Number(match[2]), path: join(dir, file) }];
-    })
-    .toSorted((a, b) => a.run - b.run);
+  return listTraces(dir)
+    .filter((ref) => ref.arm === arm)
+    .map((ref) => ({ case: ref.case, run: ref.n, path: ref.path }));
 }
 
 /** A case's deliverable file as the fixture leaves it, from `<beforeDir>/<case>.md`. */
@@ -130,7 +124,7 @@ async function beforeText(
 /**
  * Every run's deliverable text on one arm, pooled across result paths in the order given and
  * grouped by case. `fileFor` names the file a case's deliverable is written to, or undefined to
- * extract the `<out>` block from the final reply instead. A run with no deliverable is reported
+ * extract the `<tag>` block from the final reply instead. A run with no deliverable is reported
  * on stderr and left out. Edits to a named file replay against the case's `beforeDir` file.
  */
 export async function collectDrafts(
@@ -138,6 +132,7 @@ export async function collectDrafts(
   fileFor: (caseName: string) => string | undefined,
   arm = "with",
   beforeDir?: string,
+  tag?: string,
 ): Promise<Map<string, string[]>> {
   const perPath = await Promise.all(
     paths.map((path) => {
@@ -147,7 +142,7 @@ export async function collectDrafts(
           const trace = await Bun.file(f.path).text();
           const file = fileFor(f.case);
           const seed = file === undefined ? undefined : await beforeText(beforeDir, f.case);
-          const text = extractDeliverable(trace, file, seed);
+          const text = extractDeliverable(trace, file, seed, tag);
           if (text === undefined) {
             const hint =
               file === undefined
@@ -187,8 +182,9 @@ export function surfaceFor(
   caseName: string,
   tags: Map<string, string[]>,
   overrides: Map<string, string>,
+  fallback?: Surface,
 ): Surface {
-  const override = overrides.get(caseName);
+  const override = overrides.get(caseName) ?? fallback;
   if (override !== undefined) return Surface.parse(override);
   const found = (tags.get(caseName) ?? []).filter((t) =>
     (SURFACES as readonly string[]).includes(t),
@@ -293,6 +289,8 @@ interface PairsFlags {
   candidateArm?: string | undefined;
   baseLabel: string;
   candidateLabel: string;
+  tag?: string | undefined;
+  defaultSurface?: Surface | undefined;
 }
 
 export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
@@ -318,6 +316,7 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
       (c) => fileOverrides.get(c),
       candidateArm,
       flags.before,
+      flags.tag,
     ),
   );
 
@@ -337,7 +336,7 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
           `${caseName}.json field ${flags.field}`,
         );
         const [text = raw] = await trimToChange(flags.before, caseName, [raw]);
-        const surface = surfaceFor(caseName, tags, surfaceOverrides);
+        const surface = surfaceFor(caseName, tags, surfaceOverrides, flags.defaultSurface);
         const brief = await briefFor(suite, caseName);
         return texts.map((candidateText, run) => ({
           id: `${caseName}-original-${flags.candidateLabel}-${run}`,
@@ -358,7 +357,13 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
   if (flags.base === undefined) throw new Error("one of --base or --original is required");
   const baseDrafts = await trimAll(
     flags.before,
-    await collectDrafts(flags.base.split(","), (c) => fileOverrides.get(c), baseArm, flags.before),
+    await collectDrafts(
+      flags.base.split(","),
+      (c) => fileOverrides.get(c),
+      baseArm,
+      flags.before,
+      flags.tag,
+    ),
   );
   const perCase = await Promise.all(
     [...candidateDrafts].map(async ([caseName, candidateTexts]): Promise<Pair[]> => {
@@ -367,7 +372,7 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
         console.error(`skip ${caseName}: no base drafts`);
         return [];
       }
-      const surface = surfaceFor(caseName, tags, surfaceOverrides);
+      const surface = surfaceFor(caseName, tags, surfaceOverrides, flags.defaultSurface);
       const brief = await briefFor(suite, caseName);
       if (baseTexts.length !== candidateTexts.length) {
         console.error(
@@ -552,7 +557,10 @@ export function scoreJudgments(
       case: name,
       n: js.length,
       winRate: wins.length > 0 ? mean(wins) : Number.NaN,
-      p: signFlipPValue(wins, 10_000, rng),
+      p: signFlipPValue(
+        wins.map((w) => w - 0.5),
+        rng,
+      ),
     };
   };
 
@@ -758,6 +766,12 @@ export const pairsCommand = new Command("pairs")
   .option(
     "--before <dir>",
     "Directory of <case>.md files holding a deliverable file's pre-change contents; Edit-only drafts replay against them and drafts are trimmed to the changed region",
+  )
+  .option("--tag <name>", "Reply tag holding the deliverable", "out")
+  .option(
+    "--default-surface <surface>",
+    "Surface for every case without a --surface override, for suites whose tags name none",
+    (value) => Surface.parse(value),
   )
   .option("--base-arm <arm>", "Arm the base drafts come from", "with")
   .option("--candidate-arm <arm>", "Arm the candidate drafts come from", "with")

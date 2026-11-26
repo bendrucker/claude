@@ -41,15 +41,27 @@ A plugin `README.md` is an index, not documentation: a title with one-line descr
 
 ## Plugin Metadata
 
-Plugin `settings.json` supports only `agent` and `subagentStatusLine`. Don't create schema-only placeholder files. `plugin.json` supports an optional `"$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json"` for editor autocomplete, and `displayName` for the UI.
+Plugin `settings.json` supports only `agent` and `subagentStatusLine`, and `subagentStatusLine` is deprecated in favor of an `AgentRow` mod. Don't create schema-only placeholder files. `plugin.json` supports an optional `"$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json"` for editor autocomplete, and `displayName` for the UI.
 
 Deleting a plugin's `commands/`, `agents/`, or `hooks/` directory requires removing the matching path key from `plugin.json` in the same change, or `claude plugin validate` fails CI on the dangling path.
 
+## Integration Tests
+
+When plugin code drives another program, such as a multiplexer, a TUI, an external CLI, or Claude Code itself, commit a test file that runs the real program, in the same change, in addition to any manual live run. A unit test over a stubbed CLI proves only what the stub was told. Drive the program the way a user would: start it in a scratch session or server the test owns, send input, and assert on the captured screen or the files it writes. Write the test even when it spends API tokens or needs this machine's apps. Keep such a test out of the default run (`*.integration.ts`, or `e2e-*.ts` for a `claude -p` run), and run it yourself before opening the PR. [`testing.md`](testing.md) covers the mechanics.
+
 ## Dependencies
 
-A skill that loads a skill from another plugin creates a plugin dependency. Declare it in the `dependencies` array of the depending plugin's `plugin.json`, as a bare plugin name resolved against this marketplace. Declare it only when the skill is unusable without the target, since `dependencies` requires the named plugin to be enabled and cannot express a choice between two providers.
+A skill that loads a skill from another plugin creates a plugin dependency. Declare it in the `dependencies` array of the depending plugin's `plugin.json`. `dependencies` requires each listed plugin to be enabled and cannot express a choice between two providers, so declare one only in these cases:
 
-Plugin-specific code dependencies go in the plugin's own `plugins/<name>/package.json`, which the root `workspaces` globs pick up. No cross-plugin imports, and no reaching into `packages/` via relative paths. Shared code goes to an npm workspace package, declared in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.
+- A skill is unusable without the target.
+- A tool plugin layers Ben's conventions for one external tool over that tool's upstream plugin. Write the upstream as `<plugin>@<marketplace>` and add its marketplace to `allowCrossMarketplaceDependenciesOn` in `.claude-plugin/marketplace.json`. Put the marketplace in `extraKnownMarketplaces` in `user/settings.json`, pinned to a tag.
+- A workflow plugin routes to the tool plugins for the reviewers, viewers, or CLIs it opens, as `review` depends on `hunk` and `plannotator@plannotator`. Write a plugin in this marketplace as its bare name.
+
+Keep instructions specific to one tool in that tool's plugin, and keep the workflow plugin's skills to routing and the steps every tool shares.
+
+When the upstream provides no instructions of its own, a tool plugin injects the text bundled with the installed binary through a `!` line. That text matches the installed version.
+
+Plugin-specific code dependencies go in the plugin's own `plugins/<name>/package.json`, which the root `workspaces` globs pick up. Plugin runtime code imports only from its own directory and the npm registry, because Claude Code caches each plugin alone and a `workspace:` or `file:` specifier into `packages/` doesn't resolve there. Plugins that need the same code each carry a copy, which a checkout-only test under `packages/` can pin together. Checkout-only code, such as eval harnesses and repo tooling, imports `packages/` by relative path. Run `bun scripts/check-plugin-imports.ts` to verify.
 
 That manifest belongs at the plugin root, never under a skill. One manifest per plugin covers every skill in it, and a skill's scripts resolve against the plugin root's `node_modules`. A nested manifest still resolves in the checkout, where the root `workspaces` declaration hoists every member into a single `node_modules`, so the gap first appears in the cached copy as an unresolved import at runtime. These machines load the plugins in place from `~/.claude-repo` through a `directory` marketplace, so a session here never sees the cached copy either. Only a public install does. `bun run plugin-lockfiles check` fails on one. Eval harnesses under `plugins/<name>/evals/` keep their own manifests, since they run from the checkout and never ship.
 

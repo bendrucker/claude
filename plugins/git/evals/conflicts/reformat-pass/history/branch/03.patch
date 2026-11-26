@@ -1,0 +1,24 @@
+diff --git a/src/effort.test.ts b/src/effort.test.ts
+index 8e76641..1016321 100644
+--- a/src/effort.test.ts
++++ b/src/effort.test.ts
+@@ -3,6 +3,7 @@ import { type EffortMarker, effortGlyph, effortMarker } from "./effort";
+ 
+ describe("effortMarker", () => {
+   test.each<[string | null | undefined, EffortMarker | null]>([
++    ["minimal", { glyph: "·", isDefault: false }],
+     ["low", { glyph: "∙", isDefault: false }],
+     ["medium", { glyph: "⁚", isDefault: false }],
+     ["high", { glyph: "⁝", isDefault: true }],
+diff --git a/src/effort.ts b/src/effort.ts
+index 43171a8..48781d1 100644
+--- a/src/effort.ts
++++ b/src/effort.ts
+@@ -2,6 +2,7 @@
+ // count grows with effort, and the dots sit on the text baseline so the glyph
+ // aligns with the model letter rather than floating like braille.
+ const EFFORT_GLYPHS: Record<string, string> = {
++  minimal: "·",
+   low: "∙",
+   medium: "⁚",
+   high: "⁝",

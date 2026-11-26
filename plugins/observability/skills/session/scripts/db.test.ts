@@ -972,6 +972,19 @@ describe("hook_events", () => {
 });
 
 describe("skill_loads view", () => {
+  it("sizes each body in bytes", async () => {
+    const rows = await db.query(
+      `SELECT body_bytes FROM skill_loads WHERE session_id = 'skill-loads-session' AND skill = 'ship'`,
+      z.object({ body_bytes: z.coerce.number() }),
+    );
+    expect(rows).toEqual([
+      {
+        body_bytes: "Base directory for this skill: /Users/test/.claude/skills/ship\n\n# Ship"
+          .length,
+      },
+    ]);
+  });
+
   it("records each body load with its trigger and plugin version", async () => {
     const rows = await db.query(
       `SELECT skill, plugin, plugin_version, trigger, tool_use_id FROM skill_loads
@@ -1001,6 +1014,55 @@ describe("skill_loads view", () => {
         tool_use_id: null,
       },
     ]);
+  });
+});
+
+describe("idle-compactions query", () => {
+  it("reports size, band, time to the next prompt, and re-injected skills per idle compaction", async () => {
+    const rows = await runQuery(
+      db,
+      "idle-compactions",
+      z.object({
+        session_id: z.string(),
+        compact_pre_tokens: z.bigint(),
+        in_window_band: z.boolean(),
+        minutes_to_next_prompt: z.number().nullable(),
+        next_prompt_source: z.string().nullable(),
+        reinjected_skills: z.bigint(),
+        reinjected_bytes: z.coerce.number().transform((bytes) => bytes > 0),
+      }),
+      filterParams({ window: null }),
+    );
+    expect(rows).toEqual([
+      {
+        session_id: "idle-resumed-session",
+        compact_pre_tokens: 241000n,
+        in_window_band: true,
+        minutes_to_next_prompt: 90,
+        next_prompt_source: "typed",
+        reinjected_skills: 2n,
+        reinjected_bytes: true,
+      },
+      {
+        session_id: "idle-abandoned-session",
+        compact_pre_tokens: 305000n,
+        in_window_band: false,
+        minutes_to_next_prompt: null,
+        next_prompt_source: null,
+        reinjected_skills: 0n,
+        reinjected_bytes: false,
+      },
+    ]);
+  });
+
+  it("moves the band's upper edge with the window param", async () => {
+    const rows = await runQuery(
+      db,
+      "idle-compactions",
+      z.object({ session_id: z.string(), in_window_band: z.boolean() }),
+      filterParams({ window: "400000" }),
+    );
+    expect(rows.every((r) => r.in_window_band)).toBe(true);
   });
 });
 
@@ -1259,13 +1321,21 @@ describe("activity query", () => {
       filterParams(),
     );
     const bySignal = new Map(rows.map((r) => [r.signal, Number(r.count)]));
-    expect(bySignal.get("prompt: typed")).toBe(2);
+    // compactions-session fixtures add four typed prompts to the two elsewhere.
+    expect(bySignal.get("prompt: typed")).toBe(6);
     expect(bySignal.get("prompt: queued")).toBe(1);
     expect(bySignal.get("prompt: system")).toBe(1);
     // `promptSource` calls this turn `queued`; the attachment says who queued it.
     expect(bySignal.get("queued command: auto-continuation")).toBe(1);
     expect(bySignal.get("interruptions")).toBe(1);
-    expect(bySignal.get("compactions")).toBe(1);
+    expect(bySignal.get("compactions")).toBe(6);
+    // The boundary's trigger says only manual or auto; the notice after it names idle
+    // and away compactions, and `precomputed` names a background summary.
+    expect(bySignal.get("compaction: manual")).toBe(1);
+    expect(bySignal.get("compaction: auto")).toBe(1);
+    expect(bySignal.get("compaction: idle")).toBe(2);
+    expect(bySignal.get("compaction: away")).toBe(1);
+    expect(bySignal.get("compaction: precomputed")).toBe(1);
     expect(bySignal.get("mode: auto")).toBe(1);
     // hooks-session contributes one, plan-iterations-session (added for the
     // plan-iterations query) contributes a second.
@@ -1352,7 +1422,7 @@ describe("outcomes query", () => {
       "sessions: ongoing": 1,
       "sessions: handed-off": 2,
       "sessions: abandoned-with-edits": 4,
-      "sessions: no-artifact": 20,
+      "sessions: no-artifact": 23,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1369,10 +1439,54 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 27,
+      "sessions: ongoing": 30,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
+  });
+});
+
+describe("subagent-effort query", () => {
+  // Same delegation-session spawns: the Explore spawn's transcript records high effort on
+  // opus, the pinned github:logs spawn records low effort on haiku, and the override
+  // spawns' transcripts record no effort field. The fork is excluded.
+  const EffortRow = z.object({
+    subagent_type: z.string(),
+    effort: z.string().nullable(),
+    model: z.string().nullable(),
+    spawns: z.bigint(),
+    median_output_tokens: z.bigint().nullable(),
+    median_wall_s: z.number().nullable(),
+    est_cost_usd: z.number().nullable(),
+  });
+
+  async function effortRows() {
+    return (await runQuery(db, "subagent-effort", EffortRow, filterParams())).filter((r) =>
+      ["Explore", "github:logs", "general-purpose"].includes(r.subagent_type),
+    );
+  }
+
+  it("reports the effort each subagent transcript ran at", async () => {
+    const rows = await effortRows();
+    expect(rows.find((r) => r.subagent_type === "Explore")).toMatchObject({
+      effort: "high",
+      model: "opus",
+    });
+    expect(rows.find((r) => r.subagent_type === "github:logs")).toMatchObject({
+      effort: "low",
+      model: "haiku",
+    });
+  });
+
+  it("leaves effort null when the transcript does not record it", async () => {
+    const rows = await effortRows();
+    const generic = rows.filter((r) => r.subagent_type === "general-purpose");
+    expect(generic.every((r) => r.effort === null)).toBe(true);
+  });
+
+  it("sums tokens from the subagent's own transcript", async () => {
+    const rows = await effortRows();
+    expect(Number(rows.find((r) => r.subagent_type === "Explore")?.median_output_tokens)).toBe(500);
   });
 });
 
@@ -3165,6 +3279,174 @@ describe("message_usage cost columns and usage queries", () => {
   });
 });
 
+describe("memory-loads query", () => {
+  const home = "/Users/test";
+  const widget = `${home}/src/acme/widget`;
+
+  function memoryLine(session: string, cwd: string, file: string, body: string, scope = "Project") {
+    return {
+      type: "attachment",
+      sessionId: session,
+      cwd,
+      uuid: `${session}:${file}`,
+      timestamp: "2026-03-01T10:00:00.000Z",
+      attachment: {
+        type: "nested_memory",
+        path: file,
+        displayPath: file,
+        content: {
+          path: file,
+          type: scope,
+          content: body,
+          rawContent: `---\npaths: ["**"]\n---\n${body}`,
+        },
+      },
+    };
+  }
+
+  beforeEach(async () => {
+    const testing = "one two three four";
+    const loads: [string, string, string, string, string?][] = [
+      ["mem-main", widget, `${widget}/.claude/rules/testing.md`, testing],
+      ["mem-main", widget, `${widget}/src/agents/CLAUDE.md`, "nested memory"],
+      [
+        "mem-local",
+        `${widget}/.worktrees/b1/sub`,
+        `${widget}/.worktrees/b1/.claude/rules/testing.md`,
+        testing,
+      ],
+      [
+        "mem-local",
+        `${widget}/.worktrees/b1/sub`,
+        `${widget}/.worktrees/b1/src/agents/CLAUDE.md`,
+        "nested memory",
+      ],
+      [
+        "mem-container",
+        `${home}/src/.worktrees/acme/widget/b2`,
+        `${home}/src/.worktrees/acme/widget/b2/.claude/rules/testing.md`,
+        testing,
+      ],
+      [
+        "mem-herdr",
+        `${home}/.herdr/worktrees/widget/b3`,
+        `${home}/.herdr/worktrees/widget/b3/.claude/rules/testing.md`,
+        testing,
+      ],
+      ["mem-sibling", `${widget}.b4`, `${widget}.b4/.claude/rules/testing.md`, testing],
+      [
+        "mem-harness",
+        `${widget}/.claude/worktrees/b5`,
+        `${widget}/.claude/worktrees/b5/.claude/rules/style.md`,
+        Array.from({ length: 40 }, () => "w").join(" "),
+      ],
+      ["mem-main", widget, `${home}/.claude/rules/shell.md`, "a b c", "User"],
+      [
+        "mem-dotted",
+        `${home}/src/other/widget.io`,
+        `${home}/src/other/widget.io/.claude/rules/testing.md`,
+        "one two three four five",
+      ],
+    ];
+    const lines = loads.map(([session, cwd, file, body, scope]) =>
+      memoryLine(session, cwd, file, body, scope),
+    );
+    await db.run(
+      `INSERT INTO raw
+       SELECT 'local', UNNEST(pinned_columns(value)),
+         '${home}/.claude/projects/memory/' || (value->>'$.sessionId') || '.jsonl',
+         key::BIGINT + 1, value
+       FROM json_each($lines::JSON)`,
+      { lines: JSON.stringify(lines) },
+    );
+    await rebuildViews(db);
+  });
+
+  it("folds every worktree layout onto one repo-relative row, ranked by total words", async () => {
+    const rows = await runQuery(
+      db,
+      "memory-loads",
+      z.object({
+        host: z.string(),
+        repo: z.string(),
+        path: z.string(),
+        loads: z.bigint(),
+        sessions: z.bigint(),
+        words_per_load: z.number(),
+        bytes_per_load: z.number(),
+        total_words: z.bigint(),
+      }),
+      { ...filterParams(), limit: null },
+    );
+    expect(
+      rows.map((r) => ({
+        host: r.host,
+        repo: r.repo,
+        path: r.path,
+        loads: Number(r.loads),
+        sessions: Number(r.sessions),
+        words_per_load: r.words_per_load,
+        total_words: Number(r.total_words),
+      })),
+    ).toEqual([
+      {
+        host: "local",
+        repo: "widget",
+        path: ".claude/rules/style.md",
+        loads: 1,
+        sessions: 1,
+        words_per_load: 40,
+        total_words: 40,
+      },
+      {
+        host: "local",
+        repo: "widget",
+        path: ".claude/rules/testing.md",
+        loads: 5,
+        sessions: 5,
+        words_per_load: 4,
+        total_words: 20,
+      },
+      {
+        host: "local",
+        repo: "widget.io",
+        path: ".claude/rules/testing.md",
+        loads: 1,
+        sessions: 1,
+        words_per_load: 5,
+        total_words: 5,
+      },
+      {
+        host: "local",
+        repo: "widget",
+        path: "src/agents/CLAUDE.md",
+        loads: 2,
+        sessions: 2,
+        words_per_load: 2,
+        total_words: 4,
+      },
+      {
+        host: "local",
+        repo: "~",
+        path: "~/.claude/rules/shell.md",
+        loads: 1,
+        sessions: 1,
+        words_per_load: 3,
+        total_words: 3,
+      },
+    ]);
+    expect(rows[1]?.bytes_per_load).toBe("one two three four".length);
+  });
+
+  it("filters to one repo by its folded name, keeping user-scope memory", async () => {
+    const rows = await runQuery(db, "memory-loads", z.object({ repo: z.string() }), {
+      ...filterParams({ project: "other" }),
+      limit: null,
+    });
+    expect(rows.map((r) => r.repo)).toEqual(["~"]);
+  });
+});
+
 describe("field registry", () => {
   let projects: string;
   const at = (day: number) => new Date(Date.UTC(2026, 0, day, 12)).toISOString();
@@ -3431,6 +3713,11 @@ describe("native harness fields", () => {
     result("n3", "PreToolUse:Bash hook error: Cannot commit directly to main", {
       toolDenialKind: "permission-rule",
     }),
+    use("n8", "Bash", { command: "gh pr create --body x" }),
+    result("n8", "PreToolUse:Bash hook error: Vale found 1 alert in this text.", {
+      toolDenialKind: "permission-rule",
+      permissionDecision: rejectHook,
+    }),
     use("n4", "Bash", { command: "make" }),
     result("n4", "ok", {
       is_error: false,
@@ -3486,6 +3773,7 @@ describe("native harness fields", () => {
       { tool_use_id: "n1", hook_name: "(unmapped)", deny_source: "field" },
       { tool_use_id: "n3", hook_name: "git:block-default-branch-commit", deny_source: "prefix" },
       { tool_use_id: "n5", hook_name: "(unmapped)", deny_source: "field" },
+      { tool_use_id: "n8", hook_name: "writing:lint", deny_source: "field" },
     ]);
   });
 
@@ -3556,6 +3844,7 @@ describe("native harness fields", () => {
 const fixtureGlobs: Record<string, string> = {
   frontmatter_glob: join(import.meta.dirname, "..", "SKILL.md"),
   metrics_glob: join(fixturesDir, "..", "hook-metrics", "*.jsonl"),
+  log_path: join(fixturesDir, "..", "writing-hooks", "log.jsonl"),
   plans_glob: join(plansFixtureDir, "*.md"),
   plugin_skill_glob: join(skillsFixtureDir, "cache/*/*/*/skills/*/SKILL.md"),
   user_skill_glob: join(skillsFixtureDir, "user/*/SKILL.md"),

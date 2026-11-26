@@ -28,11 +28,15 @@ describe("selectSuites", () => {
 
   const files: Record<string, string> = {
     "plugins/p/evals/a/one/case.yaml": "plugins: [../../..]\n",
+    "plugins/p/evals/a/suite.yaml": "context: [user/CLAUDE.md]\n",
     "plugins/p/evals/b/one/case.yaml": "plugins: [../../.., ../../../../q]\n",
     "plugins/p/evals/local/one/case.yaml": "plugins: [../../..]\n",
     "plugins/p/evals/local/.local-only": "",
     "plugins/p/evals/notes/README.md": "no cases",
     "plugins/q/skills/s/SKILL.md": "",
+    "plugins/q/.claude-plugin/plugin.json": '{ "dependencies": ["upstream@elsewhere", "r@home"] }',
+    "plugins/r/.claude-plugin/plugin.json": "{}",
+    ".claude-plugin/marketplace.json": '{ "name": "home" }',
     "evals/user/tdd/suite.yaml":
       "wrap:\n  skills: [user/skills/tdd]\n  context: [user/rules/ts.md]\n",
     "evals/user/tdd/one/case.yaml": "plugins: [../.., ../../../../plugins/q]\n",
@@ -56,6 +60,11 @@ describe("selectSuites", () => {
       expected: ["evals/user/tdd", "plugins/p/evals/b"],
     },
     {
+      name: "a dependency qualified with the repo's marketplace, past one from another",
+      changed: ["plugins/r/.claude-plugin/plugin.json"],
+      expected: ["evals/user/tdd", "plugins/p/evals/b"],
+    },
+    {
       name: "a file a wrapped skill links to",
       changed: ["user/skills/shared/ref.md"],
       expected: ["evals/user/tdd"],
@@ -65,6 +74,7 @@ describe("selectSuites", () => {
       changed: ["user/skills/tdd/SKILL.md"],
       expected: ["evals/user/tdd"],
     },
+    { name: "a context file", changed: ["user/CLAUDE.md"], expected: ["plugins/p/evals/a"] },
     { name: "a wrapped rule", changed: ["user/rules/ts.md"], expected: ["evals/user/tdd"] },
     {
       name: "the suite itself",

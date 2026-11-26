@@ -1,0 +1,4 @@
+wt -C /tmp/eval/cwd switch --create fix-delay-overflow --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval fix-delay-overflow -c /tmp/eval/cwd/.worktrees/fix-delay-overflow --json -- claude --name fix-delay-overflow -- <prompt>
+launch fix-delay-overflow /tmp/eval/cwd/.worktrees/fix-delay-overflow
+allow Bash(bun test:*)

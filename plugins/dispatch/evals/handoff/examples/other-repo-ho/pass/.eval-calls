@@ -1,0 +1,3 @@
+wt -C /tmp/eval/cwd/repos/infra switch --create add-codeowners --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval add-codeowners -c /tmp/eval/cwd/repos/infra/.worktrees/add-codeowners --json -- claude --name add-codeowners -- <prompt>
+launch add-codeowners /tmp/eval/cwd/repos/infra/.worktrees/add-codeowners

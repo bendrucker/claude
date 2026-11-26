@@ -257,9 +257,23 @@ function graphql(q: string): Out {
   return fail("glab: GraphQL is unavailable in this snapshot. Use the REST endpoints.");
 }
 
+function expandPlaceholders(endpoint: string, args: Args): string {
+  let out = endpoint;
+  for (const pair of args.flags.get("--placeholder") ?? []) {
+    const eq = pair.indexOf("=");
+    if (eq < 1) continue;
+    const key = pair.slice(0, eq).replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+    out = out.replaceAll(
+      new RegExp(`:${key}(?![A-Za-z0-9_])`, "g"),
+      encodeURIComponent(pair.slice(eq + 1)),
+    );
+  }
+  return out;
+}
+
 function api(args: Args): Out {
   const fieldMap = fields(args);
-  const raw = (args.positional[0] ?? "").replace(/^\/?(api\/v4\/)?/, "");
+  const raw = expandPlaceholders(args.positional[0] ?? "", args).replace(/^\/?(api\/v4\/)?/, "");
   if (raw === "graphql") return graphql(fieldMap.get("query") ?? "");
   const method = (
     flag(args, "-X", "--method") ?? (fieldMap.size > 0 || has(args, "--input") ? "POST" : "GET")
@@ -293,6 +307,18 @@ function api(args: Args): Out {
       },
     };
   if (rest === "merge_requests") return { json: [mr()] };
+  const branch = /^repository\/branches\/([^/]+)$/.exec(rest);
+  if (branch) {
+    const name = decodeURIComponent(branch[1] ?? "");
+    const sha = (() => {
+      try {
+        return resolve(name);
+      } catch {
+        return fail("glab: 404 Branch Not Found");
+      }
+    })();
+    return { json: { name, commit: { id: sha, short_id: sha.slice(0, 8) } } };
+  }
   if (rest === "members/all") return { json: participants() };
   if (rest === mrPath) return { json: mr() };
   if (rest === `${mrPath}/versions`) return { json: meta.versions.map(version).toReversed() };
@@ -405,6 +431,9 @@ function noteList(): string {
     .join("");
 }
 
+/** The `glab mr note` subcommands that write, refused as snapshot writes so a grader sees the attempt. */
+const NOTE_WRITES = new Set(["create", "resolve", "reopen", "draft"]);
+
 function mrCommand(sub: string, args: Args): Out {
   const json = (flag(args, "--output", "-F") ?? "") === "json";
   if (sub === "list") {
@@ -416,6 +445,8 @@ function mrCommand(sub: string, args: Args): Out {
       fail(`glab: no merge request found for ${args.positional[1]}`);
     return noteList();
   }
+  if (sub === "note" && NOTE_WRITES.has(args.positional[0] ?? ""))
+    refuse("glab", `glab mr note ${args.positional[0]}`);
   if (!matches(args.positional[0])) fail(`glab: no merge request found for ${args.positional[0]}`);
   if (sub === "view") {
     if (json) return { json: mr() };
@@ -442,4 +473,10 @@ function main([cmd = "", sub = "", ...rest]: string[]): Out {
 
 const out = main(argv);
 if (typeof out === "string") process.stdout.write(out);
-else emit(out.json, flag(parseArgs(argv, BOOLEANS), "--jq"));
+else {
+  const parsed = parseArgs(argv, BOOLEANS);
+  const ndjson = argv[0] === "api" && flag(parsed, "--output") === "ndjson";
+  if (ndjson && Array.isArray(out.json))
+    process.stdout.write(out.json.map((item) => `${JSON.stringify(item)}\n`).join(""));
+  else emit(out.json, flag(parsed, "--jq"));
+}

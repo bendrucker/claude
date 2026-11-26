@@ -1,0 +1,7 @@
+import { createServer, type RequestListener } from "node:http";
+
+export function start(handler: RequestListener) {
+  const server = createServer(handler);
+  server.listen(Number(process.env.PORT ?? 3000));
+  return server;
+}

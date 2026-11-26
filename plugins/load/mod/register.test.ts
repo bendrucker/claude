@@ -16,7 +16,20 @@ function ran(stdout: string): ProcessRunResult {
 }
 
 function agent(id: string, status: AgentInfo["status"]): AgentInfo {
-  return { id, description: "", type: "general-purpose", status };
+  return {
+    id,
+    description: "",
+    type: "general-purpose",
+    status,
+    kind: "local_agent",
+    taskStatus: "running",
+    label: "",
+    startTime: 0,
+    cwd: "/work",
+    tokenCount: 0,
+    tokenSamples: [],
+    hasRow: false,
+  };
 }
 
 interface World {

@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { resolveAdapter } from "../../packages/evals/adapter";
 import { loadColumn } from "../../packages/evals/column";
-import { render } from "../../packages/evals/compare";
+import { costRatios, render } from "../../packages/evals/compare";
 import { generate } from "../../packages/evals/generate";
 
 function float(value: string): number {
@@ -40,6 +40,17 @@ export const program = new Command("compare.ts")
     "native",
   )
   .option("--markdown", "print markdown with the starred rows first and the full tables collapsed")
+  .option(
+    "--row <label>",
+    "score row the markdown leads with, starred or not: <case>/<arm>, <tag>/<arm>, or <case>/<arm>/<grader>; repeatable",
+    collect,
+    [],
+  )
+  .option(
+    "--max-cost-ratio <r>",
+    "exit 1 when a column's median costUsd over every run in it (all cases and arms pooled), divided by the baseline's, exceeds this ratio. Runs missing costUsd are skipped and counted",
+    float,
+  )
   .action(async (columns, options) => {
     if (options.suite !== undefined) await generate(options.suite);
     const paths = columns.map((c) => c.split(","));
@@ -47,15 +58,31 @@ export const program = new Command("compare.ts")
       program.error(error instanceof Error ? error.message : String(error)),
     );
     const label = adapter.label ?? basename;
-    console.log(
-      render({
-        columns: await Promise.all(paths.map((p) => loadColumn(p, adapter))),
-        labels: paths.map((p, i) => options.label[i] ?? label(p[0] ?? "")),
-        alpha: options.alpha,
-        tags: options.suite === undefined ? undefined : await adapter.tags(options.suite),
-        markdown: options.markdown,
-      }),
-    );
+    const report = {
+      columns: await Promise.all(paths.map((p) => loadColumn(p, adapter))),
+      labels: paths.map((p, i) => options.label[i] ?? label(p[0] ?? "")),
+      alpha: options.alpha,
+      tags: options.suite === undefined ? undefined : await adapter.tags(options.suite),
+      markdown: options.markdown,
+      rows: options.row,
+    };
+    try {
+      console.log(render(report));
+      if (options.maxCostRatio !== undefined) {
+        const { ratios } = costRatios(report.columns);
+        const over = ratios.flatMap((r, i) =>
+          r !== undefined && r > (options.maxCostRatio ?? Infinity)
+            ? [`${report.labels[i + 1]} ${r.toFixed(2)}`]
+            : [],
+        );
+        if (over.length > 0) {
+          console.error(`Median cost ratio over ${options.maxCostRatio}: ${over.join(", ")}`);
+          process.exitCode = 1;
+        }
+      }
+    } catch (error) {
+      program.error(error instanceof Error ? error.message : String(error));
+    }
   });
 
 if (import.meta.main) {

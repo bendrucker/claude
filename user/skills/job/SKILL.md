@@ -12,8 +12,10 @@ allowed-tools:
   - Read(${CLAUDE_SKILL_DIR}/references/*)
   - Bash(claude agents:*)
   - Bash(claude --bg:*)
-  - Bash(herdr agent list:*)
-  - Bash(herdr agent focus:*)
+  - Read(~/.config/claude-job-skill/**)
+  - Bash(cat ~/.config/claude-job-skill/config.json)
+  - Bash(echo:*)
+  - Bash(date:*)
 ---
 
 # Job
@@ -40,7 +42,9 @@ Arguments beyond the mode are a focus hint ($ARGUMENTS). Weight the brief toward
 
 ## Delegation
 
-This skill never names platforms. The config declares which version-control platform, issue tracker, worktree tool, messaging platform, email account, and optional personal capture inbox the user works with. For each task, find the installed skill covering the configured tool's task and load it for mechanics, falling back to the configured CLI or MCP directly. Stay read-only until the user confirms actions.
+This skill never names platforms. The config declares which version-control platform, issue tracker, worktree tool, terminal multiplexer, messaging platform, email account, and optional personal capture inbox the user works with. For each task, find the installed skill covering the configured tool's task and load it for mechanics, falling back to the configured CLI or MCP directly. Stay read-only until the user confirms actions.
+
+Load each delegated skill before the first call to its platform, in the orchestrator and in every gather sub-agent. Name the skill in each gather prompt, and dispatch gather with an agent type that has the `Skill` tool. Connector calls made without the skill fail argument validation.
 
 Platforms, hostnames, and usernames come only from the config or the user, never from this skill.
 
@@ -54,29 +58,19 @@ Read-only first. The sources are independent (review queue, own PRs, tracker, me
 
 #### Reporting
 
-End every gather prompt by naming the report as the agent's final action: send it to the orchestrator before going idle. An agent that goes idle carrying no report gets one nudge, never a second. When the nudge produces nothing, treat that source as timed out.
-
-Gather runs against a five-minute deadline from dispatch. Past it, stop the outstanding agent (`TaskStop` for an `Agent` dispatch) and run its source inline.
+End every gather prompt by naming the report as the agent's final action. An agent that goes idle without a report gets one nudge. Gather runs against a five-minute deadline from dispatch. Past it, or when the nudge produces nothing, stop the agent and run its source inline.
 
 Surface each source's findings as it lands, so a stalled source delays one entry instead of the brief. Hold the merge and the brief entries themselves until every source has reported or been run inline.
 
 #### Agents
 
-Background Claude sessions may already be working items in the brief. Run `claude agents --json --all` inline in the orchestrator rather than in a sub-agent: it is one command, and the join needs the raw records that a sub-agent summary would flatten. Every record carries `sessionId`, `name`, `cwd`, `kind`, and `startedAt`. The rest is keyed to `kind`: a `background` record adds `id` and `state` (`working`, `blocked`, `done`, or `failed`, plus `waitingFor` when blocked), and an `interactive` record adds `pid` and `status` instead. Join on `sessionId`, the one field both kinds share.
+Background Claude sessions may already be working items in the brief. Run `claude agents --json --all` inline in the orchestrator, since the join needs the raw records a sub-agent summary would flatten. Records join on `sessionId`. A `background` record carries `state` (`working`, `blocked`, `done`, or `failed`, plus `waitingFor` when blocked), and an `interactive` record carries `status` instead.
 
-When `HERDR_PANE_ID` is set, a second inline call, `herdr agent list`, maps live sessions to the terminal panes running them. Join its agents to the `claude agents` records on `sessionId == agent_session.value` and record the matched `pane_id` on the brief item. That join is exact, so never fall back to a title or `cwd` comparison. When `HERDR_PANE_ID` is unset there is no herdr server to ask, so skip the call and the resume command below carries the handoff. Load the `herdr:herdr` skill for the mechanics and for which commands answer with JSON.
+When the config names a multiplexer, load its skill to map live sessions to the panes running them by `sessionId`, and record the matched pane on the brief item. Match panes only by `sessionId`, never by title or `cwd`.
 
-Join each record to a brief item in this order:
+Join a record to a brief item by a full PR URL in its `name`, or by an issue key or `#`-prefixed PR number bounded by non-alphanumeric characters and confirmed against the repo `cwd` resolves to. Match whole identifiers only, since `#42` occurs inside `#142`. Failing that, narrow candidates to the repo `cwd` resolves to and match the name text against item titles. `cwd` is the directory the session launched from, so use it to scope by repo and never report it as the work.
 
-1. A `name` matching the `job-<identifier>` convention below, with the identifier in its sanitized form. Exact and structural, so it is the only join that never guesses.
-2. A full PR URL in `name`, or an issue key or `#`-prefixed PR number bounded by non-alphanumeric characters and confirmed against the repo `cwd` resolves to. This covers sessions launched by hand. Do not match a bare substring: `#42` occurs inside `#142`, and every repo has a PR numbered 42.
-3. `cwd` resolved to a repo, narrowing the candidate items, plus a semantic match of the name text against item titles.
-
-`cwd` is the directory the session launched from. A session that entered a worktree mid-run still reports its launch directory, usually a main checkout, occasionally a path that has since been pruned. Use it to scope candidates by repo. Never derive a branch from it, and never report it as the work.
-
-When an item's session is still unresolved and the user asks about that specific item, fall back to the `observability:session` skill's `search` query with the identifier as `query` and the repo as `project`. Never during gather, since it costs a query per item.
-
-Handle three record classes explicitly. Skip any record whose `sessionId` is the current session. Surface `blocked` records, which are waiting on the user and are the reason this source exists. Surface `failed` records, since abandoned work reads as done work otherwise.
+Skip the record for the current session. Surface `blocked` records, which are waiting on the user, and `failed` records, since abandoned work reads as done work otherwise.
 
 ### Brief
 
@@ -86,17 +80,19 @@ Within a group, order blocking items first, then oldest. Each item gets an ident
 
 #### Next actor
 
-Every review-queue item, outbox item, and discussion thread resolves to a next actor before it earns a place in the brief. The test is who the item is waiting on. An open thread by itself does not answer that. Items waiting on someone else are dropped.
+Every review-queue item, outbox item, and discussion thread resolves to a next actor before it earns a place in the brief. The test is who the item is waiting on. Items waiting on someone else are dropped.
 
 The user is the next actor when someone asked the user a direct question, when the user has not reviewed the item at all or has not seen the revision now on the branch, when the user's own MR is blocked on something the user owns, or when the item needs a decision that is the user's to make.
 
-Someone else is the next actor when the user commented or reviewed last and nothing the user raised has been answered, when the item is approved or has changes requested and only the author can move it, and when it is blocked on work the user does not own. Open threads are not an exception: a thread carrying the user's unanswered comment is waiting on whoever it was addressed to.
+Someone else is the next actor when the user commented or reviewed last and nothing the user raised has been answered, when the item is approved or has changes requested and only the author can move it, and when it is blocked on work the user does not own. A thread carrying the user's unanswered comment is waiting on whoever it was addressed to.
 
-An entry collapsing several sources can carry both actors at once. The user wins that tie, because dropping the entry would drop a question addressed to the user. Carry only the parts that resolve to the user into the entry's summary and its recommended action, and leave the author-owned threads out of both.
+An entry collapsing several sources can carry both actors at once. The user wins that tie, because dropping the entry would drop a question addressed to the user. Carry only the parts that resolve to the user into the entry's summary and its recommended action.
 
-A re-review resolves on the revision rather than on its threads. Commits answering the user's earlier feedback make the user the next actor. Threads the author has not answered do not, and they stay out of the item's summary even when the item itself survives.
+A re-review resolves on the revision rather than on its threads. Commits answering the user's earlier feedback make the user the next actor. Threads the author has not answered do not, and they stay out of the item's summary.
 
-Report the drop rather than hiding it. Each group ends with a one-line count of what the filter removed, such as `3 items waiting on their authors, not shown`. That count is how the user tells a filtered group from an empty one.
+Each group ends with a one-line count of what the filter removed, such as `3 items waiting on their authors, not shown`. That count is how the user tells a filtered group from an empty one.
+
+#### Agent lines
 
 An item with a matched agent gains one line under its existing entry:
 
@@ -104,30 +100,26 @@ An item with a matched agent gains one line under its existing entry:
 agent `<short id>` · <state>[ (<waitingFor>)] · <age>
 ```
 
-A live session (`working`, `blocked`, or an interactive session whose `state` is null) adds a second line naming how to get back into it, because that is the action. With a matched pane the line is `→ herdr agent focus <pane_id>`, and `herdr agent attach <pane_id>` is the variant that connects to the pane directly. Without one it is `→ claude --resume <sessionId>`. A `done` or `failed` session gets no action line either way. It is history, so the item keeps the action it already had, and the entry carries the `sessionId` as the prior attempt worth reading.
+A live session (`working`, `blocked`, or an interactive session whose `state` is null) adds a second line naming how to get back into it, because that is the action: the multiplexer skill's focus command for a matched pane, otherwise `→ claude --resume <sessionId>`. A `done` or `failed` session gets no action line. The item keeps the action it already had, and the entry carries the `sessionId` as the prior attempt worth reading.
 
-An unmatched agent becomes its own entry only when it still wants something: `blocked`, `failed`, or `working`. Since gather runs with `--all`, unmatched `done` records are completed history and get dropped. Keeping them would fill a prioritized brief with finished work. Group what remains by the repo `cwd` resolves to, or `Misc` when it resolves to none. A blocked agent is blocking work and sorts with it under the ordering rule above.
+An unmatched agent becomes its own entry when it is `blocked`, `failed`, or `working`, grouped by the repo `cwd` resolves to or `Misc`. A blocked agent sorts with blocking work. Unmatched `done` records are dropped, except that every `done` session still holding a multiplexer pane joins one cleanup entry offering to close those panes as a safe action.
 
-Close with the mode's cross-project synthesis: the day's sequence, or the night's open decisions. This is the triage gate. The brief covers everything that survived the next-actor filter, and nothing executes until the user approves the order. Omit groups that gathered nothing and never pad. A group whose items all resolved to another actor is not empty, so print its heading with the count line alone. An empty queue is a two-line brief.
+Close with the mode's cross-project synthesis: the day's sequence, or the night's open decisions. This is the triage gate: nothing executes until the user approves the order. Omit groups that gathered nothing. A group whose items all resolved to another actor prints its heading with the count line alone. An empty queue is a two-line brief.
 
 ### Act
 
 Split recommended actions into two groups:
 
-- Safe: reversible or expected. Assign a reviewer, retry CI, add a reaction or brief acknowledgement, post a reply the user has seen drafted, correct a tracker status, archive a handled notification or email.
+- Safe: reversible or expected. Assign a reviewer, retry CI, add a reaction or brief acknowledgement, post a reply the user has seen drafted, correct a tracker status, archive a handled notification or email, close the pane of a finished session.
 - Ask-first: approve, merge, close without the evidence below, anything hard to walk back. Each needs its own confirmation.
 
 Closing a tracker issue is safe only on evidence the orchestrator checked itself: that issue's own MR merged, or its acceptance criteria met in the code. A sub-agent reporting a merged MR is evidence about the MR. Confirm the MR belongs to the issue before it becomes evidence about the issue, since a linked MR may belong to a sibling.
 
-Drive inbound to zero. Items the next-actor rule filtered out never enter this loop, since waiting on someone else is their disposition. Everything else that reached the brief leaves the run with a terminal disposition: handled, reacted to or briefly acknowledged, deferred to the work tracker as a team-backlog item or to the personal inbox for your own next-steps and reminders when one is configured, or archived. Never stand up a tracker issue in place of a personal capture: when the user says "my inbox" that means the personal inbox, and when the destination is unclear, ask. Nothing stays in an ambiguous unread state. Where a reaction or brief acknowledgement closes a thread, prefer that over a filler reply. Draft a reply only when it carries real content, and keep it terse.
+Drive inbound to zero. Everything that reached the brief leaves the run with a terminal disposition: handled, reacted to or briefly acknowledged, deferred to the work tracker as a team-backlog item or to the personal inbox for your own next-steps and reminders when one is configured, or archived. When the user says "my inbox", route to the personal inbox, never a tracker issue. When the destination is unclear, ask. Where a reaction or brief acknowledgement closes a thread, prefer that over a filler reply. Draft a reply only when it carries real content, and keep it terse.
 
 #### Questions
 
-A question that blocks a dispatch goes into a running list the moment it arises, ranked by how many dispatches its answer releases. Write the list to a file and name its path in the brief. It survives an interrupted turn, and the user can read it before returning. Everything the list does not block keeps moving meanwhile.
-
-Ask in one pass, top blockers first, when the user is available.
-
-A background agent's idle notification arrives as a user turn and cancels an open question, so prefer to ask while nothing is mid-flight. When a notification does cancel a question, re-ask it. The interrupt is not an answer.
+Collect the questions that block a dispatch and ask them in one pass, top blockers first, while everything they do not block keeps moving. A background agent's idle notification arrives as a user turn and cancels an open question. Re-ask it, since the interrupt is not an answer.
 
 #### Execution
 
@@ -135,10 +127,6 @@ Present safe actions via AskUserQuestion (execute all, pick a subset, or none). 
 
 Run the quick safe actions and tracker corrections first. Session-length work like a review starts only at the end of the run, after the rest is cleared, and never before the approved order from triage.
 
-Never dispatch over an item with a live session. When the item's session resolved to a herdr pane, `herdr agent focus <pane_id>` hands the user the running session rather than a command to paste. Confirm before focusing, since it moves the user's foreground away from this session, and treat it as the last action in the run for that item. Without a matched pane, surface the resume command and let the user run it.
+Never dispatch over an item with a live session. With a matched pane, confirm, then focus it through the multiplexer skill as the last action for that item, since it moves the user's foreground away from this session. Without one, surface the resume command.
 
-A prior session that is `done` or `failed` does not block a fresh dispatch, but when the work needs another pass, name that `sessionId` in the new prompt so the new session can look up what already happened.
-
-Every session this skill dispatches is named `job-<identifier>`, reusing the identifier from the brief. That is what lets tomorrow's run join by name alone.
-
-The `Agent` tool sets the constraint: its `name` accepts letters, digits, underscores, and hyphens, must start with a letter or digit, and caps at 64 characters. `claude --bg --name` is looser, so sanitizing to the `Agent` set yields one form that serves both. Sanitize the identifier and truncate it to fit. `ENG-2408` survives as written, and MR 789 in `acme/api` becomes `job-api-mr-789`, since a bare `job-789` says nothing about which repo it belongs to. The sanitized name is what `claude agents --json` reports back, so it is also what the join above matches.
+A prior session that is `done` or `failed` does not block a fresh dispatch. When the work needs another pass, name that `sessionId` in the new prompt so the new session can look up what already happened.

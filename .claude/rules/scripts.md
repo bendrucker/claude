@@ -11,7 +11,7 @@ Distributed plugin code does not get that guarantee. Auto-install needs the regi
 
 #### Workspace Dependencies
 
-Auto-install skips `workspace:*` specifiers. A script importing a workspace package (`@bendrucker/*`) needs `bun install` first, or it fails with `Cannot find module`. The project Worktrunk `post-start` hook runs it for new worktrees, but not for `Agent(isolation='worktree')` worktrees, which skip wt hooks.
+Auto-install skips `workspace:*` specifiers. A script importing a workspace package (`@bendrucker/*`) needs `bun install` first, or it fails with `Cannot find module`. The project Worktrunk `post-start` hook runs it for new worktrees, including `Agent(isolation='worktree')` worktrees, which Worktrunk's `WorktreeCreate` hook makes with `wt switch --create`. A script run before that hook finishes still fails. A worktree `wt` did not create, such as Claude Desktop's `.claude/worktrees/<name>`, gets the install from the project `SessionStart` hook (`.claude/hooks/mod-types/`), which runs `bun install --frozen-lockfile` when the session's checkout has no `node_modules` and records the outcome as the `stage` in `~/.claude/hook-metrics/mod-types.jsonl`.
 
 Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` code via relative paths (`../packages/marketplace/index`), so it runs in fresh worktrees without install. Reserve workspace specifiers for distributed plugin code, which cannot use relative imports across the plugin boundary.
 
@@ -21,7 +21,7 @@ Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` cod
 
 Plugins cannot use it. Workspace specifiers never resolve in a cached plugin, so a plugin declares `zod` in its own `package.json` and calls `schema.parse` directly.
 
-A plugin hook that gates a tool call drops the dependency instead. A missing package throws at import, and Claude Code treats a hook that wrote nothing to stdout as a hook with no decision to add, so the call proceeds ungated. Such a hook imports only node builtins and narrows its input with a `value is T` predicate over the one field it reads. [`plugins/mac/hooks/sandbox.ts`](../../plugins/mac/hooks/sandbox.ts) is the only one, and a test runs a copy of it from a directory with no `node_modules` above it.
+A plugin hook that gates a tool call drops the dependency instead. A missing package throws at import, and Claude Code treats a hook that wrote nothing to stdout as a hook with no decision to add, so the call proceeds ungated. Such a hook imports only node builtins and narrows its input with a `value is T` predicate over the one field it reads.
 
 # Parsing Structured Text
 
@@ -52,11 +52,4 @@ A regex is fine inside a single node's text, where the grammar is already resolv
 
 Apple Events and Launch Services handoff (`osascript`, `open`, URL schemes) does not survive the sandbox even with `sandbox.allowAppleEvents`, because the child's TCC attribution changes under the Seatbelt container. These wrappers need a full sandbox skip.
 
-The `mac` plugin's marker hook provides the skip without a matcher: it reads the head of the invoked script for a `claude:dangerouslyDisableSandbox` comment and injects `dangerouslyDisableSandbox: true`. Add the marker after the shebang of any top-level script that hands off to Apple Events or Launch Services, or that writes its plugin data dir under `~/.claude/plugins`:
-
-```ts
-#!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: <reason>
-```
-
-It fires for scripts run through `bun` or `node`, or executed by path with a script extension (see `SCRIPT_INTERPRETERS` and `SCRIPT_EXTENSIONS` in [`plugins/mac/hooks/sandbox.ts`](../../plugins/mac/hooks/sandbox.ts)). See [`plugins/mac/README.md`](../../plugins/mac/README.md) for details.
+Give each such script a shim in its plugin's `bin/`, a `#!/bin/sh` that `exec`s the script relative to itself, and list the shim's name in `sandbox.excludedCommands` in `user/settings.json`. Claude Code appends each enabled plugin's `bin/` to the Bash `PATH`, and no `PATH` directory is writable from the sandbox, so the name cannot resolve to a planted file. Prefix the name with its plugin (`things-url`) so it cannot collide with a system command earlier on `PATH`. It matches command text, so the script escapes only when it is the whole command, with nothing ahead of it or chained after it. Claude Code adds a plugin's `bin/` only if it exists when the session's shell starts, and rebuilds the list only on `/reload-plugins`, so a skill that names a shim runs its plugin's `scripts/bin-path-check.sh` copy through a bang line, which `scripts/plugin-bin.test.ts` enforces. Prefer a `filesystem.allowWrite` grant when the script needs only a write path. A hook that adds `dangerouslyDisableSandbox` through `updatedInput` fails under auto mode, which refuses a call a hook changed after review.

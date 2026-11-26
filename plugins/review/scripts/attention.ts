@@ -332,6 +332,103 @@ export function currentPane(env: Record<string, string | undefined> = process.en
   return paneId;
 }
 
+export type Host =
+  | { kind: "herdr"; pane: string }
+  | { kind: "rex"; block: string }
+  | { kind: "none" };
+
+// herdr wins when both are set: a herdr pane inside a Rex block is the nearer host.
+export function sessionHost(env: Record<string, string | undefined> = process.env): Host {
+  const pane = currentPane(env);
+  if (pane != null) return { kind: "herdr", pane };
+  const block = env.REX_BLOCK;
+  if (block != null && block !== "") return { kind: "rex", block };
+  return { kind: "none" };
+}
+
+export const apps = ["hunk", "plannotator"] as const;
+export type App = (typeof apps)[number];
+
+export function isApp(value: string): value is App {
+  return (apps as readonly string[]).includes(value);
+}
+
+export interface RexReview {
+  base?: string | undefined;
+  batch?: boolean;
+  app?: App | undefined;
+  doc?: string | undefined;
+}
+
+// A document always opens in plannotator-tui. Only Hunk has a live mode.
+export function rexReviewArgs(block: string, review: RexReview = {}): string[] {
+  const args = ["do", "review_changes", `block=${block}`];
+  if (review.doc != null) return [...args, `doc=${resolve(review.doc)}`];
+  if (review.base != null && review.base !== "") args.push(`base=${review.base}`);
+  if (review.app !== "hunk") return args;
+  return [...args, "app=hunk", `mode=${review.batch === true ? "batch" : "live"}`];
+}
+
+export const CLOSED = "[review: closed]";
+
+// The reviewer pane appends one line per note here and a closed line last.
+export function eventsPath(block: string, home = homedir()): string {
+  return join(home, ".local", "state", "rex-review", "blocks", `${block}.events`);
+}
+
+type Read = { missing: true } | { missing: false; offset: number; lines: string[] };
+
+// Whole lines written since `offset`. A shorter file is a new review's, read from the top.
+async function readFrom(path: string, offset: number): Promise<Read> {
+  const file = Bun.file(path);
+  if (!(await file.exists())) return { missing: true };
+  const start = file.size < offset ? 0 : offset;
+  const bytes = await file.slice(start).bytes();
+  // A partial last line waits for the rest of its write.
+  const end = bytes.lastIndexOf(0x0a) + 1;
+  const text = new TextDecoder().decode(bytes.subarray(0, end));
+  return {
+    missing: false,
+    offset: start + end,
+    lines: text.split("\n").filter((l) => l.trim() !== ""),
+  };
+}
+
+// Prints lines appended after the call until a closed line. A missing file
+// means no review is open, after a grace period for one that is opening.
+export async function tailEvents(
+  path: string,
+  emit: (line: string) => void,
+  { pollMs = 200, graceMs = 5_000 } = {},
+): Promise<void> {
+  const file = Bun.file(path);
+  const exists = await file.exists();
+  if (exists && ((await file.text()).trimEnd().split("\n").at(-1) ?? "").startsWith(CLOSED)) {
+    emit(CLOSED);
+    return;
+  }
+  let offset = exists ? file.size : 0;
+  let seen = exists;
+  const deadline = Date.now() + graceMs;
+  for (;;) {
+    // oxlint-disable-next-line no-await-in-loop -- each read starts where the last ended.
+    const read = await readFrom(path, offset);
+    if (read.missing && (seen || Date.now() >= deadline)) {
+      emit(CLOSED);
+      return;
+    }
+    if (!read.missing) {
+      seen = true;
+      offset = read.offset;
+      const closed = read.lines.findIndex((line) => line.startsWith(CLOSED));
+      for (const line of closed === -1 ? read.lines : read.lines.slice(0, closed + 1)) emit(line);
+      if (closed !== -1) return;
+    }
+    // oxlint-disable-next-line no-await-in-loop -- polling waits between reads.
+    await Bun.sleep(pollMs);
+  }
+}
+
 // Attention is best effort: a herdr that is down or slow must not fail the
 // skill that asked for it.
 function herdr(args: string[]): boolean {
@@ -474,6 +571,22 @@ function reportQuit(pane: string, outcome: QuitOutcome): void {
   }
 }
 
+function openReviewr(paneId: string): void {
+  const workspace = process.env.HERDR_WORKSPACE_ID;
+  const open =
+    workspace == null
+      ? "none"
+      : existingReviewr(herdrJson(["pane", "list", "--workspace", workspace]), process.cwd());
+  if (typeof open === "object") {
+    console.log(`reviewr already open (${open.pane})`);
+    return;
+  }
+  openPane(
+    reviewrOpenArgs(paneId),
+    `reviewr not found: install the \`${REVIEWR_PLUGIN}\` herdr plugin`,
+  );
+}
+
 async function closeDoc(paneId: string, file: string): Promise<void> {
   const path = canonical(resolve(file));
   const recordPath = docPanePath(paneId);
@@ -483,6 +596,15 @@ async function closeDoc(paneId: string, file: string): Promise<void> {
   reportQuit(pane, quitSurface(pane, herdrSurface(pane, DOC_PROCESS)));
   delete panes[path];
   await writeDocPanes(recordPath, panes);
+}
+
+function rexOpen(block: string, review: RexReview): void {
+  const result = Bun.spawnSync(["rex", ...rexReviewArgs(block, review)], {
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  if (result.exitCode !== 0) process.exit(1);
+  const surface = review.doc == null && review.app === "hunk" ? "Hunk" : "plannotator-tui";
+  console.log(`opened ${surface} beside ${block}`);
 }
 
 function fail(message: string): never {
@@ -558,10 +680,22 @@ const promptCmd = command(
 const openCmd = command(
   {
     name: "open",
-    help: { description: "Open a review surface beside this pane, delivering into it" },
+    help: { description: "Open a review surface beside this pane, or both with --diff and --doc" },
     flags: {
-      diff: { type: Boolean, description: "Open reviewr over the working diff" },
-      doc: { type: String, description: "Open plannotator-tui over this file" },
+      diff: { type: Boolean, description: "Review the working diff" },
+      doc: { type: String, description: "Review this file" },
+      base: {
+        type: String,
+        description: "Under Rex, review <base>..HEAD instead of the working diff",
+      },
+      batch: {
+        type: Boolean,
+        description: "Under Rex, hold notes for Send instead of delivering each to `watch`",
+      },
+      app: {
+        type: String,
+        description: `Under Rex, the app that shows the diff: ${apps.join(" or ")}`,
+      },
     },
   },
   async (parsed) => {
@@ -569,26 +703,25 @@ const openCmd = command(
       parsed.showHelp();
       process.exit(1);
     }
-    const paneId =
-      currentPane() ?? fail("not inside a herdr pane (HERDR_PANE_ID unset): use --browser");
-    if (parsed.flags.doc != null) {
-      if (!(await Bun.file(parsed.flags.doc).exists())) fail(`no such file: ${parsed.flags.doc}`);
-      await openDoc(paneId, parsed.flags.doc);
+    const host = sessionHost();
+    if (host.kind === "none") fail("no herdr pane or Rex block: run the browser gate");
+    const doc = parsed.flags.doc;
+    if (doc != null && !(await Bun.file(doc).exists())) fail(`no such file: ${doc}`);
+    const { app } = parsed.flags;
+    if (app != null && !isApp(app)) fail(`--app must be ${apps.join(" or ")}`);
+    if (host.kind === "rex") {
+      if (parsed.flags.diff) {
+        rexOpen(host.block, {
+          base: parsed.flags.base,
+          batch: parsed.flags.batch === true,
+          app: app ?? undefined,
+        });
+      }
+      if (doc != null) rexOpen(host.block, { doc });
       process.exit(0);
     }
-    const workspace = process.env.HERDR_WORKSPACE_ID;
-    const open =
-      workspace == null
-        ? "none"
-        : existingReviewr(herdrJson(["pane", "list", "--workspace", workspace]), process.cwd());
-    if (typeof open === "object") {
-      console.log(`reviewr already open (${open.pane})`);
-      process.exit(0);
-    }
-    openPane(
-      reviewrOpenArgs(paneId),
-      `reviewr not found: install the \`${REVIEWR_PLUGIN}\` herdr plugin`,
-    );
+    if (parsed.flags.diff) openReviewr(host.pane);
+    if (doc != null) await openDoc(host.pane, doc);
     process.exit(0);
   },
 );
@@ -596,23 +729,21 @@ const openCmd = command(
 const closeCmd = command(
   {
     name: "close",
-    help: { description: "Quit the review surface once Ben approves" },
+    help: { description: "Quit the review surfaces once Ben approves" },
     flags: {
       diff: { type: Boolean, description: "Quit reviewr over the working diff" },
       doc: { type: String, description: "Quit plannotator-tui over this file" },
     },
   },
   async (parsed) => {
-    if (parsed.flags.diff === (parsed.flags.doc != null)) {
+    if (!parsed.flags.diff && parsed.flags.doc == null) {
       parsed.showHelp();
       process.exit(1);
     }
     const paneId = currentPane();
     if (paneId == null) return;
-    if (parsed.flags.doc != null) {
-      await closeDoc(paneId, parsed.flags.doc);
-      process.exit(0);
-    }
+    if (parsed.flags.doc != null) await closeDoc(paneId, parsed.flags.doc);
+    if (!parsed.flags.diff) process.exit(0);
     const workspace =
       process.env.HERDR_WORKSPACE_ID ?? fail("HERDR_WORKSPACE_ID unset: cannot find reviewr");
     const open = existingReviewr(
@@ -627,9 +758,30 @@ const closeCmd = command(
   },
 );
 
+const watchCmd = command(
+  {
+    name: "watch",
+    help: {
+      description: "Under Rex, print each review note as Ben saves it until the review closes",
+    },
+  },
+  async () => {
+    const host = sessionHost();
+    if (host.kind !== "rex") fail("watch needs a Rex block: herdr delivers notes on Send");
+    // Each stdout line is one Monitor event.
+    await tailEvents(eventsPath(host.block), (line) => {
+      console.log(line);
+    });
+    process.exit(0);
+  },
+);
+
 if (import.meta.main) {
   await cli(
-    { name: "attention", commands: [raiseCmd, clearCmd, promptCmd, openCmd, closeCmd] },
+    {
+      name: "attention",
+      commands: [raiseCmd, clearCmd, promptCmd, openCmd, closeCmd, watchCmd],
+    },
     (parsed) => {
       parsed.showHelp();
       process.exit(1);

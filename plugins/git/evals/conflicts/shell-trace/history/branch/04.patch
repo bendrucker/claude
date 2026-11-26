@@ -1,0 +1,16 @@
+diff --git a/scripts/install b/scripts/install
+--- a/scripts/install
++++ b/scripts/install
+@@ -40,10 +40,12 @@
+ # overwrite.
+ # EXPIRES: 2027-02-02 every machine has the linked herdr plugin config tree
++trace_begin herdr-plugin-config
+ herdr_plugin_config="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/plugins/config"
+ if [[ -d $herdr_plugin_config && ! -L $herdr_plugin_config ]]; then
+   rm -rf $herdr_plugin_config.pre-link
+   mv $herdr_plugin_config $herdr_plugin_config.pre-link
+   gum log --level warn "moved $herdr_plugin_config to .pre-link; anything you configured by hand is in there"
+ fi
++trace_end
+
+ # One-time cleanups older machines have left to do, which convergence cannot

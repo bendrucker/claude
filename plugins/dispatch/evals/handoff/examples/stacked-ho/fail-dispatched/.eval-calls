@@ -1,0 +1,3 @@
+wt -C /tmp/eval/cwd switch --create document-timeout --base add-timeout --no-cd --yes --format=json
+rex window new -s session:eval document-timeout -c /tmp/eval/cwd/.worktrees/document-timeout --json -- claude --name document-timeout -- <prompt>
+allow Bash(bun test:*)

@@ -4,7 +4,7 @@ import { type Engine, describe, expect, mock, test } from "claude-code/testing";
 type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 
 const START = { surface: "terminal", isInteractive: true, cwd: "/work" } as const;
-const ZSH = "5.9.2\non\noff\noff\non\n";
+const ZSH = "5.9.2\n";
 
 function ran(stdout: string, exitCode = 0): ProcessRunResult {
   return { exitCode, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false };
@@ -44,36 +44,20 @@ const named = (world: World, event: string) =>
   world.events.filter((e) => e.event === event).map((e) => e.detail);
 
 describe("register", () => {
-  test("reports the shell and its options at session start", async ($, on) => {
+  test("reports the shell at session start", async ($, on) => {
     const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
     await $.session.start(START);
     expect(named(world, "session.start")).toEqual([
-      {
-        shell: "/bin/zsh",
-        version: "5.9.2",
-        active: true,
-        nomatch: "on",
-        nullglob: "off",
-        cshnullglob: "off",
-        equals: "on",
-      },
+      { shell: "/bin/zsh", version: "5.9.2", active: true },
     ]);
   });
 
-  test("quotes what zsh would expand and records the rules", async ($, on) => {
+  test("runs a command with unquoted patterns as written", async ($, on) => {
     const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
     await $.session.start(START);
-    await bash($, "grep -rn register --include=*.ts plugins | head -2; echo ===");
-    expect(world.ran).toEqual(["grep -rn register --include='*.ts' plugins | head -2; echo '==='"]);
-    expect(named(world, "rewrite")).toEqual([{ rules: ["flag-glob", "equals"] }]);
-  });
-
-  test("passes a command with nothing to quote through unchanged", async ($, on) => {
-    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
-    await $.session.start(START);
-    await bash($, "ls -la 'src/*.ts'");
-    expect(world.ran).toEqual(["ls -la 'src/*.ts'"]);
-    expect(named(world, "rewrite")).toEqual([]);
+    const result = await bash($, "grep -rn register --include=*.ts plugins | head -2; echo ===");
+    expect(world.ran).toEqual(["grep -rn register --include=*.ts plugins | head -2; echo ==="]);
+    expect(result.deny).toBeUndefined();
   });
 
   test("notes a zsh error after the result, in full once and briefly after", async ($, on) => {
@@ -101,28 +85,21 @@ describe("register", () => {
   });
 
   test("stays inert under bash", async ($, on) => {
-    const world = worldOf(on, { SHELL: "/bin/bash" }, ran("\n\n\n\n\n"));
+    const world = worldOf(on, { SHELL: "/bin/bash" }, ran("\n"));
     await $.session.start(START);
     world.output = "(eval):1: no matches found: *.nope";
-    const result = await bash($, "grep --include=*.ts x .; echo ===");
+    const result = await bash($, "ls *.nope");
     expect(named(world, "session.start")[0]).toMatchObject({ shell: "/bin/bash", active: false });
-    expect(world.ran).toEqual(["grep --include=*.ts x .; echo ==="]);
     expect(result.context).toBeUndefined();
-    expect(named(world, "rewrite")).toEqual([]);
+    expect(named(world, "explain")).toEqual([]);
   });
 
-  test("follows the user's options", async ($, on) => {
-    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran("5.9.2\non\non\noff\non\n"));
-    await $.session.start(START);
-    await bash($, "grep --include=*.ts x .; echo ===");
-    expect(world.ran).toEqual(["grep --include=*.ts x .; echo '==='"]);
-  });
-
-  test("falls back to zsh defaults when the probe fails", async ($, on) => {
+  test("still notes zsh errors when the probe fails", async ($, on) => {
     const world = worldOf(on, { SHELL: "/bin/zsh" }, new Error("timed out"));
     await $.session.start(START);
-    await bash($, "echo ===");
-    expect(world.ran).toEqual(["echo '==='"]);
+    world.output = "(eval):1: no matches found: *.nope";
+    const result = await bash($, "ls *.nope");
+    expect(result.context).toHaveLength(1);
     expect(named(world, "error")).toMatchObject([{ hook: "session.start", kind: "probe" }]);
   });
 

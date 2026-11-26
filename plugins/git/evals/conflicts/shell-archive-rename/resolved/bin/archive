@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+src=${1:?usage: archive <dir> <dest>}
+dest=${2:?usage: archive <dir> <dest>}
+keep=${ARCHIVE_KEEP:-7}
+
+mkdir -p "$dest"
+name=$(basename "$src")
+stamp=${ARCHIVE_STAMP:-$(date +%Y%m%d%H%M%S)}
+tar --exclude=.git -czf "$dest/$name-$stamp.tar.gz" -C "$(dirname "$src")" "$name"
+
+# Keep the newest archives. Names sort by timestamp.
+ls -1 "$dest/$name"-*.tar.gz | sort -r | tail -n +$((keep + 1)) | while read -r old; do
+  rm -f "$old"
+done

@@ -366,6 +366,7 @@ describe("hook process", () => {
       const input = mockInput('git commit -m "test"', testRepo);
       const proc = Bun.spawn(["bun", join(import.meta.dir, "block-default-branch-commit.ts")], {
         cwd: spawnDir,
+        env: process.env,
         stdin: new TextEncoder().encode(JSON.stringify(input)),
         stdout: "pipe",
         stderr: "inherit",

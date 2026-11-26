@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+. "$(dirname "${BASH_SOURCE[0]}")/size.sh"
+
+archive_size() {
+  local archive_kb=$1
+  printf 'archive: %s\n' "$(human_size $((archive_kb * 1024)))"
+}

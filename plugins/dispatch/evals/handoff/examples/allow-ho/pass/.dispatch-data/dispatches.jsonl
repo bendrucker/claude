@@ -1,0 +1,1 @@
+{"ts":"2026-11-17T12:00:00.000Z","task":"Fix the delay overflow.","repo":"/tmp/eval/cwd","branch":"fix-delay-overflow","path":"/tmp/eval/cwd/.worktrees/fix-delay-overflow","mux":"rex","target":"block:eval-1","host":null,"name":"fix-delay-overflow","title":"Fix Delay Overflow","place":"tab","session":null,"sender":null,"outcome":"dispatched"}

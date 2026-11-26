@@ -1,0 +1,1 @@
+We're on `feature-x` in this tab, adding the retry counter. The counter never resets after a successful connect, and I think that fix belongs with this branch's work. Spin off a session to work out where the reset should happen and fix it while I carry on here. I'll check in on it as it goes and review the approach before it opens a PR.

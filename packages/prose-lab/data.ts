@@ -1,0 +1,222 @@
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
+import { z } from "zod";
+
+export const DATA = join(import.meta.dirname, "data");
+/** Snapshots of documents reviewed in Plannotator, which every corpus includes. */
+export const DOCS = join(DATA, "docs");
+
+export const Hit = z.object({
+  plugin: z.string(),
+  check: z.string(),
+  severity: z.string(),
+  message: z.string(),
+  file: z.string(),
+  line: z.number(),
+  span: z.tuple([z.number(), z.number()]),
+  match: z.string(),
+  /** False when the plugin's own config turns the check off and only a wide sweep fires it. */
+  shipped: z.boolean().optional(),
+});
+export type Hit = z.infer<typeof Hit>;
+
+export const Corpus = z.enum(["skills", "agent-facing", "all"]);
+export type Corpus = z.infer<typeof Corpus>;
+
+export const Sweep = z.object({
+  corpus: Corpus,
+  rev: z.string(),
+  words: z.number(),
+  hits: z.array(Hit),
+  plugins: z.array(z.string()).optional(),
+  /** Other checkouts' roots by the name their hits' files carry as a prefix. */
+  repos: z.record(z.string(), z.string()).default({}),
+});
+export type Sweep = z.infer<typeof Sweep>;
+
+export const Verdict = z.enum(["right", "wrong", "unsure"]);
+
+export const Label = Hit.extend({
+  id: z.string(),
+  verdict: Verdict,
+  note: z.string(),
+  pattern: z.string().optional(),
+  /** Scores count a model's labels apart from the user's. */
+  by: z.enum(["user", "model"]).default("user"),
+  ts: z.string(),
+});
+export type Label = z.infer<typeof Label>;
+
+/** A span the user marked that no shipped rule caught. */
+export const Flag = z.object({
+  id: z.string(),
+  pattern: z.string().optional(),
+  file: z.string(),
+  line: z.number(),
+  span: z.tuple([z.number(), z.number()]),
+  match: z.string(),
+  note: z.string(),
+  ts: z.string(),
+});
+export type Flag = z.infer<typeof Flag>;
+
+/** A reviewed document's snapshot under `DOCS`, and the file it was copied from. */
+export const Doc = z.object({
+  doc: z.string(),
+  source: z.string(),
+  ts: z.string(),
+});
+export type Doc = z.infer<typeof Doc>;
+
+export const Pattern = z.object({
+  slug: z.string().regex(/^[a-z0-9-]+$/),
+  description: z.string(),
+  style: z.enum(["Prompting", "Writing"]),
+  /** The shipped rule's check name once the pattern is promoted. */
+  check: z.string().optional(),
+});
+export type Pattern = z.infer<typeof Pattern>;
+
+export const Score = z.object({
+  pattern: z.string(),
+  candidate: z.string(),
+  hits: z.number(),
+  right: z.number(),
+  wrong: z.number(),
+  byModel: z.number().default(0),
+  low: z.number(),
+  high: z.number(),
+  recall: z.number(),
+  positives: z.number(),
+  perThousand: z.number(),
+  // A score recorded before complexity was measured can't be promoted until it is rescored.
+  complexity: z.number().default(Number.POSITIVE_INFINITY),
+  ts: z.string(),
+});
+export type Score = z.infer<typeof Score>;
+
+/** A candidate's unlabeled hit, queued so the next sitting judges text the candidate was not written from. */
+export const Queued = Hit.extend({ pattern: z.string(), candidate: z.string() });
+export type Queued = z.infer<typeof Queued>;
+
+/** One proposer call on a file: the spans it resolved, keyed by the file text, prompt, and model asked. */
+export const Proposed = z.object({
+  file: z.string(),
+  key: z.string(),
+  /** Spans the model returned, before quotes that didn't match the file were dropped. */
+  asked: z.number(),
+  hits: z.array(Hit),
+  ts: z.string(),
+});
+export type Proposed = z.infer<typeof Proposed>;
+
+export function hitId(hit: Pick<Hit, "check" | "file" | "line" | "span">): string {
+  return `${hit.check}|${hit.file}|${hit.line}|${hit.span[0]}`;
+}
+
+/** A directory's entries, or none when it does not exist yet. */
+export async function entries(dir: string): Promise<string[]> {
+  try {
+    return await readdir(dir);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+export async function readJsonl<T>(schema: z.ZodType<T>, path: string): Promise<T[]> {
+  const file = Bun.file(path);
+  if (!(await file.exists())) return [];
+  return (await file.text())
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => schema.parse(JSON.parse(line)));
+}
+
+export async function appendJsonl(path: string, records: readonly unknown[]): Promise<void> {
+  if (records.length === 0) return;
+  const file = Bun.file(path);
+  const before = (await file.exists()) ? await file.text() : "";
+  await Bun.write(path, before + records.map((record) => `${JSON.stringify(record)}\n`).join(""));
+}
+
+/** The last record per key, since the stores are append-only and a relabel supersedes. */
+export function latest<T>(records: readonly T[], key: (record: T) => string): T[] {
+  return [...new Map(records.map((record) => [key(record), record])).values()];
+}
+
+/** The records that move the labels and flags named by `ids` to pattern `slug`. */
+export function assign(
+  slug: string,
+  ids: readonly string[],
+  labels: readonly Label[],
+  flags: readonly Flag[],
+  ts: string,
+): { labels: Label[]; flags: Flag[] } {
+  const byId = new Map<string, Label | Flag>([
+    ...labels.map((label) => [label.id, label] as const),
+    ...flags.map((flag) => [flag.id, flag] as const),
+  ]);
+  const missing = ids.filter((id) => !byId.has(id));
+  if (missing.length > 0) throw new Error(`Unknown ids: ${missing.join(", ")}`);
+  const wanted = new Set(ids);
+  const pick = <T extends { id: string }>(records: readonly T[]): T[] =>
+    records.flatMap((record) => (wanted.has(record.id) ? [{ ...record, pattern: slug, ts }] : []));
+  return { labels: pick(labels), flags: pick(flags) };
+}
+
+export interface Store {
+  dir: string;
+  sweep(): Promise<Sweep | undefined>;
+  writeSweep(sweep: Sweep): Promise<void>;
+  labels(): Promise<Label[]>;
+  flags(): Promise<Flag[]>;
+  docs(): Promise<Doc[]>;
+  patterns(): Promise<Pattern[]>;
+  scores(): Promise<Score[]>;
+  queue(): Promise<Queued[]>;
+  proposals(): Promise<Proposed[]>;
+  /** The last sweep's hits and the proposer's, which the deck and scores judge alike. */
+  hits(): Promise<Hit[]>;
+  addProposals(records: readonly Proposed[]): Promise<void>;
+  addLabels(records: readonly Label[]): Promise<void>;
+  addFlags(records: readonly Flag[]): Promise<void>;
+  addDocs(records: readonly Doc[]): Promise<void>;
+  addPatterns(records: readonly Pattern[]): Promise<void>;
+  addScores(records: readonly Score[]): Promise<void>;
+  enqueue(records: readonly Queued[]): Promise<void>;
+}
+
+export function store(dir = DATA): Store {
+  const path = (name: string): string => join(dir, name);
+  return {
+    dir,
+    async sweep() {
+      const file = Bun.file(path("hits.json"));
+      return (await file.exists()) ? Sweep.parse(await file.json()) : undefined;
+    },
+    async writeSweep(sweep) {
+      await Bun.write(path("hits.json"), JSON.stringify(sweep));
+    },
+    labels: async () => latest(await readJsonl(Label, path("labels.jsonl")), (l) => l.id),
+    flags: async () => latest(await readJsonl(Flag, path("flags.jsonl")), (f) => f.id),
+    docs: () => readJsonl(Doc, path("docs.jsonl")),
+    patterns: async () => latest(await readJsonl(Pattern, path("patterns.jsonl")), (p) => p.slug),
+    scores: async () =>
+      latest(await readJsonl(Score, path("scores.jsonl")), (s) => `${s.pattern}|${s.candidate}`),
+    queue: async () => latest(await readJsonl(Queued, path("queue.jsonl")), hitId),
+    proposals: async () =>
+      latest(await readJsonl(Proposed, path("proposals.jsonl")), (p) => p.file),
+    async hits() {
+      const [swept, proposed] = await Promise.all([this.sweep(), this.proposals()]);
+      return [...(swept?.hits ?? []), ...proposed.flatMap((entry) => entry.hits)];
+    },
+    addProposals: (records) => appendJsonl(path("proposals.jsonl"), records),
+    addLabels: (records) => appendJsonl(path("labels.jsonl"), records),
+    addFlags: (records) => appendJsonl(path("flags.jsonl"), records),
+    addDocs: (records) => appendJsonl(path("docs.jsonl"), records),
+    addPatterns: (records) => appendJsonl(path("patterns.jsonl"), records),
+    addScores: (records) => appendJsonl(path("scores.jsonl"), records),
+    enqueue: (records) => appendJsonl(path("queue.jsonl"), records),
+  };
+}

@@ -11,7 +11,7 @@ Why each sandbox grant and hook exists, and what would retire it, is in [`docs/s
 
 ## Layers
 
-`managed/settings.json` loads on every platform as managed settings. Put an entry there only when it is right in a remote session too, because a lower scope cannot remove a list entry or hook it adds, and its scalars outrank project settings and `/config`. Everything else stays in `user/settings.json`, the local machines' user file, where `/plugin`, moshi, and herdr write and `claude-sync` reads plugin declarations. Remote-only entries go in `platforms/remote/settings.json`.
+`managed/settings.json` loads on every platform as managed settings. Put an entry there only when it is right in a remote session too, because a lower scope cannot remove a list entry or hook it adds, and its scalars outrank project settings and `/config`. Everything else stays in `user/settings.json`, the local machines' user file, where `/plugin`, moshi, herdr, and Rex write and `claude-sync` reads plugin declarations. Remote-only entries go in `platforms/remote/settings.json`.
 
 ## Permission Paths
 
@@ -41,7 +41,7 @@ Scopes combine rather than replace, so that run still carries the deployed file'
 
 ## Sandbox
 
-`excludedCommands` matches each command in a Bash invocation's top-level chain, the positions separated by `&&`, `;`, a newline, or a pipe. The invocation escapes only when every command in that chain matches, so `cd <dir> && git <subcommand>` and `git push 2>&1 | tail` both run sandboxed. A global option before the subcommand also misses `git:*`, so `git -c <key>=<value> push` runs sandboxed. Run `git <subcommand>` bare from the session's directory when it must escape. A verb reached only through `$(...)` does not match, and a command spawned by a non-exempt wrapper stays sandboxed. A wrapper that hands off to Apple Events or Launch Services needs a full skip via the `mac` plugin's marker hook, covered in [`scripts.md`](scripts.md).
+`excludedCommands` matches each command in a Bash invocation's top-level chain, the positions separated by `&&`, `;`, a newline, or a pipe. The invocation escapes only when every command in that chain matches, so `cd <dir> && git <subcommand>` and `git push 2>&1 | tail` both run sandboxed. A global option before the subcommand also misses `git:*`, so `git -c <key>=<value> push` runs sandboxed. Run `git <subcommand>` bare from the session's directory when it must escape. A verb reached only through `$(...)` does not match, and a command spawned by a non-exempt wrapper stays sandboxed. A wrapper that hands off to Apple Events or Launch Services needs its own entry, covered in [`scripts.md`](scripts.md).
 
 Because the escape outranks `filesystem` denies, every entry is a full sandbox escape for any invocation made only of matching commands. Weigh a new one against that reach. Verified against CLI 2.1.294, so re-probe before trusting it on a later build.
 

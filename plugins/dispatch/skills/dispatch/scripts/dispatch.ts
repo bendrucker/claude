@@ -1,0 +1,1730 @@
+#!/usr/bin/env bun
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { homedir, hostname } from "node:os";
+import { isAbsolute, join } from "node:path";
+import { cli } from "cleye";
+import { z } from "zod";
+import { appendDispatch, type DispatchLedgerRow, resolveDataDir } from "./ledger";
+import { type ResolveRepo, resolveRepo } from "./repo";
+import { createSessionsCommand, currentSession, resolveSessionLabel } from "./sessions";
+
+const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
+// wt's pr:<n> and mr:<n> shortcuts, or a PR or MR URL.
+const CHANGE_PATTERN =
+  /^(?:(?:pr|mr):[1-9][0-9]*|https:\/\/[A-Za-z0-9.-]+(?:\/[A-Za-z0-9._~%-]+)+)$/;
+const AGENT_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
+const MAX_AGENT_NAME = 32;
+const MAX_TITLE = 60;
+const SPLIT_RIGHT_COLUMNS = 160;
+const MAX_TASK_SUMMARY = 120;
+// The prompt travels as one argv element, and the whole argv shares an
+// operating-system limit that a large paste can exhaust.
+const MAX_PROMPT_BYTES = 128 * 1024;
+const FETCH_TIMEOUT_MS = 60_000;
+const NAME_ATTEMPTS = 3;
+// A new pane draws its prompt while a startup hook such as mise's still holds
+// the foreground, and agent start refuses the pane as busy until it lets go.
+const BUSY_PAUSE_MS = 1_000;
+const POLL_MS = 1_000;
+const LOCK_PAUSE_MS = 250;
+// A denied write shares the prefix, but only a lock someone holds exists already.
+const CONFIG_LOCK_HELD = /could not lock config file .*: File exists/;
+const SETTINGS_FILE = ".claude/settings.local.json";
+// Only the bottom of the screen shows the live state, and the transcript above
+// it can quote either phrase.
+const SCREEN_TAIL_LINES = 20;
+const DIALOG =
+  /Do you trust the files in this folder\?|trust this folder|Do you want to proceed\?|Esc to cancel/i;
+const BUSY_SPINNER = /esc to interrupt/i;
+// A spinner glyph, a gerund ending in an ellipsis, then the elapsed timer.
+const SPINNER_LINE = /^\s*[^\s\w❯⏺│─]\s\S+…\s\(\d+[hms]\b/m;
+// A first turn can finish inside one poll interval, leaving its timing line.
+const TURN_DONE = /^\s*✻ .*\bdone\b/m;
+// An echoed prompt followed by a reply. The empty input box shows a bare `❯`.
+const ANSWERED = /^❯ \S.*\n(?:.*\n)*?⏺ /m;
+// `--exec` and its shell launcher print these, and `--keep-open` leaves them on screen.
+const EXEC_FAILED = /^dispatch failed: /m;
+const WORKTREE_LINE = /^dispatch worktree: (\S+)$/m;
+const BRANCH_LINE = /^dispatch branch: (\S+)$/m;
+// Linux caps one argv element at 128KB including its terminator.
+const MAX_ARG_BYTES = 128 * 1024 - 1;
+// rex passes words without a shell. This launcher's own shell expands $HOME.
+const REMOTE_LAUNCHER = [
+  'script="$HOME/.claude-repo/plugins/dispatch/skills/dispatch/scripts/dispatch.ts"',
+  'command -v bun >/dev/null 2>&1 || { echo "dispatch failed: bun is not on PATH"; exit 1; }',
+  '[ -f "$script" ] || { echo "dispatch failed: $script is not deployed"; exit 1; }',
+  'exec bun "$script" "$@"',
+].join("; ");
+
+export interface CommandResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+}
+
+export interface RunOptions {
+  // A fetch over SSH waits on an agent that may be waiting on a hardware key,
+  // which never returns unattended.
+  timeoutMs?: number;
+  // An undefined value removes the variable.
+  env?: Record<string, string | undefined>;
+  cwd?: string;
+}
+
+export type Runner = (argv: readonly string[], options?: RunOptions) => Promise<CommandResult>;
+
+export type Pause = (ms: number) => Promise<void>;
+
+// The claude-dispatch sandbox.excludedCommands entry covers the whole invocation,
+// so every subprocess takes an argv array.
+export const spawnRunner: Runner = async (argv, options) => {
+  let proc: Bun.Subprocess<"ignore", "pipe", "pipe">;
+  try {
+    proc = Bun.spawn([...argv], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: Object.fromEntries(
+        Object.entries({ ...process.env, ...options?.env }).filter(
+          (entry): entry is [string, string] => entry[1] != null,
+        ),
+      ),
+      cwd: options?.cwd ?? process.cwd(),
+    });
+  } catch (error) {
+    // Spawning throws when the binary is missing, which would escape the
+    // DispatchError contract and lose the partial record with it.
+    const reason = error instanceof Error ? error.message : String(error);
+    return { code: 127, stdout: "", stderr: `${argv[0]}: ${reason}\n` };
+  }
+  const timer =
+    options?.timeoutMs == null
+      ? null
+      : setTimeout(() => {
+          proc.kill();
+        }, options.timeoutMs);
+  try {
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    if (options?.timeoutMs == null || proc.signalCode == null) return { code, stdout, stderr };
+    return {
+      code: code === 0 ? 124 : code,
+      stdout,
+      stderr: `${stderr}${argv[0]}: killed after ${options.timeoutMs}ms\n`,
+    };
+  } finally {
+    if (timer != null) clearTimeout(timer);
+  }
+};
+
+export const MUXES = ["rex", "herdr", "bg"] as const;
+export type Mux = (typeof MUXES)[number];
+export type Status = "working" | "blocked" | "failed" | "unknown";
+export type Checkout = "new-branch" | "existing-branch" | "existing-worktree";
+export type Place = "pane" | "tab" | "bg";
+
+export interface DispatchRecord {
+  mux: Mux;
+  // The Rex block or herdr pane running the session.
+  target: string | null;
+  host: string | null;
+  name: string;
+  title: string;
+  place: Place;
+  // A remote worktree's path is known only once its screen shows it.
+  path: string | null;
+  branch: string;
+  session: string | null;
+  status: Status;
+  settings: string[];
+  // Unknown for another host, whose worktree is prepared there.
+  checkout?: Checkout;
+  submoduleError?: string;
+  // What a blocked Claude Code reported through Rex or `claude agents`.
+  blockedKind?: string;
+  blockedMessage?: string;
+}
+
+export interface DispatchResult {
+  record: DispatchRecord;
+  root: string;
+}
+
+// A partial record means a worktree exists that nobody owns.
+export class DispatchError extends Error {
+  readonly partial: DispatchRecord | null;
+  root: string | null = null;
+
+  constructor(message: string, partial: DispatchRecord | null) {
+    super(message);
+    this.name = "DispatchError";
+    this.partial = partial;
+  }
+}
+
+const WtSwitched = z.object({
+  action: z.string(),
+  branch: z.string().nullish(),
+  path: z.string(),
+  created_branch: z.boolean().optional(),
+});
+
+const RexCreated = z.object({ block_ids: z.array(z.string()).min(1) });
+
+const ProgramStatus = z.object({
+  records: z.array(
+    z.object({
+      id: z.string().nullish(),
+      state: z.string(),
+      effective_app: z.string().nullish(),
+      kind: z.string().nullish(),
+      msg: z.string().nullish(),
+    }),
+  ),
+});
+
+export interface ReportedStatus {
+  status: Status;
+  kind?: string;
+  message?: string;
+}
+
+// The session's own record carries no id. Records with one track its tasks.
+export function readProgramStatus(stdout: string): ReportedStatus | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(stdout);
+  } catch {
+    // An older Rex, or a block that is not a terminal, returns something else.
+    return null;
+  }
+  const parsed = ProgramStatus.safeParse(json);
+  if (!parsed.success) return null;
+  const claude = parsed.data.records.filter((record) => record.effective_app === "claude-code");
+  const record = claude.find((entry) => entry.id == null) ?? claude[0];
+  if (record == null) return null;
+  if (record.state === "working" || record.state === "done") return { status: "working" };
+  if (record.state === "error") return { status: "failed" };
+  if (record.state !== "blocked") return { status: "unknown" };
+  const blocked: ReportedStatus = { status: "blocked" };
+  if (record.kind != null) blocked.kind = record.kind;
+  if (record.msg != null) blocked.message = record.msg;
+  return blocked;
+}
+
+const BackgroundAgents = z.array(
+  z.object({
+    id: z.string().nullish(),
+    name: z.string().nullish(),
+    kind: z.string().nullish(),
+    state: z.string().nullish(),
+    status: z.string().nullish(),
+    waitingFor: z.string().nullish(),
+  }),
+);
+
+const WAITING_KINDS: Readonly<Record<string, string>> = {
+  "permission prompt": "permission",
+  "sandbox request": "permission",
+  "input needed": "question",
+};
+
+// Reads one background session's entry from `claude agents --json`, by id
+// when `claude --bg` printed one and by name otherwise.
+export function readBackgroundStatus(
+  stdout: string,
+  target: string | null,
+  name: string,
+): ReportedStatus | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(stdout);
+  } catch {
+    // A failed listing prints prose, which leaves the poll to try again.
+    return null;
+  }
+  const parsed = BackgroundAgents.safeParse(json);
+  if (!parsed.success) return null;
+  const entry = parsed.data.find((agent) =>
+    target == null ? agent.name === name : agent.id === target,
+  );
+  if (entry == null) return null;
+  if (entry.state === "failed" || entry.state === "stopped") return { status: "failed" };
+  if (entry.state === "blocked" || entry.status === "waiting") {
+    const blocked: ReportedStatus = { status: "blocked" };
+    const kind = entry.waitingFor == null ? undefined : WAITING_KINDS[entry.waitingFor];
+    if (kind != null) blocked.kind = kind;
+    if (entry.waitingFor != null) blocked.message = entry.waitingFor;
+    return blocked;
+  }
+  if (entry.state === "working" || entry.state === "done" || entry.status === "busy")
+    return { status: "working" };
+  return { status: "unknown" };
+}
+
+const WorkspaceCreated = z.object({
+  result: z.object({ root_pane: z.object({ pane_id: z.string() }) }),
+});
+
+const AgentList = z.object({
+  result: z.object({
+    agents: z.array(z.object({ name: z.string().nullish() })),
+  }),
+});
+
+const AgentInfo = z.object({
+  result: z.object({
+    agent: z.object({
+      agent_status: z.string(),
+      agent_session: z.object({ value: z.string() }).nullish(),
+    }),
+  }),
+});
+
+const ErrorEnvelope = z.object({
+  error: z.object({ code: z.string(), message: z.string() }),
+});
+
+const SettingsObject = z.record(z.string(), z.unknown());
+export type Settings = z.infer<typeof SettingsObject>;
+
+// herdr writes its JSON envelope on stderr, sometimes behind other output, so
+// the last line is tried after the whole stream.
+export function envelopeCode(stderr: string): string | null {
+  const lastLine = stderr.split("\n").findLast((line) => line.trim() !== "");
+  return readEnvelope(stderr) ?? (lastLine == null ? null : readEnvelope(lastLine));
+}
+
+function readEnvelope(text: string): string | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    // This probes arbitrary stderr for an envelope, so non-JSON just means there is none.
+    return null;
+  }
+  const parsed = ErrorEnvelope.safeParse(json);
+  return parsed.success ? parsed.data.error.code : null;
+}
+
+export function deriveName(branch: string, taken: ReadonlySet<string>): string {
+  const slug = branch
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9_-]/g, "-")
+    .replaceAll(/-+/g, "-")
+    .replace(/^[^a-z]+/, "")
+    .slice(0, MAX_AGENT_NAME);
+  const base = slug === "" ? "agent" : slug;
+
+  let candidate = base;
+  for (let n = 2; taken.has(candidate); n += 1) {
+    const suffix = `-${n}`;
+    candidate = base.slice(0, MAX_AGENT_NAME - suffix.length) + suffix;
+  }
+  return candidate;
+}
+
+export function deriveTitle(branch: string): string {
+  const change = /^(pr|mr):(\d+)$/.exec(branch);
+  if (change?.[1] != null) return `${change[1].toUpperCase()} ${change[2]}`;
+  const url = /\/(pull|merge_requests)\/(\d+)\/?$/.exec(branch);
+  if (url?.[1] != null) return `${url[1] === "pull" ? "PR" : "MR"} ${url[2]}`;
+  const segments = branch.split("/");
+  const words = (segments.length > 1 ? segments.slice(1) : segments)
+    .join("/")
+    .split(/[-_/]+/)
+    .filter((word) => word !== "")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1));
+  return words.length === 0 ? branch : words.join(" ");
+}
+
+export function taskSummary(prompt: string): string {
+  // A prompt file often opens with a heading or a rule, so the summary is the
+  // first line that still carries words once the markup is off the front.
+  const line =
+    prompt
+      .split("\n")
+      .map((entry) => entry.replace(/^[\s>#*+-]+/, "").trim())
+      .find((entry) => /\w/.test(entry)) ?? "";
+  return line.slice(0, MAX_TASK_SUMMARY);
+}
+
+export interface SenderMux {
+  kind: "rex" | "herdr";
+  // The Rex block or herdr pane running the dispatching session.
+  id: string;
+  // How another machine names this one: a Rex server address `rex -S` takes,
+  // or the hostname a herdr machine label stands for.
+  machine: string | null;
+}
+
+export interface Sender {
+  name: string;
+  mux: SenderMux | null;
+}
+
+const SessionEntry = z.object({ name: z.string().min(1) });
+
+const RexWhoami = z.object({
+  tailscale: z.object({ state: z.string(), dns_name: z.string().nullish() }).nullish(),
+});
+
+function claudeConfigDir(env: Readonly<Record<string, string | undefined>>): string {
+  const dir = env.CLAUDE_CONFIG_DIR;
+  return dir != null && dir !== "" ? dir : join(homedir(), ".claude");
+}
+
+// Claude Code registers each live session under its pid with the name that
+// ListAgents and SendMessage address it by.
+export async function readSender(
+  env: Readonly<Record<string, string | undefined>>,
+  run: Runner = spawnRunner,
+  host: string = hostname(),
+): Promise<Sender | null> {
+  const entry = await readSessionEntry(env, SessionEntry);
+  if (entry == null) return null;
+  return { name: entry.name, mux: await senderMux(env, run, host) };
+}
+
+const LiveSession = z.object({ sessionId: z.string().min(1) });
+
+// After a plan's "clear context", CLAUDE_SESSION_ID still names the planning
+// session while this entry stores the id of the transcript being written.
+export async function readLiveSession(
+  env: Readonly<Record<string, string | undefined>>,
+): Promise<string | null> {
+  return (await readSessionEntry(env, LiveSession))?.sessionId ?? null;
+}
+
+async function readSessionEntry<T>(
+  env: Readonly<Record<string, string | undefined>>,
+  schema: z.ZodType<T>,
+): Promise<T | null> {
+  const pid = env.CLAUDE_PID;
+  if (pid == null || !/^\d+$/.test(pid)) return null;
+  const file = Bun.file(join(claudeConfigDir(env), "sessions", `${pid}.json`));
+  let json: unknown;
+  try {
+    json = JSON.parse(await file.text());
+  } catch {
+    // A missing or unreadable entry means the caller falls back to what it was given.
+    return null;
+  }
+  const parsed = schema.safeParse(json);
+  return parsed.success ? parsed.data : null;
+}
+
+async function senderMux(
+  env: Readonly<Record<string, string | undefined>>,
+  run: Runner,
+  host: string,
+): Promise<SenderMux | null> {
+  const rex = env.REX_BLOCK;
+  if (rex != null && rex !== "") return { kind: "rex", id: rex, machine: await rexAddress(run) };
+  const herdr = env.HERDR_PANE_ID;
+  if (herdr != null && herdr !== "")
+    return { kind: "herdr", id: herdr, machine: host === "" ? null : host };
+  return null;
+}
+
+// The local endpoint is a unix socket, so only the server's tailnet name
+// reaches it from another machine.
+async function rexAddress(run: Runner): Promise<string | null> {
+  const result = await run(["rex", "whoami", "--json"]);
+  if (result.code !== 0) return null;
+  let json: unknown;
+  try {
+    json = JSON.parse(result.stdout);
+  } catch {
+    // An older Rex without `--json` leaves the footer machine-local.
+    return null;
+  }
+  const parsed = RexWhoami.safeParse(json);
+  const tailscale = parsed.success ? parsed.data.tailscale : null;
+  if (tailscale?.state !== "running") return null;
+  return tailscale.dns_name ?? null;
+}
+
+function remoteHint(mux: SenderMux): string {
+  if (mux.machine == null) return "";
+  if (mux.kind === "rex")
+    return ` From another machine, pass \`-S ${mux.machine}\` to \`rex\` to address that block.`;
+  return ` From another machine, pass \`--machine\` with the \`herdr machine list\` label for \`${mux.machine}\` to address that pane.`;
+}
+
+const CLOSE_WHEN_OPEN = "Once the PR is open, run `dispatch:close`.";
+
+export function withSender(prompt: string, sender: Sender | null, close: boolean): string {
+  const lines: string[] = [];
+  if (sender != null) {
+    const { mux } = sender;
+    const where =
+      mux == null
+        ? ""
+        : ` in ${mux.kind === "rex" ? "Rex block" : "herdr pane"} \`${mux.id}\`${mux.machine == null ? "" : ` on \`${mux.machine}\``}`;
+    const hint = mux == null ? "" : remoteHint(mux);
+    lines.push(
+      `The Claude session \`${sender.name}\`${where} dispatched this task. Reach it with \`SendMessage\` to \`${sender.name}\`.${hint}`,
+    );
+  }
+  if (close) lines.push(CLOSE_WHEN_OPEN);
+  if (lines.length === 0) return prompt;
+  return `${prompt.trimEnd()}\n\n---\n\n${lines.join("\n\n")}\n`;
+}
+
+export function formatRecord(record: DispatchRecord): string {
+  return JSON.stringify(record);
+}
+
+// The host multiplexer is the default, and bg never is. A nested pane inherits
+// the outer multiplexer's variables, so the environment cannot say which is inner.
+export function detectMux(env: Readonly<Record<string, string | undefined>>): Mux {
+  const rex = env.REX_BLOCK != null && env.REX_BLOCK !== "";
+  const herdr = env.HERDR_ENV === "1";
+  if (rex && herdr)
+    throw new Error(
+      "this session runs under both Rex and herdr, nested; pass --mux rex or --mux herdr",
+    );
+  if (rex) return "rex";
+  if (herdr) return "herdr";
+  throw new Error("no multiplexer hosts this session; pass --mux rex, --mux herdr, or --mux bg");
+}
+
+export function describeMuxDefault(env: Readonly<Record<string, string | undefined>>): string {
+  try {
+    return `defaults to ${detectMux(env)}, the multiplexer hosting this session`;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+// Variables the launching session set for itself would bind a background
+// session to this one. Settings re-apply their own env in the new session.
+export function detachedEnv(
+  env: Readonly<Record<string, string | undefined>>,
+): Record<string, undefined> {
+  return Object.fromEntries(
+    Object.keys(env)
+      .filter((key) => /^CLAUDE(?:CODE$|_)/.test(key) && key !== "CLAUDE_CODE_OAUTH_TOKEN")
+      .map((key) => [key, undefined]),
+  );
+}
+
+// `claude --bg` prints the id `claude attach` takes, alone or inside a hint.
+export function backgroundId(stdout: string): string | null {
+  const hinted = /claude (?:attach|logs|stop) (\S+)/.exec(stdout)?.[1];
+  if (hinted != null) return hinted;
+  const lines = stdout.split("\n").filter((line) => line.trim() !== "");
+  const only = lines.length === 1 ? lines[0]?.trim() : undefined;
+  return only != null && /^\S+$/.test(only) ? only : null;
+}
+
+export function classifyScreen(screen: string): Status {
+  const tail = screen.split("\n").slice(-SCREEN_TAIL_LINES).join("\n");
+  if (EXEC_FAILED.test(tail)) return "failed";
+  if (DIALOG.test(tail)) return "blocked";
+  if ([BUSY_SPINNER, SPINNER_LINE, TURN_DONE].some((pattern) => pattern.test(tail)))
+    return "working";
+  if (ANSWERED.test(screen)) return "working";
+  return "unknown";
+}
+
+// Base64 keeps a prompt or settings file one opaque word on its way through rex.
+export function encodeArg(text: string): string {
+  return Buffer.from(text, "utf8").toString("base64");
+}
+
+export function decodeArg(value: string, label: string): string {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0)
+    throw new Error(`${label} is not base64`);
+  return Buffer.from(value, "base64").toString("utf8");
+}
+
+function isObject(value: unknown): value is Settings {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isList(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+// Objects merge key by key, and arrays gain only the entries they lack.
+export function mergeSettings(base: Settings, patch: Settings): Settings {
+  const merged: Settings = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    const existing = merged[key];
+    if (isObject(existing) && isObject(value)) merged[key] = mergeSettings(existing, value);
+    else if (isList(existing) && isList(value)) {
+      const seen = new Set(existing.map((entry) => JSON.stringify(entry)));
+      merged[key] = [
+        ...existing,
+        ...value.filter((entry) => {
+          const encoded = JSON.stringify(entry);
+          if (seen.has(encoded)) return false;
+          seen.add(encoded);
+          return true;
+        }),
+      ];
+    } else merged[key] = value;
+  }
+  return merged;
+}
+
+export function settingsKeys(settings: Settings, prefix = ""): string[] {
+  return Object.entries(settings)
+    .flatMap(([key, value]) =>
+      isObject(value) ? settingsKeys(value, `${prefix}${key}.`) : [`${prefix}${key}`],
+    )
+    .toSorted();
+}
+
+export function settingsPatch(allow: readonly string[], sandboxWrite: readonly string[]): Settings {
+  const patch: Settings = {};
+  if (allow.length > 0) patch.permissions = { allow: [...allow] };
+  if (sandboxWrite.length > 0) patch.sandbox = { filesystem: { allowWrite: [...sandboxWrite] } };
+  return patch;
+}
+
+export function parseSettings(text: string, label: string): Settings {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (error) {
+    throw new Error(
+      `${label} is not JSON: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+  const parsed = SettingsObject.safeParse(json);
+  if (!parsed.success) throw new Error(`${label} must hold a JSON object`);
+  return parsed.data;
+}
+
+function decode<T>(
+  schema: z.ZodType<T>,
+  result: CommandResult,
+  label: string,
+  partial: DispatchRecord | null,
+): T {
+  let json: unknown;
+  try {
+    json = JSON.parse(result.stdout);
+  } catch {
+    throw new DispatchError(
+      `${label} did not return JSON: ${result.stdout.slice(0, 200)}`,
+      partial,
+    );
+  }
+  const parsed = schema.safeParse(json);
+  if (!parsed.success)
+    throw new DispatchError(
+      `${label} returned an unexpected shape: ${parsed.error.message}`,
+      partial,
+    );
+  return parsed.data;
+}
+
+function fatal(result: CommandResult, ...tolerated: readonly string[]): boolean {
+  if (result.code === 0) return false;
+  const code = envelopeCode(result.stderr);
+  return code == null || !tolerated.includes(code);
+}
+
+async function required(
+  run: Runner,
+  argv: readonly string[],
+  partial: DispatchRecord | null,
+  options?: RunOptions,
+): Promise<CommandResult> {
+  const result = await run(argv, options);
+  if (result.code !== 0)
+    throw new DispatchError(
+      result.stderr.trim() === "" ? `${argv.join(" ")} exited ${result.code}` : result.stderr,
+      partial,
+    );
+  return result;
+}
+
+async function requiredJson<T>(
+  run: Runner,
+  argv: readonly string[],
+  schema: z.ZodType<T>,
+  partial: DispatchRecord | null,
+): Promise<T> {
+  return decode(schema, await required(run, argv, partial), argv.slice(0, 3).join(" "), partial);
+}
+
+// A base like origin/main needs its remote updated first. A local ref names no
+// remote, and fetching one the repository does not have would fail the dispatch.
+function baseRemote(remotes: ReadonlySet<string>, base: string): string | null {
+  const candidate = base.split("/")[0];
+  if (candidate == null || candidate === base) return null;
+  return remotes.has(candidate) ? candidate : null;
+}
+
+function failureText(result: CommandResult, label: string): string {
+  const stderr = result.stderr.trim();
+  return stderr === "" ? `${label} exited ${result.code}` : stderr;
+}
+
+// Every worktree of a repository writes the one .git/config, and git fails at
+// once rather than waiting when a sibling holds its lock.
+function retryConfigLock(run: Runner, budgetMs: number, pause: Pause): Runner {
+  const attempt = async (
+    argv: readonly string[],
+    options: RunOptions | undefined,
+    waited: number,
+  ): Promise<CommandResult> => {
+    const result = await run(argv, options);
+    if (result.code === 0 || !CONFIG_LOCK_HELD.test(result.stderr) || waited >= budgetMs)
+      return result;
+    await pause(LOCK_PAUSE_MS);
+    return attempt(argv, options, waited + LOCK_PAUSE_MS);
+  };
+  return (argv, options) => attempt(argv, options, 0);
+}
+
+// GitHub over SSH signs with a key that may need a touch nobody is there to give, so
+// fetch the same repository over HTTPS into the remote's own tracking refs.
+export function fetchArgs(remote: string, url: string): string[] {
+  const ssh = /^(?:git@github\.com:|ssh:\/\/git@github\.com\/)(.+?)(?:\.git)?\/?$/.exec(url.trim());
+  if (ssh?.[1] == null) return [remote];
+  return [`https://github.com/${ssh[1]}.git`, `+refs/heads/*:refs/remotes/${remote}/*`];
+}
+
+// git worktree add leaves submodules empty, so a checkout whose tooling links
+// into them comes up broken. The session can still repair it, so a failure is
+// recorded rather than fatal.
+async function initSubmodules(run: Runner, path: string): Promise<string | undefined> {
+  if (!(await Bun.file(join(path, ".gitmodules")).exists())) return undefined;
+  const result = await run(["git", "-C", path, "submodule", "update", "--init", "--recursive"], {
+    timeoutMs: FETCH_TIMEOUT_MS,
+    env: { GIT_TERMINAL_PROMPT: "0" },
+  });
+  return result.code === 0 ? undefined : failureText(result, "git submodule update");
+}
+
+// A tracked settings file would put the grants in the session's next commit.
+async function writeSettings(
+  run: Runner,
+  path: string,
+  patch: Settings,
+  partial: DispatchRecord,
+): Promise<string[]> {
+  const keys = settingsKeys(patch);
+  if (keys.length === 0) return [];
+  const ignored = await run(["git", "-C", path, "check-ignore", "--quiet", SETTINGS_FILE]);
+  if (ignored.code === 1)
+    throw new DispatchError(
+      `${SETTINGS_FILE} is not git-ignored in ${path}, so the settings were not written`,
+      partial,
+    );
+  if (ignored.code !== 0)
+    throw new DispatchError(failureText(ignored, "git check-ignore"), partial);
+
+  const file = Bun.file(join(path, SETTINGS_FILE));
+  let existing: Settings = {};
+  if (await file.exists()) {
+    try {
+      existing = parseSettings(await file.text(), join(path, SETTINGS_FILE));
+    } catch (error) {
+      throw new DispatchError(error instanceof Error ? error.message : String(error), partial);
+    }
+  }
+  await Bun.write(file, `${JSON.stringify(mergeSettings(existing, patch), null, 2)}\n`);
+  return keys;
+}
+
+function agentNames(listed: z.infer<typeof AgentList>): ReadonlySet<string> {
+  return new Set(listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])));
+}
+
+// The `--` keeps a prompt that opens with a dash or a frontmatter rule from
+// parsing as a flag.
+function claudeArgs(name: string, prompt: string, extra: readonly string[] = []): string[] {
+  return ["--name", name, ...extra, "--", prompt];
+}
+
+interface Context {
+  run: Runner;
+  pause: Pause;
+  options: DispatchOptions;
+  partial: DispatchRecord;
+  path: string;
+}
+
+const BlockSize = z.object({ columns: z.number() });
+
+// A block whose size cannot be read splits to the right, as Rex does by default.
+async function splitDirection(run: Runner, block: string): Promise<"right" | "below"> {
+  const result = await run(["rex", "block", "call", "-b", block, "size"]);
+  if (result.code !== 0) return "right";
+  let json: unknown;
+  try {
+    json = JSON.parse(result.stdout);
+  } catch {
+    // An older Rex without the size method prints prose.
+    return "right";
+  }
+  const parsed = BlockSize.safeParse(json);
+  if (!parsed.success) return "right";
+  return parsed.data.columns >= SPLIT_RIGHT_COLUMNS ? "right" : "below";
+}
+
+async function launchRex(ctx: Context): Promise<void> {
+  const { options, partial } = ctx;
+  const command = ["--json", "--", "claude", ...claudeArgs(partial.name, options.prompt)];
+  const argv =
+    options.split && options.rexBlock != null
+      ? [
+          "rex",
+          "split",
+          "-b",
+          options.rexBlock,
+          `--split=${await splitDirection(ctx.run, options.rexBlock)}`,
+          "-c",
+          ctx.path,
+          "--label",
+          partial.title,
+          "--focus=false",
+          ...command,
+        ]
+      : [
+          "rex",
+          "window",
+          "new",
+          "-s",
+          options.rexSession ?? "",
+          partial.title,
+          "-c",
+          ctx.path,
+          "--focus=false",
+          ...command,
+        ];
+  const created = await requiredJson(ctx.run, argv, RexCreated, partial);
+  partial.target = created.block_ids[0] ?? null;
+}
+
+// A derived name can be bound by another dispatch between the list and this
+// start, and herdr names that race. The worktree already exists by then, so
+// the dispatch takes the next free name rather than leaving it without a
+// session. The replacement can lose the same race, so the retry is bounded. A
+// name the caller asked for has no substitute.
+async function startNamed(
+  ctx: Context,
+  pane: string,
+  name: string,
+  attempt = 1,
+  busy = Math.ceil(ctx.options.timeout / BUSY_PAUSE_MS),
+): Promise<{ name: string; started: CommandResult }> {
+  const { run, options, partial } = ctx;
+  const started = await run([
+    "herdr",
+    "agent",
+    "start",
+    name,
+    "--kind",
+    "claude",
+    "--pane",
+    pane,
+    "--",
+    ...claudeArgs(name, options.prompt),
+  ]);
+  const code = envelopeCode(started.stderr);
+  if (code === "agent_pane_busy" && busy > 1) {
+    await ctx.pause(BUSY_PAUSE_MS);
+    return startNamed(ctx, pane, name, attempt, busy - 1);
+  }
+  if (options.name != null || attempt >= NAME_ATTEMPTS || code !== "agent_name_taken")
+    return { name, started };
+
+  const live = agentNames(await requiredJson(run, ["herdr", "agent", "list"], AgentList, partial));
+  return startNamed(ctx, pane, deriveName(options.branch, live), attempt + 1, busy);
+}
+
+async function launchHerdr(ctx: Context): Promise<void> {
+  const { run, partial } = ctx;
+  const workspace = await requiredJson(
+    run,
+    ["herdr", "workspace", "create", "--cwd", ctx.path, "--label", partial.branch, "--no-focus"],
+    WorkspaceCreated,
+    partial,
+  );
+  const pane = workspace.result.root_pane.pane_id;
+  partial.target = pane;
+  const { name, started } = await startNamed(ctx, pane, partial.name);
+  // A trust dialog holds the session before herdr sees it ready, which the
+  // status poll then reports as blocked.
+  if (fatal(started, "agent_not_ready")) throw new DispatchError(started.stderr, partial);
+  partial.name = name;
+}
+
+const BARE_COMMAND =
+  "Run claude-dispatch as the whole Bash command, with no cd, env prefix, pipe, chain, or loop, so its sandbox.excludedCommands entry applies. Issue one Bash call per dispatch. If it already was the whole command, the deployed settings lack claude-dispatch:* in excludedCommands.";
+
+// The sandbox denies the jobs directory every background session writes.
+const JOBS_DENIED = /EPERM[\s\S]*\.claude\/jobs|\.claude\/jobs[\s\S]*EPERM/;
+
+async function launchBackground(ctx: Context): Promise<void> {
+  const { partial } = ctx;
+  const started = await ctx.run(
+    ["claude", "--bg", ...claudeArgs(partial.name, ctx.options.prompt)],
+    {
+      cwd: ctx.path,
+      env: detachedEnv(process.env),
+    },
+  );
+  if (started.code !== 0) {
+    const message =
+      started.stderr.trim() === "" ? `claude --bg exited ${started.code}` : started.stderr;
+    throw new DispatchError(
+      JOBS_DENIED.test(message)
+        ? `claude --bg cannot write ~/.claude/jobs under the sandbox. ${BARE_COMMAND}\n${message}`
+        : message,
+      partial,
+    );
+  }
+  partial.target = backgroundId(started.stdout);
+}
+
+// A background session has no screen until it prints, so its state comes from
+// `claude agents`. A sandboxed listing comes back empty, and the last attempt
+// falls back to the logs.
+async function pollBackground(ctx: Context, last: boolean): Promise<Status> {
+  const { run, partial } = ctx;
+  const listed = await run(["claude", "agents", "--json", "--all", "--cwd", ctx.path]);
+  const reported =
+    listed.code === 0 ? readBackgroundStatus(listed.stdout, partial.target, partial.name) : null;
+  if (reported != null && reported.status !== "unknown") {
+    if (reported.kind != null) partial.blockedKind = reported.kind;
+    if (reported.message != null) partial.blockedMessage = reported.message;
+    return reported.status;
+  }
+  if (!last) return "unknown";
+  return pollScreen(run, partial, ["claude", "logs", partial.target ?? partial.name]);
+}
+
+async function pollScreen(
+  run: Runner,
+  partial: DispatchRecord,
+  argv: readonly string[],
+): Promise<Status> {
+  const captured = await run(argv);
+  if (captured.code !== 0) return "unknown";
+  partial.path ??= WORKTREE_LINE.exec(captured.stdout)?.[1] ?? null;
+  partial.branch = BRANCH_LINE.exec(captured.stdout)?.[1] ?? partial.branch;
+  return classifyScreen(captured.stdout);
+}
+
+async function pollHerdr(ctx: Context, name: string): Promise<Status> {
+  const result = await ctx.run(["herdr", "agent", "get", name]);
+  if (result.code !== 0) return "unknown";
+  const { agent } = decode(AgentInfo, result, "herdr agent get", ctx.partial).result;
+  ctx.partial.session = agent.agent_session?.value ?? ctx.partial.session;
+  if (agent.agent_status === "working" || agent.agent_status === "done") return "working";
+  return agent.agent_status === "blocked" ? "blocked" : "unknown";
+}
+
+// Claude Code reports its state to Rex, which outlasts any screen pattern. The
+// screen still shows what comes before the first report: the trust dialog, or
+// the remote launcher's failure.
+async function pollRex(
+  run: Runner,
+  partial: DispatchRecord,
+  server: readonly string[],
+  last: boolean,
+): Promise<Status> {
+  const block = partial.target ?? "";
+  const called = await run([
+    "rex",
+    ...server,
+    "block",
+    "call",
+    "-b",
+    block,
+    "program_status",
+    "{}",
+  ]);
+  const reported = called.code === 0 ? readProgramStatus(called.stdout) : null;
+  if (reported != null) {
+    if (reported.kind != null) partial.blockedKind = reported.kind;
+    if (reported.message != null) partial.blockedMessage = reported.message;
+    return reported.status;
+  }
+  const screen = await pollScreen(run, partial, [
+    "rex",
+    ...server,
+    "capture",
+    "-b",
+    block,
+    "--trim",
+  ]);
+  return last || screen === "blocked" || screen === "failed" ? screen : "unknown";
+}
+
+async function awaitStatus(
+  poll: (last: boolean) => Promise<Status>,
+  pause: Pause,
+  timeout: number,
+): Promise<Status> {
+  const attempt = async (left: number): Promise<Status> => {
+    const status = await poll(left <= 1);
+    if (status !== "unknown" || left <= 1) return status;
+    await pause(POLL_MS);
+    return attempt(left - 1);
+  };
+  return attempt(Math.ceil(timeout / POLL_MS));
+}
+
+function localPoll(ctx: Context): (last: boolean) => Promise<Status> {
+  const { run, partial } = ctx;
+  if (partial.mux === "herdr") return () => pollHerdr(ctx, partial.name);
+  if (partial.mux === "bg") return (last) => pollBackground(ctx, last);
+  return (last) => pollRex(run, partial, [], last);
+}
+
+export interface DispatchOptions {
+  repo: string;
+  branch: string;
+  prompt: string;
+  name?: string | undefined;
+  title?: string | undefined;
+  // Defaults to the upstream remote's default branch, or origin/main without one.
+  base?: string | undefined;
+  timeout: number;
+  mux: Mux;
+  split?: boolean;
+  rexSession?: string | undefined;
+  rexBlock?: string | undefined;
+  // A saved Rex host label. The launcher runs there with --exec.
+  host?: string | undefined;
+  settings?: Settings;
+}
+
+function validateCommon(
+  options: WorktreeOptions & { prompt: string; name?: string | undefined },
+): void {
+  if (!BRANCH_PATTERN.test(options.branch) && !CHANGE_PATTERN.test(options.branch))
+    throw new DispatchError(
+      `branch ${JSON.stringify(options.branch)} must match ${BRANCH_PATTERN.source} or ${CHANGE_PATTERN.source}`,
+      null,
+    );
+  if (options.name != null && !AGENT_NAME_PATTERN.test(options.name))
+    throw new DispatchError(
+      `agent name ${JSON.stringify(options.name)} must match ${AGENT_NAME_PATTERN.source}`,
+      null,
+    );
+  // A ref may hold ~, ^, and @{}, so only a leading dash that a parser would
+  // read as a flag is out.
+  if (options.base != null && (options.base.startsWith("-") || options.base.trim() === ""))
+    throw new DispatchError(`base ${JSON.stringify(options.base)} must name a ref`, null);
+  const promptBytes = Buffer.byteLength(options.prompt);
+  if (promptBytes > MAX_PROMPT_BYTES)
+    throw new DispatchError(
+      `the prompt is ${promptBytes} bytes, over the ${MAX_PROMPT_BYTES} an argument carries. Point the session at a file instead of pasting its contents.`,
+      null,
+    );
+}
+
+export function titleOf(options: Pick<DispatchOptions, "title" | "branch">): string {
+  return options.title ?? deriveTitle(options.branch);
+}
+
+export function placeOf(options: Pick<DispatchOptions, "mux" | "split">): Place {
+  if (options.mux === "bg") return "bg";
+  return options.split === true ? "pane" : "tab";
+}
+
+function validate(options: DispatchOptions): void {
+  validateCommon(options);
+  if (options.title != null && (options.title.trim() === "" || /[\n\r]/.test(options.title)))
+    throw new DispatchError("--title must be one non-empty line", null);
+  if (options.title != null && options.title.length > MAX_TITLE)
+    throw new DispatchError(`--title must be at most ${MAX_TITLE} characters`, null);
+  if (options.host != null) {
+    validateRemote(options, options.host);
+    return;
+  }
+  if (options.split === true && options.mux !== "rex")
+    throw new DispatchError("--split needs --mux rex", null);
+  if (options.mux === "rex" && options.split === true && (options.rexBlock ?? "") === "")
+    throw new DispatchError("--split needs REX_BLOCK to name the block to split", null);
+  if (options.mux === "rex" && options.split !== true && (options.rexSession ?? "") === "")
+    throw new DispatchError(
+      "a Rex tab needs a session: pass --session <id or label> (`rex ls` lists them)",
+      null,
+    );
+}
+
+function validateRemote(options: DispatchOptions, host: string): void {
+  if (options.mux !== "rex") throw new DispatchError("--host needs --mux rex", null);
+  if (options.split === true)
+    throw new DispatchError("--split opens beside this block, so it cannot take --host", null);
+  if ((options.rexSession ?? "") === "")
+    throw new DispatchError(
+      `--host needs --session naming a session on ${host} (\`rex -S ${host} ls\` lists them)`,
+      null,
+    );
+  const encoded = [
+    ["the prompt", encodeArg(options.prompt)],
+    ["the settings", encodeArg(JSON.stringify(options.settings ?? {}))],
+  ] as const;
+  for (const [label, value] of encoded)
+    if (value.length > MAX_ARG_BYTES)
+      throw new DispatchError(
+        `${label} encodes to ${value.length} bytes, over the ${MAX_ARG_BYTES} one argument carries to another machine`,
+        null,
+      );
+}
+
+// The words after `rex window new --`, which run the launcher on the host.
+export function remoteCommand(options: DispatchOptions, name: string): string[] {
+  const settings = options.settings ?? {};
+  return [
+    "sh",
+    "-c",
+    REMOTE_LAUNCHER,
+    "dispatch",
+    "--exec",
+    "--repo",
+    options.repo,
+    "--branch",
+    options.branch,
+    ...(options.base == null ? [] : ["--base", options.base]),
+    "--name",
+    name,
+    "--timeout",
+    String(options.timeout),
+    "--prompt-base64",
+    encodeArg(options.prompt),
+    ...(Object.keys(settings).length > 0
+      ? ["--settings-base64", encodeArg(JSON.stringify(settings))]
+      : []),
+  ];
+}
+
+async function dispatchRemote(
+  options: DispatchOptions,
+  host: string,
+  run: Runner,
+  pause: Pause,
+): Promise<DispatchResult> {
+  const name = options.name ?? deriveName(options.branch, new Set());
+  const title = titleOf(options);
+  const created = await requiredJson(
+    run,
+    [
+      "rex",
+      "-S",
+      host,
+      "window",
+      "new",
+      "-s",
+      options.rexSession ?? "",
+      title,
+      ...(isAbsolute(options.repo) ? ["-c", options.repo] : []),
+      "--keep-open",
+      "--focus=false",
+      "--json",
+      "--",
+      ...remoteCommand(options, name),
+    ],
+    RexCreated,
+    null,
+  );
+  const record: DispatchRecord = {
+    mux: "rex",
+    target: created.block_ids[0] ?? null,
+    host,
+    name,
+    title,
+    place: "tab",
+    path: null,
+    branch: options.branch,
+    session: null,
+    status: "unknown",
+    settings: settingsKeys(options.settings ?? {}),
+  };
+  const server = ["-S", host];
+  record.status = await awaitStatus(
+    (last) => pollRex(run, record, server, last),
+    pause,
+    options.timeout,
+  );
+  // A program status report skips the screen, which is where the path shows.
+  if (record.path == null)
+    await pollScreen(run, record, [
+      "rex",
+      ...server,
+      "capture",
+      "-b",
+      record.target ?? "",
+      "--trim",
+    ]);
+  return { root: options.repo, record };
+}
+
+export type WorktreeOptions = Pick<
+  DispatchOptions,
+  "repo" | "branch" | "base" | "timeout" | "settings"
+>;
+
+interface Prepared {
+  root: string;
+  path: string;
+  partial: DispatchRecord;
+}
+
+export async function dispatch(
+  options: DispatchOptions,
+  run: Runner = spawnRunner,
+  pause: Pause = Bun.sleep,
+  probe: Probe = probeWorktreeAdmin,
+  resolve: ResolveRepo = resolveRepo,
+): Promise<DispatchResult> {
+  validate(options);
+  if (options.host != null) return dispatchRemote(options, options.host, run, pause);
+
+  // A herdr name already bound would fail agent start after the worktree
+  // exists, so the live names are read before anything is created.
+  const taken =
+    options.mux === "herdr"
+      ? agentNames(await requiredJson(run, ["herdr", "agent", "list"], AgentList, null))
+      : new Set<string>();
+  const wanted = options.name ?? deriveName(options.branch, taken);
+  if (taken.has(wanted))
+    throw new DispatchError(
+      `agent name ${JSON.stringify(wanted)} is already bound to a live agent`,
+      null,
+    );
+
+  const { root, path, partial } = await prepareWorktree(
+    options,
+    { name: wanted, mux: options.mux, title: titleOf(options), place: placeOf(options) },
+    run,
+    pause,
+    probe,
+    resolve,
+  );
+  try {
+    const ctx: Context = { run, pause, options, partial, path };
+    const launch = { rex: launchRex, herdr: launchHerdr, bg: launchBackground }[options.mux];
+    await launch(ctx);
+    partial.status = await awaitStatus(localPoll(ctx), pause, options.timeout);
+    return { root, record: partial };
+  } catch (error) {
+    if (error instanceof DispatchError) error.root ??= root;
+    throw error;
+  }
+}
+
+async function fetchBase(
+  run: Runner,
+  root: string,
+  remotes: ReadonlySet<string>,
+  base: string,
+): Promise<void> {
+  const remote = baseRemote(remotes, base);
+  if (remote == null) return;
+  const url = await required(run, ["git", "-C", root, "remote", "get-url", remote], null);
+  const fetchOptions: RunOptions = {
+    timeoutMs: FETCH_TIMEOUT_MS,
+    env: { GIT_TERMINAL_PROMPT: "0" },
+  };
+  const args = fetchArgs(remote, url.stdout);
+  // Without an HTTPS credential, a private repository is reachable only over the remote's own URL.
+  const https =
+    args.length > 1 ? await run(["git", "-C", root, "fetch", ...args], fetchOptions) : null;
+  if (https?.code !== 0)
+    await required(run, ["git", "-C", root, "fetch", remote], null, fetchOptions);
+}
+
+async function branchExists(
+  run: Runner,
+  root: string,
+  remotes: ReadonlySet<string>,
+  branch: string,
+): Promise<boolean> {
+  const listed = await required(
+    run,
+    [
+      "git",
+      "-C",
+      root,
+      "for-each-ref",
+      "--format=%(refname)",
+      `refs/heads/${branch}`,
+      `refs/remotes/*/${branch}`,
+    ],
+    null,
+  );
+  // A pattern also matches refs beneath it, so only an exact name counts.
+  const wanted = new Set([
+    `refs/heads/${branch}`,
+    ...[...remotes].map((remote) => `refs/remotes/${remote}/${branch}`),
+  ]);
+  return listed.stdout.split("\n").some((line) => wanted.has(line.trim()));
+}
+
+// A fork's own main lags its parent, so a checkout with an upstream remote
+// branches from the parent's default branch.
+async function defaultBase(
+  run: Runner,
+  root: string,
+  remotes: ReadonlySet<string>,
+): Promise<string> {
+  if (!remotes.has("upstream")) return "origin/main";
+  const head = await run([
+    "git",
+    "-C",
+    root,
+    "symbolic-ref",
+    "--short",
+    "refs/remotes/upstream/HEAD",
+  ]);
+  const ref = head.stdout.trim();
+  return head.code === 0 && ref !== "" ? ref : "upstream/main";
+}
+
+// The words naming what wt switch checks out. Only a branch that exists
+// nowhere is created, and only then does the base matter.
+async function switchTarget(
+  run: Runner,
+  root: string,
+  remotes: ReadonlySet<string>,
+  options: WorktreeOptions,
+): Promise<string[]> {
+  if (CHANGE_PATTERN.test(options.branch)) return [options.branch];
+  // A local branch needs nothing from the network.
+  if (await branchExists(run, root, new Set(), options.branch)) return [options.branch];
+  const base = options.base ?? (await defaultBase(run, root, remotes));
+  await fetchBase(run, root, remotes, base);
+  if (await branchExists(run, root, remotes, options.branch)) return [options.branch];
+
+  const verified = await run(["git", "-C", root, "rev-parse", "--verify", "--quiet", base]);
+  if (verified.code !== 0)
+    throw new DispatchError(`base ${JSON.stringify(base)} names no commit in ${root}`, null);
+  return ["--create", options.branch, "--base", base];
+}
+
+function checkoutOf(switched: z.infer<typeof WtSwitched>): Checkout {
+  if (switched.action === "existing") return "existing-worktree";
+  return switched.created_branch === true ? "new-branch" : "existing-branch";
+}
+
+// Resolves to why the repository's worktree admin directory refuses writes,
+// or null when it accepts them.
+export type Probe = (root: string) => Promise<string | null>;
+
+const DENIED = new Set(["EPERM", "EACCES", "EROFS"]);
+
+// The sandbox makes .git/worktrees read-only, so git worktree add fails only
+// after wt has created the branch. Any other error is left for wt to report.
+export const probeWorktreeAdmin: Probe = async (root) => {
+  const common = await spawnRunner([
+    "git",
+    "-C",
+    root,
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-common-dir",
+  ]);
+  if (common.code !== 0) return null;
+  const admin = join(common.stdout.trim(), "worktrees");
+  try {
+    await mkdir(admin, { recursive: true });
+    await rm(await mkdtemp(join(admin, ".dispatch-probe-")), { recursive: true });
+    return null;
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? error.code : null;
+    if (typeof code !== "string" || !DENIED.has(code)) return null;
+    return `${admin} is not writable, so this ran inside the Claude Code sandbox. ${BARE_COMMAND}`;
+  }
+};
+
+type Launch = Pick<DispatchRecord, "name" | "mux" | "title" | "place">;
+
+async function prepareWorktree(
+  options: WorktreeOptions,
+  launch: Launch,
+  run: Runner,
+  pause: Pause,
+  probe: Probe,
+  resolve: ResolveRepo,
+): Promise<Prepared> {
+  let repo: string;
+  try {
+    repo = await resolve(options.repo, run);
+  } catch (error) {
+    throw new DispatchError(error instanceof Error ? error.message : String(error), null);
+  }
+  // The porcelain listing puts the main worktree first whatever the
+  // repository's git layout, and wt runs from there.
+  const listing = await required(run, ["git", "-C", repo, "worktree", "list", "--porcelain"], null);
+  const root = listing.stdout
+    .split("\n")
+    .find((line) => line.startsWith("worktree "))
+    ?.slice("worktree ".length)
+    .trim();
+  if (root == null || root === "")
+    throw new DispatchError(`git named no worktree for ${repo}`, null);
+
+  try {
+    const denied = await probe(root);
+    if (denied != null) throw new DispatchError(denied, null);
+    const listedRemotes = await required(run, ["git", "-C", root, "remote"], null);
+    const remotes = new Set(
+      listedRemotes.stdout
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== ""),
+    );
+    const target = await switchTarget(run, root, remotes, options);
+
+    const locked = retryConfigLock(run, options.timeout, pause);
+    const switched = await requiredJson(
+      locked,
+      ["wt", "-C", root, "switch", ...target, "--no-cd", "--yes", "--format=json"],
+      WtSwitched,
+      null,
+    );
+    const path = switched.path;
+
+    // Everything past here has a worktree behind it, so a failure carries the
+    // record forward rather than leaving the checkout orphaned without a trace.
+    const partial: DispatchRecord = {
+      mux: launch.mux,
+      target: null,
+      host: null,
+      name: launch.name,
+      title: launch.title,
+      place: launch.place,
+      path,
+      branch: switched.branch ?? options.branch,
+      session: null,
+      status: "unknown",
+      settings: [],
+      checkout: checkoutOf(switched),
+    };
+
+    const submoduleError = await initSubmodules(run, path);
+    if (submoduleError != null) partial.submoduleError = submoduleError;
+    partial.settings = await writeSettings(run, path, options.settings ?? {}, partial);
+    return { root, path, partial };
+  } catch (error) {
+    if (error instanceof DispatchError) error.root ??= root;
+    throw error;
+  }
+}
+
+export type Start = (argv: readonly string[], cwd: string) => Promise<number>;
+
+const inheritStart: Start = async (argv, cwd) =>
+  Bun.spawn([...argv], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" }).exited;
+
+export interface ExecOptions extends WorktreeOptions {
+  prompt: string;
+  name: string;
+}
+
+// The far side of --host. It owns the terminal rex opened, and Remote Control
+// puts the session in the caller's ListAgents.
+export async function execSession(
+  options: ExecOptions,
+  run: Runner = spawnRunner,
+  pause: Pause = Bun.sleep,
+  start: Start = inheritStart,
+  probe: Probe = probeWorktreeAdmin,
+  resolve: ResolveRepo = resolveRepo,
+): Promise<number> {
+  validateCommon(options);
+  const { path, partial } = await prepareWorktree(
+    options,
+    { name: options.name, mux: "rex", title: deriveTitle(options.branch), place: "tab" },
+    run,
+    pause,
+    probe,
+    resolve,
+  );
+  process.stdout.write(`dispatch worktree: ${path}\ndispatch branch: ${partial.branch}\n`);
+  if (partial.submoduleError != null)
+    process.stderr.write(`warning: submodules were not initialized: ${partial.submoduleError}\n`);
+  return start(
+    ["claude", ...claudeArgs(options.name, options.prompt, ["--remote-control", options.name])],
+    path,
+  );
+}
+
+async function readPrompt(path: string | undefined): Promise<string> {
+  if (path == null || path === "") return Bun.stdin.text();
+  return Bun.file(path)
+    .text()
+    .catch((error: unknown) => {
+      const reason = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`cannot read the prompt at ${path}: ${reason}\n`);
+      process.exit(2);
+    });
+}
+
+function inspectHint(record: DispatchRecord): string {
+  if (record.mux === "rex" && record.host != null)
+    return `rex -S ${record.host} capture -b ${record.target ?? "<block>"} --trim`;
+  if (record.mux === "rex") return `rex capture -b ${record.target ?? "<block>"} --trim`;
+  if (record.mux === "bg") return `claude logs ${record.target ?? record.name}`;
+  return `herdr agent read ${record.name}`;
+}
+
+if (import.meta.main && process.argv[2] === "sessions") {
+  await createSessionsCommand(spawnRunner).parseAsync(process.argv.slice(3), { from: "user" });
+} else if (import.meta.main) {
+  const argv = cli({
+    name: "dispatch",
+    help: {
+      description:
+        "Check out a branch, PR, or MR in a worktree with wt, write its local Claude settings, and start `claude --name <name> <prompt>` in a new Rex tab or herdr workspace. The repository's own checkout is never moved.",
+    },
+    flags: {
+      repo: {
+        type: String,
+        default: process.cwd(),
+        description:
+          "Repository to branch from: a path, an owner/name slug, or a GitHub URL. A missing checkout is cloned to ~/src/<upstream owner>/<name>, through your fork when you cannot push upstream",
+      },
+      branch: {
+        type: String,
+        description:
+          "Branch for the session, created when it exists nowhere, or a pr:<n>, mr:<n>, or PR/MR URL (required)",
+      },
+      prompt: { type: String, description: "File holding the prompt; reads stdin when absent" },
+      name: { type: String, description: "Session name; derived from the branch when absent" },
+      title: {
+        type: String,
+        description:
+          "Rex tab or pane label, two to four Title Case words naming the task; derived from the branch when absent",
+      },
+      keepOpen: {
+        type: Boolean,
+        default: false,
+        description: "Leave out the prompt's instruction to run dispatch:close once the PR is open",
+      },
+      base: {
+        type: String,
+        description:
+          "Ref a newly created branch starts from; defaults to the upstream remote's default branch when the checkout has one, origin/main otherwise",
+      },
+      mux: {
+        type: String,
+        description: `rex, herdr, or bg (claude --bg); ${describeMuxDefault(process.env)}`,
+      },
+      session: {
+        type: String,
+        description: "Rex session ID or label for the new tab; defaults to this pane's session",
+      },
+      split: {
+        type: Boolean,
+        default: false,
+        description:
+          "Rex only: open a pane in this tab, beside the current block at 160 columns or more and below it otherwise, instead of a new tab",
+      },
+      allow: {
+        type: [String],
+        description: "Permission rule for permissions.allow (repeatable)",
+      },
+      sandboxWrite: {
+        type: [String],
+        description: "Path for sandbox.filesystem.allowWrite (repeatable)",
+      },
+      settingsJson: {
+        type: String,
+        description: "JSON file deep-merged into the worktree's .claude/settings.local.json",
+      },
+      host: {
+        type: String,
+        description:
+          "Rex only: saved host label (`rex hosts list`) to run the session on; --repo is a path there",
+      },
+      exec: {
+        type: Boolean,
+        default: false,
+        description:
+          "Internal: the --host side. Prepare the worktree here and run claude in the foreground",
+      },
+      promptBase64: { type: String, description: "Internal: --exec prompt, base64" },
+      settingsBase64: { type: String, description: "Internal: --exec settings JSON, base64" },
+      dataDir: {
+        type: String,
+        description: "Dispatch ledger directory; defaults to the plugin data dir",
+      },
+      timeout: {
+        type: Number,
+        default: 30_000,
+        description: "Milliseconds to wait for the session to start working",
+      },
+    },
+  });
+
+  // The caller's poll reads this screen, so every failure prints its marker.
+  if (argv.flags.exec) {
+    try {
+      const { branch, name, promptBase64, settingsBase64 } = argv.flags;
+      if (branch == null || branch === "") throw new Error("--branch is required");
+      if (name == null || name === "") throw new Error("--name is required");
+      if (promptBase64 == null) throw new Error("--prompt-base64 is required");
+      const settings =
+        settingsBase64 == null
+          ? {}
+          : parseSettings(decodeArg(settingsBase64, "--settings-base64"), "--settings-base64");
+      process.exit(
+        await execSession({
+          repo: argv.flags.repo,
+          branch,
+          base: argv.flags.base,
+          timeout: argv.flags.timeout,
+          name,
+          prompt: decodeArg(promptBase64, "--prompt-base64"),
+          settings,
+        }),
+      );
+    } catch (error) {
+      process.stdout.write(
+        `dispatch failed: ${error instanceof Error ? error.message.trim() : String(error)}\n`,
+      );
+      if (error instanceof DispatchError && error.partial != null)
+        process.stdout.write(`${formatRecord(error.partial)}\n`);
+      process.exit(1);
+    }
+  }
+
+  if (argv.flags.branch == null || argv.flags.branch === "") {
+    process.stderr.write("--branch is required\n");
+    argv.showHelp();
+    process.exit(2);
+  }
+
+  if (!Number.isFinite(argv.flags.timeout) || argv.flags.timeout <= 0) {
+    process.stderr.write("--timeout must be a positive number of milliseconds\n");
+    process.exit(2);
+  }
+
+  const muxFlag = z.enum(MUXES).optional().safeParse(argv.flags.mux);
+  if (!muxFlag.success) {
+    process.stderr.write(`--mux must be one of ${MUXES.join(", ")}\n`);
+    process.exit(2);
+  }
+  let mux: Mux;
+  try {
+    mux = muxFlag.data ?? detectMux(process.env);
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(2);
+  }
+
+  let settings: Settings;
+  try {
+    const extra =
+      argv.flags.settingsJson == null
+        ? {}
+        : parseSettings(await Bun.file(argv.flags.settingsJson).text(), argv.flags.settingsJson);
+    settings = mergeSettings(extra, settingsPatch(argv.flags.allow, argv.flags.sandboxWrite));
+  } catch (error) {
+    process.stderr.write(
+      `cannot read --settings-json: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exit(2);
+  }
+
+  const prompt = await readPrompt(argv.flags.prompt);
+  if (prompt.trim() === "") {
+    process.stderr.write("the prompt is empty; pass --prompt <file> or pipe it on stdin\n");
+    process.exit(2);
+  }
+  const sender = await readSender(process.env);
+  // This pane's session is on this machine, never the host's.
+  const rexSessionValue =
+    argv.flags.session ??
+    (argv.flags.host == null && mux === "rex"
+      ? await currentSession(process.env, spawnRunner)
+      : undefined);
+  const rexSession =
+    mux === "rex" && rexSessionValue != null && rexSessionValue !== "" && argv.flags.host == null
+      ? await resolveSessionLabel(spawnRunner, rexSessionValue)
+      : undefined;
+
+  // The session is already running and the caller needs its identifiers, so a
+  // ledger failure warns rather than failing the dispatch.
+  const writeLedger = (
+    record: DispatchRecord,
+    repo: string,
+    outcome: "dispatched" | "orphaned" | "failed",
+  ) => {
+    try {
+      const row: DispatchLedgerRow = {
+        ts: new Date().toISOString(),
+        task: taskSummary(prompt),
+        repo,
+        branch: record.branch,
+        path: record.path,
+        mux: record.mux,
+        target: record.target,
+        host: record.host,
+        name: record.name,
+        title: record.title,
+        place: record.place,
+        session: record.session,
+        sender: sender?.name ?? null,
+        outcome,
+      };
+      if (rexSession != null) row.rexSession = rexSession;
+      appendDispatch(row, resolveDataDir(argv.flags.dataDir));
+    } catch (error) {
+      process.stderr.write(
+        `warning: dispatch ledger not written: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
+  };
+
+  try {
+    const { record, root } = await dispatch({
+      repo: argv.flags.repo,
+      branch: argv.flags.branch,
+      prompt: withSender(prompt, sender, !argv.flags.keepOpen && mux !== "bg"),
+      name: argv.flags.name,
+      title: argv.flags.title,
+      base: argv.flags.base,
+      timeout: argv.flags.timeout,
+      mux,
+      split: argv.flags.split,
+      rexSession: rexSessionValue,
+      host: argv.flags.host,
+      rexBlock: process.env.REX_BLOCK,
+      settings,
+    });
+
+    if (record.submoduleError != null)
+      process.stderr.write(
+        `warning: submodules in ${record.path} were not initialized: ${record.submoduleError}\n`,
+      );
+    if (record.status !== "working")
+      process.stderr.write(
+        `warning: ${record.name} is ${record.status} after ${argv.flags.timeout}ms. Read its screen with \`${inspectHint(record)}\`.\n`,
+      );
+
+    writeLedger(record, root, "dispatched");
+    process.stdout.write(`${formatRecord(record)}\n`);
+  } catch (error) {
+    if (!(error instanceof DispatchError)) throw error;
+    process.stderr.write(error.message.endsWith("\n") ? error.message : `${error.message}\n`);
+    // The record reaches the caller before the ledger is touched, so a ledger
+    // failure cannot cost them the only copy of it.
+    if (error.partial != null) {
+      process.stderr.write(`${formatRecord(error.partial)}\n`);
+      // A worktree that predates the dispatch still has an owner.
+      const outcome = error.partial.checkout === "existing-worktree" ? "failed" : "orphaned";
+      writeLedger(error.partial, error.root ?? argv.flags.repo, outcome);
+    }
+    process.exit(1);
+  }
+}

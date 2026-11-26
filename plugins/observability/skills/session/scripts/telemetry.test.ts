@@ -122,13 +122,10 @@ describe("classifier query", () => {
         "dropped-allow-rule | Bash(python3 *) | .claude/settings.local.json | 1 |  |  | ",
         "permission-decision | Bash |  | 1 | 1510 | 1510 | 1510",
         "permission-decision | Read |  | 1 | 0 | 0 | 0",
-        "verdict | allow | ok | 1 | 12 | 12 | 12",
-        "verdict | ask | automode-blocked | 1 | 10100 | 10100 | 10100",
-        "verdict | ask | automode-unavailable | 1 | 30500 | 30500 | 30500",
-        "verdict | ask | user-rejected | 1 | 1600 | 1600 | 1600",
       ]
     `);
-  });
+    // Indexing from empty can download the community extensions on a cold runner.
+  }, 60_000);
 });
 
 describe("telemetry ingest", () => {
@@ -221,62 +218,6 @@ describe("telemetry ingest", () => {
     await rm(debugDir, { recursive: true });
     await reindex();
     expect(await count("SELECT COUNT(*) AS n FROM debug_events")).toBe(1);
-  });
-
-  it("reads the mod's verdict events", async () => {
-    const { modEventsDir, reindex } = layout();
-    const base = makeModRecord({
-      mod: "auto-mode",
-      event_name: "auto-mode.tool.verdict",
-      ok: false,
-      durationMs: 40,
-    });
-    const verdict = {
-      ...base,
-      attributes: {
-        ...base.attributes,
-        tool_use_id: "t1",
-        tool: "Bash",
-        decision: "ask",
-        hook: "PreToolUse",
-        setting: "permissions.blockReadsOutsideWorkingDirectories",
-        decider: "host",
-        ceiling: "ask",
-        read_only: true,
-        outcome: "deny",
-      },
-    };
-    await Bun.write(
-      join(modEventsDir, "s1", "auto-mode.1.0.jsonl"),
-      `${JSON.stringify(verdict)}\n`,
-    );
-    await reindex();
-
-    const verdicts = await db.query(
-      "SELECT tool_use_id, hook, setting, decider, ceiling, read_only, duration_ms, outcome FROM classifier_verdicts",
-      z.object({
-        tool_use_id: z.string(),
-        hook: z.string().nullable(),
-        setting: z.string().nullable(),
-        decider: z.string().nullable(),
-        ceiling: z.string().nullable(),
-        read_only: z.boolean().nullable(),
-        duration_ms: z.bigint().nullable(),
-        outcome: z.string().nullable(),
-      }),
-    );
-    expect(verdicts).toEqual([
-      {
-        tool_use_id: "t1",
-        hook: "PreToolUse",
-        setting: "permissions.blockReadsOutsideWorkingDirectories",
-        decider: "host",
-        ceiling: "ask",
-        read_only: true,
-        duration_ms: 40n,
-        outcome: "deny",
-      },
-    ]);
   });
 });
 

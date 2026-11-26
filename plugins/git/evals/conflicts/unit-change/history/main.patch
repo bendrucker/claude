@@ -1,0 +1,84 @@
+diff --git a/src/cache.ts b/src/cache.ts
+index 2e55fa8..e18fb11 100644
+--- a/src/cache.ts
++++ b/src/cache.ts
+@@ -1,5 +1,5 @@
+ import { waitFor, type Wait } from "./wait";
+ 
+ export function warmCache(ready: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
+-  return wait(ready, { timeout: 30 });
++  return wait(ready, { timeout: 30_000 });
+ }
+diff --git a/src/deploy.ts b/src/deploy.ts
+index e2f6d2f..059f863 100644
+--- a/src/deploy.ts
++++ b/src/deploy.ts
+@@ -1,5 +1,5 @@
+ import { waitFor, type Wait } from "./wait";
+ 
+ export function waitForDeploy(ready: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
+-  return wait(ready, { timeout: 30 });
++  return wait(ready, { timeout: 30_000 });
+ }
+diff --git a/src/queue.ts b/src/queue.ts
+index 73b03a7..3ae581e 100644
+--- a/src/queue.ts
++++ b/src/queue.ts
+@@ -1,5 +1,5 @@
+ import { waitFor, type Wait } from "./wait";
+ 
+ export function waitForQueue(ready: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
+-  return wait(ready, { timeout: 30 });
++  return wait(ready, { timeout: 30_000 });
+ }
+diff --git a/src/server.ts b/src/server.ts
+index 61bfa4b..b64e89d 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -1,5 +1,5 @@
+ import { waitFor, type Wait } from "./wait";
+ 
+ export function waitForServer(ready: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
+-  return wait(ready, { timeout: 30 });
++  return wait(ready, { timeout: 30_000 });
+ }
+diff --git a/src/wait.test.ts b/src/wait.test.ts
+index 35b3adc..6ddf05f 100644
+--- a/src/wait.test.ts
++++ b/src/wait.test.ts
+@@ -15,11 +15,11 @@ function fakeClock(): Clock & { t: number } {
+ test("resolves true once the check passes", async () => {
+   const clock = fakeClock();
+   let calls = 0;
+-  expect(await waitFor(() => ++calls === 3, { timeout: 10, clock })).toBe(true);
++  expect(await waitFor(() => ++calls === 3, { timeout: 10_000, clock })).toBe(true);
+ });
+ 
+ test("gives up after the timeout", async () => {
+   const clock = fakeClock();
+-  expect(await waitFor(() => false, { timeout: 2, interval: 500, clock })).toBe(false);
++  expect(await waitFor(() => false, { timeout: 2000, interval: 500, clock })).toBe(false);
+   expect(clock.t).toBe(2000);
+ });
+diff --git a/src/wait.ts b/src/wait.ts
+index 12e73c4..00e14ef 100644
+--- a/src/wait.ts
++++ b/src/wait.ts
+@@ -9,7 +9,7 @@ export const systemClock: Clock = {
+ };
+ 
+ export interface WaitOptions {
+-  /** Seconds to keep checking before giving up. */
++  /** Milliseconds to keep checking before giving up. */
+   timeout: number;
+   /** Milliseconds between checks. */
+   interval?: number;
+@@ -22,7 +22,7 @@ export type Wait = (check: () => boolean | Promise<boolean>, options: WaitOption
+ export const waitFor: Wait = async (check, options) => {
+   const clock = options.clock ?? systemClock;
+   const interval = options.interval ?? 500;
+-  const deadline = clock.now() + options.timeout * 1000;
++  const deadline = clock.now() + options.timeout;
+   while (true) {
+     if (await check()) return true;
+     if (clock.now() >= deadline) return false;

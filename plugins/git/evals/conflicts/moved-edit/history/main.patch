@@ -1,0 +1,184 @@
+diff --git a/src/lcov.test.ts b/src/lcov.test.ts
+index 4ebe5c3..544c75e 100644
+--- a/src/lcov.test.ts
++++ b/src/lcov.test.ts
+@@ -1,26 +1,18 @@
+ import { describe, expect, test } from "bun:test";
+-import { lineCoverage, parseLcov, totalCoverage } from "./lcov";
++import { functionCoverage, lineCoverage, totalCoverage } from "./lcov";
++import { parseLcov } from "./reader";
+ 
+ const sample = "SF:src/a.ts\nDA:1,1\nDA:2,0\nFNF:2\nFNH:1\nend_of_record\n";
+ 
+-describe("parseLcov", () => {
+-  test("reads a record", () => {
+-    const [fc] = parseLcov(sample);
+-    expect(fc.file).toBe("src/a.ts");
+-    expect(fc.lineHits.get(2)).toBe(0);
+-    expect(fc.functionsFound).toBe(2);
+-  });
+-
+-  test("ignores lines outside a record", () => {
+-    expect(parseLcov("DA:1,1\n")).toEqual([]);
+-  });
+-});
+-
+ describe("coverage", () => {
+   test("lineCoverage", () => {
+     expect(lineCoverage(parseLcov(sample)[0]).pct).toBe(50);
+   });
+ 
++  test("functionCoverage", () => {
++    expect(functionCoverage(parseLcov(sample)[0])).toBe(50);
++  });
++
+   test("totalCoverage", () => {
+     expect(totalCoverage(parseLcov(sample))).toBe(50);
+   });
+diff --git a/src/lcov.ts b/src/lcov.ts
+index c5b366f..51f95c1 100644
+--- a/src/lcov.ts
++++ b/src/lcov.ts
+@@ -1,4 +1,4 @@
+-// Minimal lcov reader. lcov is a line-based format:
++// Coverage math over parsed lcov records. Parsing lives in `reader.ts`. lcov is a line-based format:
+ //   SF:<source file>
+ //   FNF:<functions found>  FNH:<functions hit>
+ //   DA:<line>,<execution count>
+@@ -17,60 +17,37 @@ export function coveredLines(fc: FileCoverage): number[] {
+   return [...fc.lineHits.entries()]
+     .filter(([, hits]) => hits > 0)
+     .map(([line]) => line)
+-    .sort((a, b) => a - b);
++    .toSorted((a, b) => a - b);
+ }
+ 
+ export function uncoveredLines(fc: FileCoverage): number[] {
+   return [...fc.lineHits.entries()]
+     .filter(([, hits]) => hits === 0)
+     .map(([line]) => line)
+-    .sort((a, b) => a - b);
++    .toSorted((a, b) => a - b);
+ }
+ 
+-export function lineCoverage(fc: FileCoverage): { total: number; covered: number; pct: number } {
++export interface LineCoverage {
++  total: number;
++  covered: number;
++  /** Percentage of executable lines covered, 0-100. 100 when there are no lines. */
++  pct: number;
++}
++
++export function lineCoverage(fc: FileCoverage): LineCoverage {
+   const total = fc.lineHits.size;
+   const covered = coveredLines(fc).length;
+   const pct = total === 0 ? 100 : (covered / total) * 100;
+   return { total, covered, pct };
+ }
+ 
+-export function parseLcov(text: string): FileCoverage[] {
+-  const records: FileCoverage[] = [];
+-  let current: FileCoverage | null = null;
+-
+-  for (const raw of text.split("\n")) {
+-    const line = raw;
+-    if (line === "") continue;
+-
+-    if (line.startsWith("SF:")) {
+-      current = {
+-        file: line.slice(3),
+-        lineHits: new Map(),
+-        functionsFound: 0,
+-        functionsHit: 0,
+-      };
+-      continue;
+-    }
+-    if (!current) continue;
+-
+-    if (line.startsWith("DA:")) {
+-      const [lineNo, count] = line.slice(3).split(",");
+-      current.lineHits.set(Number(lineNo), Number(count));
+-    } else if (line.startsWith("FNF:")) {
+-      current.functionsFound = Number(line.slice(4));
+-    } else if (line.startsWith("FNH:")) {
+-      current.functionsHit = Number(line.slice(4));
+-    } else if (line === "end_of_record") {
+-      records.push(current);
+-      current = null;
+-    }
+-  }
+-  return records;
+-}
+-
+ export function totalCoverage(records: FileCoverage[]): number {
+   const all = records.map(lineCoverage);
+   const total = all.reduce((n, c) => n + c.total, 0);
+   const covered = all.reduce((n, c) => n + c.covered, 0);
+   return total === 0 ? 100 : (covered / total) * 100;
+ }
++
++export function functionCoverage(fc: FileCoverage): number {
++  return fc.functionsFound === 0 ? 100 : (fc.functionsHit / fc.functionsFound) * 100;
++}
+diff --git a/src/reader.test.ts b/src/reader.test.ts
+new file mode 100644
+index 0000000..209ea60
+--- /dev/null
++++ b/src/reader.test.ts
+@@ -0,0 +1,15 @@
++import { describe, expect, test } from "bun:test";
++import { parseLcov } from "./reader";
++
++describe("parseLcov", () => {
++  test("reads a record", () => {
++    const [fc] = parseLcov("SF:src/a.ts\nDA:1,1\nDA:2,0\nFNF:2\nFNH:1\nend_of_record\n");
++    expect(fc.file).toBe("src/a.ts");
++    expect(fc.lineHits.get(2)).toBe(0);
++    expect(fc.functionsFound).toBe(2);
++  });
++
++  test("ignores lines outside a record", () => {
++    expect(parseLcov("DA:1,1\n")).toEqual([]);
++  });
++});
+diff --git a/src/reader.ts b/src/reader.ts
+new file mode 100644
+index 0000000..2d00161
+--- /dev/null
++++ b/src/reader.ts
+@@ -0,0 +1,35 @@
++import type { FileCoverage } from "./lcov";
++
++export function parseLcov(text: string): FileCoverage[] {
++  const records: FileCoverage[] = [];
++  let current: FileCoverage | null = null;
++
++  for (const raw of text.split("\n")) {
++    const line = raw;
++    if (line === "") continue;
++
++    if (line.startsWith("SF:")) {
++      current = {
++        file: line.slice(3),
++        lineHits: new Map(),
++        functionsFound: 0,
++        functionsHit: 0,
++      };
++      continue;
++    }
++    if (!current) continue;
++
++    if (line.startsWith("DA:")) {
++      const [lineNo, count] = line.slice(3).split(",");
++      current.lineHits.set(Number(lineNo), Number(count));
++    } else if (line.startsWith("FNF:")) {
++      current.functionsFound = Number(line.slice(4));
++    } else if (line.startsWith("FNH:")) {
++      current.functionsHit = Number(line.slice(4));
++    } else if (line === "end_of_record") {
++      records.push(current);
++      current = null;
++    }
++  }
++  return records;
++}

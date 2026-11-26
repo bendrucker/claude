@@ -1,0 +1,30 @@
+package ledger
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+// ParseCents converts a decimal string such as "12.50" to cents.
+func ParseCents(s string) (int, error) {
+	whole, frac, found := strings.Cut(strings.TrimSpace(s), ".")
+	if !found {
+		frac = "00"
+	}
+	if len(frac) != 2 {
+		return 0, fmt.Errorf("want two decimal places in %q", s)
+	}
+	w, err := strconv.Atoi(whole)
+	if err != nil {
+		return 0, err
+	}
+	f, err := strconv.Atoi(frac)
+	if err != nil {
+		return 0, err
+	}
+	if strings.HasPrefix(whole, "-") {
+		f = -f
+	}
+	return w*100 + f, nil
+}

@@ -352,6 +352,8 @@ export interface ThingsClient {
   requireTags: TagRequirer;
   /** Waits out the URL scheme's rate limit between batches. */
   pace(ms: number): Promise<void>;
+  /** Moves todos to the Trash through Apple Events, the URL scheme having no delete. */
+  deleteTodos(ids: string[]): Promise<void>;
 }
 
 const defaultClient: ThingsClient = {
@@ -359,6 +361,9 @@ const defaultClient: ThingsClient = {
   dispatch,
   requireTags,
   pace: Bun.sleep,
+  deleteTodos: async (ids) => {
+    await runScript("delete-todos.js", ids);
+  },
 };
 
 export function registerTools(server: McpServer, client: ThingsClient = defaultClient): void {
@@ -787,6 +792,21 @@ export function registerTools(server: McpServer, client: ThingsClient = defaultC
       return jsonResult(
         await reorder(list, ids, (command, params) => client.dispatch(command, params)),
       );
+    },
+  );
+
+  server.registerTool(
+    "delete_todos",
+    {
+      title: "Delete todos",
+      description:
+        "Move todos to the Trash, where they stay recoverable until it is emptied. An unknown id fails the call with nothing deleted. Prefer update_todos with canceled to keep a todo in the logbook; delete only what should leave no record.",
+      inputSchema: { ids: todoIds },
+      annotations: { destructiveHint: true },
+    },
+    async ({ ids }) => {
+      await client.deleteTodos(ids);
+      return textResult(`Moved ${ids.length} todo${ids.length === 1 ? "" : "s"} to the Trash`);
     },
   );
 }

@@ -1,0 +1,32 @@
+# evidence: assistant replies open with "I understand" as a preamble before the substance, a marker of sycophantic filler.
+# retire when: corrective-feedback moments stop citing sycophantic preambles, or the phrase stops appearing in assistant output.
+extends: existence
+message: "'%s' is a sycophantic preamble. Move to the substance."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/IUnderstand.yml
+level: warning
+ignorecase: true
+tokens:
+  - 'I\s+understand'
+tests:
+  - name: positive issue
+    about: issue
+    input: |
+      I understand the issue.
+    want: |
+      1:1:Writing.IUnderstand:'I understand' is a sycophantic preamble. Move to the substance.
+  - name: positive concern
+    about: concern
+    input: |
+      I understand your concern.
+    want: |
+      1:1:Writing.IUnderstand:'I understand' is a sycophantic preamble. Move to the substance.
+  - name: negative question
+    about: question
+    input: |
+      Do you understand the issue?
+    want: ""
+  - name: negative other subject
+    about: other subject
+    input: |
+      The system understands the input.
+    want: ""

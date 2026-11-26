@@ -1,0 +1,2 @@
+claude --bg --name config-file -- <prompt>
+launch config-file /tmp/eval/cwd/.worktrees/config-file place=bg

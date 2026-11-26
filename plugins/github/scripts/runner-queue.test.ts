@@ -2,12 +2,12 @@ import { describe, expect, test } from "bun:test";
 import {
   type Api,
   formatQueue,
-  invokesWorkflowRun,
   type Job,
   parseRunUrl,
   processInput,
   queueFor,
   type Run,
+  type Stage,
 } from "./runner-queue";
 
 const NOW = Date.parse("2026-10-22T17:00:00Z");
@@ -63,19 +63,6 @@ function fakeApi(fixture: {
   };
   return Object.assign(api, { calls });
 }
-
-describe("invokesWorkflowRun", () => {
-  test.each<[string, boolean]>([
-    ["gh workflow run session-bench.yml --ref main", true],
-    ["cd repo && gh workflow run cloud-sessions.yml", true],
-    ["gh -R bendrucker/claude workflow run eval.yml -f suite=x", true],
-    ["gh run view 123", false],
-    ["gh workflow list", false],
-    ["echo gh workflow running", false],
-  ])("%p -> %p", (command, expected) => {
-    expect(invokesWorkflowRun(command)).toBe(expected);
-  });
-});
 
 describe("parseRunUrl", () => {
   test("reads the run URL gh prints after a dispatch", () => {
@@ -168,30 +155,53 @@ describe("queueFor", () => {
 });
 
 describe("processInput", () => {
-  const input = (command: string, stdout: string) => ({
-    tool_input: { command },
-    tool_response: { stdout, stderr: "" },
-  });
+  const URL = "https://github.com/bendrucker/claude/actions/runs/3";
 
-  test("ignores commands other than a dispatch", async () => {
-    const api = fakeApi({ jobs: {} });
-    const url = "https://github.com/bendrucker/claude/actions/runs/3";
-    expect(await processInput(input("gh run view 3", url), api, NOW, 0)).toBeNull();
-    expect(await processInput(input("gh workflow run x.yml", ""), api, NOW, 0)).toBeNull();
-    expect(api.calls).toEqual([]);
-  });
-
-  test("emits the queue as PostToolUse context", async () => {
-    const api = fakeApi({ jobs: { 3: [job(3, "queued")] } });
+  async function staged(command: string, stdout: string, api: Api) {
+    const stages: Stage[] = [];
     const output = await processInput(
-      input(
-        "gh workflow run cloud-sessions.yml",
-        "https://github.com/bendrucker/claude/actions/runs/3",
-      ),
+      { tool_input: { command }, tool_response: { stdout, stderr: "" } },
+      (stage) => {
+        stages.push(stage);
+      },
       api,
       NOW,
       0,
     );
+    return { output, stages };
+  }
+
+  test("records no-match for a command that does not dispatch", async () => {
+    const api = fakeApi({ jobs: {} });
+    expect(await staged("gh run view 3", URL, api)).toEqual({ output: null, stages: ["no-match"] });
+    expect(await staged('git commit -m "gh workflow run x.yml"', URL, api)).toEqual({
+      output: null,
+      stages: ["no-match"],
+    });
+    expect(api.calls).toEqual([]);
+  });
+
+  test("records no-url when the dispatch printed no run URL", async () => {
+    const api = fakeApi({ jobs: {} });
+    expect(await staged("gh workflow run x.yml", "", api)).toEqual({
+      output: null,
+      stages: ["no-url"],
+    });
+    expect(api.calls).toEqual([]);
+  });
+
+  test("records started when no job waits on a self-hosted runner", async () => {
+    const api = fakeApi({ jobs: { 3: [job(3, "queued", { labels: ["ubuntu-latest"] })] } });
+    expect(await staged("gh workflow run x.yml", URL, api)).toEqual({
+      output: null,
+      stages: ["started"],
+    });
+  });
+
+  test("records queued and emits the queue as PostToolUse context", async () => {
+    const api = fakeApi({ jobs: { 3: [job(3, "queued")] } });
+    const { output, stages } = await staged("gh workflow run cloud-sessions.yml", URL, api);
+    expect(stages).toEqual(["queued"]);
     expect(output?.hookSpecificOutput).toMatchObject({ hookEventName: "PostToolUse" });
   });
 });

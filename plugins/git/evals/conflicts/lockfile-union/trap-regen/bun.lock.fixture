@@ -1,0 +1,34 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "union",
+    },
+    "packages/api": {
+      "name": "@union/api",
+      "dependencies": {
+        "yaml": "^2.8.0",
+        "zod": "^4.4.3",
+      },
+    },
+    "packages/web": {
+      "name": "@union/web",
+      "dependencies": {
+        "yaml": "~2.7.0",
+        "zod": "^4.4.3",
+      },
+    },
+  },
+  "packages": {
+    "@union/api": ["@union/api@workspace:packages/api"],
+
+    "@union/web": ["@union/web@workspace:packages/web"],
+
+    "yaml": ["yaml@2.9.1", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw=="],
+
+    "zod": ["zod@4.6.7", "", {}, "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="],
+
+    "@union/web/yaml": ["yaml@2.7.1", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-10ULxpnOCQXxJvBgxsn9ptjq6uviG/htZKk9veJGhlqn3w/DxQ631zFF+nlQXLwmImeS5amR2dl2U8sg6U9jsQ=="],
+  }
+}

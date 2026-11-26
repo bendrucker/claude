@@ -86,6 +86,7 @@ pulled("plants", () => {
         "grader-edit": [".eval-stubs", "evals"],
         unregistered: [".eval-stubs"],
         "holdout-fell": ["runs"],
+        "holdout-unstarred": [".eval-stubs", "runs"],
         versions: ["runs"],
       }[plant],
     });

@@ -1,3 +1,4 @@
+allow_tools: ["Bash(vale:*)"]
 graders:
   skill-fired: "*"
   rewrite-block: "*"

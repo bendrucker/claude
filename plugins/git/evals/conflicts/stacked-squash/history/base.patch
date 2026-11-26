@@ -1,0 +1,230 @@
+diff --git a/.claude-plugin/marketplace.json b/.claude-plugin/marketplace.json
+new file mode 100644
+index 00000000..75d7fd71
+--- /dev/null
++++ b/.claude-plugin/marketplace.json
+@@ -0,0 +1,195 @@
++{
++  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
++  "name": "bendrucker",
++  "version": "1.0.0",
++  "description": "Claude Code plugins for language support, workflows, and integrations",
++  "owner": {
++    "name": "Ben Drucker",
++    "url": "https://github.com/bendrucker"
++  },
++  "plugins": [
++    {
++      "name": "go",
++      "description": "Go language coding standards, best practices, and testing patterns",
++      "source": "./plugins/go"
++    },
++    {
++      "name": "mac",
++      "description": "macOS-specific automation, sandbox workarounds, and system integration",
++      "source": "./plugins/mac"
++    },
++    {
++      "name": "git",
++      "description": "Git workflow and branching best practices",
++      "source": "./plugins/git"
++    },
++    {
++      "name": "gitlab",
++      "description": "GitLab workflow best practices and glab CLI usage",
++      "source": "./plugins/gitlab"
++    },
++    {
++      "name": "linear",
++      "description": "Managing Linear issues, projects, and teams",
++      "source": "./plugins/linear"
++    },
++    {
++      "name": "things",
++      "description": "Interacting with Things 3 task manager for Mac",
++      "source": "./plugins/things"
++    },
++    {
++      "name": "issue",
++      "description": "Work on issues from GitHub, Linear, or GitLab",
++      "source": "./plugins/issue"
++    },
++    {
++      "name": "review",
++      "description": "Code review workflows for pull requests and the working diff",
++      "source": "./plugins/review"
++    },
++    {
++      "name": "newline",
++      "description": "POSIX-compliant trailing newline management",
++      "source": "./plugins/newline"
++    },
++    {
++      "name": "writing",
++      "description": "Style enforcement and AI trope detection for human-consumable prose",
++      "source": "./plugins/writing"
++    },
++    {
++      "name": "github",
++      "description": "GitHub workflow, Actions monitoring, and rulesets management",
++      "source": "./plugins/github"
++    },
++    {
++      "name": "classifier-telemetry",
++      "description": "Records each tool call's permission verdict and wall time so auto-mode classifier cost is measurable from the session index",
++      "source": "./plugins/classifier-telemetry"
++    },
++    {
++      "name": "claude-code",
++      "description": "Meta-tools for Claude Code configuration and customization",
++      "source": "./plugins/claude-code"
++    },
++    {
++      "name": "pull-request",
++      "description": "Pull request workflows: create, update, babysit CI, and reviewer follow-up",
++      "source": "./plugins/pull-request"
++    },
++    {
++      "name": "bun",
++      "description": "Bun runtime patterns, bunx, shell scripting, lockfile, and testing",
++      "source": "./plugins/bun"
++    },
++    {
++      "name": "research",
++      "description": "Research existing solutions when exploring a new problem space",
++      "source": "./plugins/research"
++    },
++    {
++      "name": "shortcuts",
++      "description": "Creating and running macOS Shortcuts programmatically",
++      "source": "./plugins/shortcuts"
++    },
++    {
++      "name": "type-ignore",
++      "description": "Detects and eliminates type ignores across your codebase",
++      "source": "./plugins/type-ignore"
++    },
++    {
++      "name": "x-callback-url",
++      "description": "Call x-callback-url schemes from the CLI and receive responses",
++      "source": "./plugins/x-callback-url"
++    },
++    {
++      "name": "ui-design",
++      "description": "UI design tools including wireframing with layout validation",
++      "source": "./plugins/ui-design"
++    },
++    {
++      "name": "mermaid",
++      "description": "Create, validate, and render Mermaid diagrams",
++      "source": "./plugins/mermaid"
++    },
++    {
++      "name": "tech-spec",
++      "description": "Create and review technical specifications",
++      "source": "./plugins/tech-spec"
++    },
++    {
++      "name": "plan",
++      "description": "Planning mode guidelines and context injection",
++      "source": "./plugins/plan"
++    },
++    {
++      "name": "mail",
++      "description": "Apple Mail integration for reading and managing email via JXA",
++      "source": "./plugins/mail"
++    },
++    {
++      "name": "opentelemetry",
++      "description": "OpenTelemetry instrumentation patterns, semantic conventions, and testing",
++      "source": "./plugins/opentelemetry"
++    },
++    {
++      "name": "terraform",
++      "description": "Terraform Cloud workspace management, run monitoring, and registry lookups",
++      "source": "./plugins/terraform"
++    },
++    {
++      "name": "honeycomb",
++      "description": "Honeycomb CLI and MCP server for observability",
++      "source": {
++        "source": "github",
++        "repo": "bendrucker/honeycomb-cli"
++      }
++    },
++    {
++      "name": "raycast",
++      "description": "Raycast extension development patterns, API, and Store publishing",
++      "source": "./plugins/raycast"
++    },
++    {
++      "name": "run-command",
++      "description": "Pick a reply's `! <command>` suggestion by click or digit to fill it into the shell prompt",
++      "source": "./plugins/run-command"
++    },
++    {
++      "name": "herdr",
++      "description": "Drive the herdr terminal workspace manager: panes, tabs, workspaces, and sibling coding agents",
++      "source": "./plugins/herdr"
++    },
++    {
++      "name": "comments",
++      "description": "Detect AI slop code comments in a diff and steer clean comment generation",
++      "source": "./plugins/comments"
++    },
++    {
++      "name": "meme",
++      "description": "Generate memes from images: classic Impact macros, labels, and TV-subtitle captions",
++      "source": "./plugins/meme"
++    },
++    {
++      "name": "activitywatch",
++      "description": "Query local ActivityWatch usage data: per-app time, window titles, and active vs idle spans",
++      "source": "./plugins/activitywatch"
++    },
++    {
++      "name": "atuin",
++      "description": "Query local shell history from atuin: recent commands, usage stats, and ad-hoc SQL over the history db",
++      "source": "./plugins/atuin"
++    },
++    {
++      "name": "prompting",
++      "description": "Writing documents a model executes: prompts, skills, tool descriptions, CLAUDE.md",
++      "source": "./plugins/prompting"
++    },
++    {
++      "name": "performance",
++      "description": "Profile, benchmark, and hill-climb software performance with noise-aware measurement",
++      "source": "./plugins/performance"
++    }
++  ]
++}
+diff --git a/plugins/github/README.md b/plugins/github/README.md
+new file mode 100644
+index 00000000..4a919fd0
+--- /dev/null
++++ b/plugins/github/README.md
+@@ -0,0 +1,23 @@
++# GitHub Plugin
++
++GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
++
++## Contents
++
++- **Skills**:
++  - `actions-monitor`: Watch a PR's CI and stream state events; invokes the logs agent on failures
++  - `attach`: Attach an image or video to an issue, PR, comment, or review, through `gh --attach` or the user-attachments endpoint it wraps
++  - `copilot`: Cross-model review of the current diff through the Copilot CLI. Slash-invocable only, one call by default and three at most, because the Copilot plan is a fixed budget
++  - `notifications`: Inbox management (list, filter, mark read/done, unsubscribe)
++  - `pr-comments`: Fetch unresolved review comments from a pull request
++  - `stack`: Build, publish, and merge native stacked PRs with the `gh stack` extension
++- **Agents**:
++  - `github-rulesets-manager`: Configure repository rulesets and branch protection
++  - `logs`: Extracts relevant lines from failing-job logs (invoked by `actions-monitor`)
++- **Hook**: Intercepts WebFetch for efficient GitHub data access
++
++## Testing
++
++```bash
++bun test plugins/github
++```

@@ -7,7 +7,7 @@ The lens for judging an implementation against its approved plan.
 - The approved plan (a file path).
 - The diff of what shipped: `git diff <base>...HEAD` against the branch's base, plus the working tree for uncommitted work.
 
-Read the plan first, then the diff. Judge the delta on its merits, not the plan's letter. A plan can be internally inconsistent or wrong, so a departure that corrects it counts as an improvement. Anchor every claim in the plan text or the diff.
+Read the plan first, then the diff. Judge the delta on its merits. A departure that corrects a wrong or inconsistent plan counts as an improvement. Anchor every claim in the plan text or the diff.
 
 ## Report
 
@@ -33,4 +33,4 @@ One paragraph. Does the outcome honor the plan's intent, even where it departs f
 
 ## Stance
 
-Neutral third party. You did not write this code, so do not defend it, and do not assume the plan was right. Where the plan and the diff disagree, report the disagreement rather than resolving it in either's favor by default.
+Judge as a neutral third party, siding with neither the code nor the plan by default. Where the plan and the diff disagree, report the disagreement. Skip stylistic nits.

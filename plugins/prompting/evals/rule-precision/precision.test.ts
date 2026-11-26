@@ -5,14 +5,17 @@ import { $ } from "bun";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
   baseRate,
+  candidateConfig,
+  type CheckScore,
   deletedLines,
   type Labels,
+  loadLabelSources,
   measure,
-  parseRule,
   render,
-  type RuleScore,
+  scoreSources,
   verdict,
 } from "./precision";
+import { VALE_CONFIG } from "../../skills/scan/scripts/vale";
 
 const BEFORE = `# Doc
 
@@ -30,6 +33,15 @@ Alpha keepword stays put.
 
 let repo = "";
 let head = "";
+let untouched = "";
+let rules = "";
+
+const candidate = (word: string): string => `extends: existence
+message: "'%s' matched."
+level: error
+tokens:
+  - ${word}
+`;
 
 beforeAll(async () => {
   // Under a pre-commit hook, inherited GIT_* variables point every git call in the scratch repo at the outer commit's index.
@@ -41,16 +53,24 @@ beforeAll(async () => {
   await $`git config user.email test@example.com`.cwd(repo).quiet();
   await $`git config user.name Test`.cwd(repo).quiet();
   await $`git config core.hooksPath /dev/null`.cwd(repo).quiet();
+  await $`git config commit.gpgsign false`.cwd(repo).quiet();
   await Bun.write(join(repo, "doc.md"), BEFORE);
   await $`git add -A`.cwd(repo).quiet();
   await $`git commit -qm first`.cwd(repo).quiet();
   await Bun.write(join(repo, "doc.md"), AFTER);
   await $`git commit -qam prune`.cwd(repo).quiet();
   head = (await $`git rev-parse HEAD`.cwd(repo).quiet().text()).trim();
+  await Bun.write(join(repo, "notes.txt"), "no prose here\n");
+  await $`git add -A`.cwd(repo).quiet();
+  await $`git commit -qm notes`.cwd(repo).quiet();
+  untouched = (await $`git rev-parse HEAD`.cwd(repo).quiet().text()).trim();
+  rules = mkdtempSync(join(tmpdir(), "rule-precision-rules-"));
+  await Bun.write(join(rules, "Cut.yml"), candidate("cutword"));
+  await Bun.write(join(rules, "Keep.yml"), candidate("keepword"));
 });
 
 afterAll(async () => {
-  await $`rm -rf ${repo}`.quiet();
+  await $`rm -rf ${repo} ${rules}`.quiet();
 });
 
 describe("deletedLines", () => {
@@ -65,21 +85,48 @@ describe("deletedLines", () => {
 });
 
 describe("measure", () => {
-  test("scores a candidate against what the commit deleted", () => {
-    const { scores, labels } = measure(
-      repo,
-      [head],
-      [parseRule("cut=/cutword/"), parseRule("keep=/keepword/")],
+  test("scores candidate rules against what the commit deleted", async () => {
+    const config = await candidateConfig(
+      [join(rules, "Cut.yml"), join(rules, "Keep.yml")],
+      VALE_CONFIG,
     );
+    const { scores, labels } = await measure(repo, [head], config);
     expect(labels).toEqual({ deleted: 2, prose: 4, docs: 1 } satisfies Labels);
-    expect(scores.map(({ rule, flagged, confirmed }) => ({ rule, flagged, confirmed }))).toEqual([
-      { rule: "cut", flagged: 2, confirmed: 2 },
-      { rule: "keep", flagged: 1, confirmed: 0 },
+    expect(scores.map(({ check, flagged, confirmed }) => ({ check, flagged, confirmed }))).toEqual([
+      { check: "Prompting.Cut", flagged: 2, confirmed: 2 },
+      { check: "Prompting.Keep", flagged: 1, confirmed: 0 },
     ]);
   });
 
-  test("measures nothing when the commit is unknown", () => {
-    expect(measure(repo, ["nosuchcommit"]).scores).toEqual([]);
+  test("reads a qualified label from its checkout", async () => {
+    const { labels } = await measure(".", [`test/scratch@${head}`], VALE_CONFIG, {
+      "test/scratch": repo,
+    });
+    expect(labels).toEqual({ deleted: 2, prose: 4, docs: 1 } satisfies Labels);
+  });
+
+  test.each<{ name: string; label: () => string; message: RegExp }>([
+    {
+      name: "unknown commit",
+      label: () => "nosuchcommit",
+      message: /does not resolve/,
+    },
+    {
+      name: "commit missing from its checkout",
+      label: () => "test/scratch@0000000000",
+      message: /does not resolve/,
+    },
+    {
+      name: "repo with no checkout",
+      label: () => `test/other@${head}`,
+      message: /no checkout/,
+    },
+  ])("rejects a label naming a $name", async ({ label, message }) => {
+    const failure = await measure(repo, [label()], VALE_CONFIG, { "test/scratch": repo }).catch(
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    expect(String(failure)).toMatch(message);
   });
 });
 
@@ -92,24 +139,9 @@ describe("baseRate", () => {
   });
 });
 
-describe("parseRule", () => {
-  test("adds the global flag a match-all scan needs", () => {
-    expect(parseRule("cut=/x/i").pattern.flags).toBe("gi");
-    expect(parseRule("cut=/x/g").pattern.flags).toBe("g");
-  });
-
-  test("keeps a pattern containing its own separator", () => {
-    expect(parseRule(String.raw`path=/a\/b/`).pattern.source).toBe(String.raw`a\/b`);
-  });
-
-  test.each(["cut", "=/x/", "cut=x"])("rejects %j", (spec) => {
-    expect(() => parseRule(spec)).toThrow();
-  });
-});
-
 describe("verdict", () => {
-  const score = (flagged: number, low: number): RuleScore => ({
-    rule: "r",
+  const score = (flagged: number, low: number): CheckScore => ({
+    check: "r",
     flagged,
     confirmed: 0,
     precision: 0,
@@ -127,9 +159,81 @@ describe("verdict", () => {
 });
 
 test("render states the floor it applied", () => {
-  const scores: RuleScore[] = [
-    { rule: "no-op", flagged: 17, confirmed: 12, precision: 12 / 17, low: 0.47, high: 0.87 },
-    { rule: "ticket-ref", flagged: 7, confirmed: 1, precision: 1 / 7, low: 0.03, high: 0.51 },
+  const scores: CheckScore[] = [
+    {
+      check: "Prompting.NoOp",
+      flagged: 17,
+      confirmed: 12,
+      precision: 12 / 17,
+      low: 0.47,
+      high: 0.87,
+    },
+    {
+      check: "Prompting.TicketRef",
+      flagged: 7,
+      confirmed: 1,
+      precision: 1 / 7,
+      low: 0.03,
+      high: 0.51,
+    },
   ];
   expect(render(scores, { deleted: 953, prose: 8840, docs: 135 }, 0.11, 10)).toMatchSnapshot();
+});
+
+describe("scoreSources", () => {
+  const options = { minFlagged: 1, minPrecision: 0.5 };
+  let config = "";
+
+  beforeAll(async () => {
+    config = await candidateConfig([join(rules, "Cut.yml"), join(rules, "Keep.yml")], VALE_CONFIG);
+  });
+
+  test("a failing human table fails the run", async () => {
+    const result = await scoreSources(repo, { human: [head], agent: [] }, config, options);
+    expect(result.failed).toBe(true);
+  });
+
+  test("the same failing table from agent labels does not", async () => {
+    const result = await scoreSources(repo, { human: [], agent: [head] }, config, options);
+    expect(result.output).toContain("Prompting.Keep");
+    expect(result.failed).toBe(false);
+  });
+
+  test("an agent source that matches nothing neither empties nor fails the run", async () => {
+    const lenient = { minFlagged: 1, minPrecision: 0.3 };
+    const cutOnly = await candidateConfig([join(rules, "Cut.yml")], VALE_CONFIG);
+    const result = await scoreSources(
+      repo,
+      { human: [head], agent: [untouched] },
+      cutOnly,
+      lenient,
+    );
+    expect(result).toMatchObject({ failed: false, empty: false });
+    expect(result.output).toContain("agent labels: no check matched");
+  });
+
+  test("human-only output has no source heading", async () => {
+    const result = await scoreSources(repo, { human: [head], agent: [] }, config, options);
+    expect(result.output).not.toContain("labels\n");
+  });
+
+  test("reports each source under its own heading", async () => {
+    const result = await scoreSources(repo, { human: [head], agent: [head] }, config, options);
+    expect(result.output).toMatchSnapshot();
+  });
+});
+
+describe("loadLabelSources", () => {
+  test("reads the tracked labels", async () => {
+    const sources = await loadLabelSources();
+    expect(sources.human.length).toBeGreaterThan(0);
+    expect(Array.isArray(sources.agent)).toBe(true);
+  });
+
+  test("rejects a malformed file", async () => {
+    const path = join(rules, "bad.json");
+    await Bun.write(path, JSON.stringify({ human: "1ec44ee80" }));
+    const failure = await loadLabelSources(path).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+  });
 });

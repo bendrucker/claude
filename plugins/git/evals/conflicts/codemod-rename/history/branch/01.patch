@@ -1,0 +1,13 @@
+diff --git a/src/select.ts b/src/select.ts
+index d1a24e7..38eb09c 100644
+--- a/src/select.ts
++++ b/src/select.ts
+@@ -18,7 +18,7 @@ function pluginNames(files: string[]): Set<string> {
+ /** Plugins whose jobs a change has to run. */
+ export function select(plugins: Plugin[], files: string[], alwaysPaths: string[]): string[] {
+   const all = plugins.map((plugin) => plugin.name);
+-  if (files.length === 0 || underAny(files, alwaysPaths)) return all;
++  if (files.length === 0 || files.length > 500 || underAny(files, alwaysPaths)) return all;
+ 
+   const changed = pluginNames(files);
+   return plugins

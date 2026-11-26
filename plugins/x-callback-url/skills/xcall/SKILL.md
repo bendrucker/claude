@@ -19,9 +19,9 @@ There is one bundle, shared by every consuming plugin, at a path outside the plu
 
 ## Sandbox
 
-Neither half of the bridge survives the command sandbox. `lsregister` cannot reach Launch Services to register the bundle, and a compiled `xcall` cannot complete the URL-scheme round trip. So `run.sh` and `build.sh` both carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker, which runs them outside it.
+Neither half of the bridge survives the command sandbox. `lsregister` cannot reach Launch Services to register the bundle, and a compiled `xcall` cannot complete the URL-scheme round trip. Both run outside it when `xcall-run` is the whole Bash command, through its `sandbox.excludedCommands` entry.
 
-The marker hook reads the script named at the head of a command, past any `VAR=value` prefixes. A wrapper token in front of it (`time`, `env`, `timeout`) hides the script from the hook, the command runs sandboxed, and the callback is lost. Invoke `run.sh` by path with at most environment assignments ahead of it.
+An entry matches the command text from its start. Anything ahead of the path (`VAR=value`, `time`, `env`, `timeout`) or chained after it keeps the command sandboxed, and the callback is lost. Invoke `run.sh` by path with nothing ahead of it.
 
 `xcall` cannot bound its own wait. Any deadline it scheduled would live in `applicationDidFinishLaunching`, which AppKit never calls when it cannot reach the WindowServer, so the sandboxed case that most needs a deadline is the one where it is never armed. `run.sh` holds both deadlines instead, from outside the process, and neither phase can wait forever:
 
@@ -31,8 +31,10 @@ The marker hook reads the script named at the head of a command, past any `VAR=v
 
 ## Usage
 
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh" xcall-run`
+
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "<url>"
+xcall-run "<url>"
 ```
 
 | Output | Contents |
@@ -47,15 +49,15 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "<url>"
 
 ```bash
 # Add a todo, get its ID back
-${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "things:///add?title=Buy%20milk"
+xcall-run "things:///add?title=Buy%20milk"
 # stdout: x-things-id=ABC123
 
 # Update a todo, confirm it applied
-${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "things:///update?id=ABC123&auth-token=TOKEN&completed=true"
+xcall-run "things:///update?id=ABC123&auth-token=TOKEN&completed=true"
 # stdout: x-things-id=ABC123
 
 # Batch create via JSON
-${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "things:///json?data=..."
+xcall-run "things:///json?data=..."
 # stdout: x-things-ids=["ABC123","DEF456"]
 ```
 
@@ -63,7 +65,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "things:///json?data=..."
 
 ```bash
 # Create a note and get its ID
-${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "bear://x-callback-url/create?title=Meeting%20Notes&text=..."
+xcall-run "bear://x-callback-url/create?title=Meeting%20Notes&text=..."
 # stdout: identifier=ABC-123&title=Meeting%20Notes
 ```
 

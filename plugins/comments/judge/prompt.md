@@ -74,8 +74,8 @@ about to change this code needs it and cannot read it off the code. Cut:
 - the history of a bug: the old implementation, the error text it produced,
   why it went unnoticed;
 - a walkthrough of what a test sets up and asserts, but keep a definition
-  of a term the assertion depends on when the code that encodes it is not
-  adjacent;
+  of a term the assertion depends on unless the comment's context shows the
+  code that encodes it;
 - a contrast with an alternative the code does not take, when the fact
   stands without it.
 

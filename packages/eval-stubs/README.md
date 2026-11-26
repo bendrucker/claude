@@ -1,6 +1,6 @@
 # Eval Stubs
 
-Offline `gh` and `glab` stand-ins for native eval cases, and the git-init preamble their fixtures share.
+Offline `gh`, `glab`, `rex`, `wt`, and `claude` stand-ins for native eval cases, and the git-init preamble their fixtures share.
 
 A suite that uses them lists `packages/eval-stubs` under `stage` in its `suite.yaml`, so `evals/native/run.ts` stages the package at the same repo-relative path as in the checkout. A case's `fixture.sh` then reaches it from its own directory:
 
@@ -10,15 +10,28 @@ bash "$stubs/install.sh"
 source "$stubs/preamble.sh" https://github.com/acme/api-server.git
 ```
 
-- [`install.sh`](install.sh) bundles [`gh.ts`](gh.ts) and [`glab.ts`](glab.ts) into `$HOME/.eval-stubs/` and puts them first on `PATH` through `$HOME/.zshenv` and `$HOME/.bashrc`, the startup files the Bash tool's zsh and bash read in an eval run. The sources import only runtime builtins, since the staged tree has no `node_modules`.
+- [`install.sh`](install.sh) bundles [`gh.ts`](gh.ts), [`glab.ts`](glab.ts), [`rex.ts`](rex.ts), [`wt.ts`](wt.ts), and [`claude.ts`](claude.ts) into `$HOME/.eval-stubs/` and puts them first on `PATH` through `$HOME/.zshenv` and `$HOME/.bashrc`, the startup files the Bash tool's zsh and bash read in an eval run. The sources import only runtime builtins, since the staged tree has no `node_modules`.
 - [`preamble.sh`](preamble.sh) starts the repo on `main` with the given origin and defines `commit DATE MESSAGE` and `commit_as NAME EMAIL DATE MESSAGE`, which print the new SHA.
+
+## Dispatch stand-ins
+
+`rex`, `wt`, and `claude` let the `dispatch:dispatch` script run without a multiplexer. `install.sh` starts two empty files in the workspace for graders:
+
+- `.eval-calls` gets one line per call, failures included: `<cli> <argv>`, with newlines in a word flattened to spaces. A launched command keeps everything through its last `--` and shows the prompt as `<prompt>`, as in `rex window new -s s relay-x -c /w --json -- claude --name relay-x -- <prompt>`. After a `rex window new` or `split` with `-c <path>`, or a `claude --bg`, a neutral `launch <branch> <path> place=<tab|pane|bg>` line follows the raw call. `<branch>` is the one checked out in `<path>`. A Rex launch ends the line with `title=<label>`, the tab name or `--label`. Then each `permissions.allow` rule in that worktree's `.claude/settings.local.json` logs as `allow <rule>` and each `sandbox.filesystem.allowWrite` path as `sandbox-write <path>`.
+- `.eval-briefs.md` gets each elided prompt after a `=== prompt for <session name> ===` line, which no markdown heading inside a prompt can be mistaken for.
+
+- `rex` answers `whoami --json`, `window new`, `split` (distinct `block:eval-<k>` ids), `block inspect … --json` (session `session:eval`), `block call … program_status`, `block call … size` (200 columns), `capture` (empty), `hosts list`, and `ls`. The status state comes from `$HOME/.eval-stubs/session-status`, a bare state or `{"state","kind","msg"}` JSON, defaulting to `working`.
+- `wt -C <root> switch` adds a git worktree under `<root>/.worktrees/<branch>` and prints the `--format=json` shape, `existing` when the branch already has one. `pr:<n>` and `mr:<n>` fail.
+- `claude --bg` prints a `bg-eval-<k>` id, and `claude agents --json` lists every one as `working`. Other `claude` calls fail.
+
+Everything else fails as offline.
 
 ## Modes
 
-- **Snapshot**: the fixture writes `$HOME/.eval-stubs/meta.json` describing one pull request (`repo`, `pull`, `reviews`, `threads`, optional `checks`) or merge request (`host`, `project`, `mr`, `versions`, `discussions`), plus `root` and the SHAs it committed. The `Meta` types in `gh.ts` and `glab.ts` define the fields. Diffs, commits, and file contents come from the scaffolded repo. Every write is refused.
-- **Echo**: with no `meta.json`, `gh pr create|edit` and `glab mr create|update` print the title and body between `PR-TITLE:`, `PR-BODY-BEGIN`, and `PR-BODY-END` lines, then the URL. Every other command fails as offline.
+- **Snapshot**: the fixture writes `$HOME/.eval-stubs/meta.json` describing one pull request (`repo`, `pull`, `reviews`, `threads`, optional `checks`) or merge request (`host`, `project`, `mr`, `versions`, `discussions`), plus `root` and the SHAs it committed. The `Meta` types in `gh.ts` and `glab.ts` define the fields. Diffs, commits, and file contents come from the scaffolded repo. Every write is refused, including `glab mr note create|resolve|reopen|draft`, so a grader sees the attempt. `glab api` expands `--placeholder key=value` into one percent-encoded path segment before matching, serves `repository/branches/<name>` for one segment, and prints one item per line for `--output ndjson`.
+- **Echo**: with no `meta.json`, `gh pr create|edit`, `glab mr create|update`, and `glab mr|issue note`, and a `glab api` POST to a notes or discussions endpoint (reading `-F body=@<path>` and a JSON `--input` as glab does) print the title and body between `PR-TITLE:`, `PR-BODY-BEGIN`, and `PR-BODY-END` lines, then the URL. Every other command fails as offline.
 
-`install.sh --check <module>` bundles a module whose default export maps a create or edit body to verdict lines, which echo mode prints after the URL and writes to `.eval-verdicts` in the run's working directory, replacing the previous call's. A `{ source: file, path: .eval-verdicts }` `regex` grader then scores the run in-run, unaffected by output the session pipes through `tail` or `head`. `install.sh` starts the file empty, so a run with no counted call fails those graders instead of erroring. A `--dry-run` or a body under three words is a probe and records nothing. A `--body-file` that can't be read fails the call with gh's error and prints no verdicts. `--offline` makes create and edit print only those lines and fail as offline, for a case graded on the drafted reply. [`pr-body/limits.ts`](../../plugins/pull-request/evals/pr-body/limits.ts) is the one check. The module and anything it imports must be staged, with their dependencies resolvable from a staged plugin's `node_modules`.
+`install.sh --check <module>` bundles a module whose default export maps a create or edit body to verdict lines, which echo mode prints after the URL and writes to `.eval-verdicts` in the run's working directory, replacing the previous call's. A `{ source: file, path: .eval-verdicts }` `regex` grader then scores the run in-run, unaffected by output the session pipes through `tail` or `head`. `install.sh` starts the file empty, so a run with no counted call fails those graders instead of erroring. A `--dry-run` or a body under three words is a probe and records nothing. A `--body-file` that can't be read fails the call with gh's error and prints no verdicts. `--offline` makes create and edit print only those lines and fail as offline, for a case graded on the drafted reply. [`pr-body/limits.ts`](../../plugins/pull-request/evals/pr-body/limits.ts) and [`note-body/check.ts`](../../plugins/gitlab/evals/note-body/check.ts) are the checks. The module and anything it imports must be staged, with their dependencies resolvable from a staged plugin's `node_modules`.
 
 ## Tests
 

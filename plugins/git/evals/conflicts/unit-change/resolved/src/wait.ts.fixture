@@ -1,0 +1,31 @@
+export interface Clock {
+  now(): number;
+  sleep(ms: number): Promise<void>;
+}
+
+export const systemClock: Clock = {
+  now: () => Date.now(),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+};
+
+export interface WaitOptions {
+  /** Milliseconds to keep checking before giving up. */
+  timeout: number;
+  /** Milliseconds between checks. */
+  interval?: number;
+  clock?: Clock;
+}
+
+export type Wait = (check: () => boolean | Promise<boolean>, options: WaitOptions) => Promise<boolean>;
+
+// Polls `check` until it returns true or the timeout elapses.
+export const waitFor: Wait = async (check, options) => {
+  const clock = options.clock ?? systemClock;
+  const interval = options.interval ?? 500;
+  const deadline = clock.now() + Math.max(options.timeout, 0);
+  while (true) {
+    if (await check()) return true;
+    if (clock.now() >= deadline) return false;
+    await clock.sleep(interval);
+  }
+};

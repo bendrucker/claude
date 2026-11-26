@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: reaches osascript and the Things URL scheme through the read and write tools, which the command sandbox blocks
-
 /**
  * Things MCP server over stdio.
  *

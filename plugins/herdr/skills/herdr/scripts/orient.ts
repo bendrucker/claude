@@ -65,21 +65,19 @@ function decode<T>(schema: z.ZodType<T>, text: string): T | null {
 async function herdr(args: string[]): Promise<string | null> {
   let proc;
   try {
-    proc = Bun.spawn(["herdr", ...args], { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+    proc = Bun.spawn(["herdr", ...args], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "ignore",
+      timeout: HERDR_TIMEOUT_MS,
+    });
   } catch {
     // A spawn can throw when the binary is missing or the process table is
     // exhausted, which leaves the same nothing to report as a non-zero exit.
     return null;
   }
-  const timer = setTimeout(() => {
-    proc.kill();
-  }, HERDR_TIMEOUT_MS);
-  try {
-    const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
-    return code === 0 ? stdout : null;
-  } finally {
-    clearTimeout(timer);
-  }
+  const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  return code === 0 ? stdout : null;
 }
 
 function workspaceLine(workspace: Workspace): string {

@@ -61,20 +61,18 @@ function decode<T>(schema: z.ZodType<T>, text: string): T | null {
 async function rex(args: string[]): Promise<string | null> {
   let proc;
   try {
-    proc = Bun.spawn(["rex", ...args], { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+    proc = Bun.spawn(["rex", ...args], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "ignore",
+      timeout: REX_TIMEOUT_MS,
+    });
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
     return null;
   }
-  const timer = setTimeout(() => {
-    proc.kill();
-  }, REX_TIMEOUT_MS);
-  try {
-    const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
-    return code === 0 ? stdout : null;
-  } finally {
-    clearTimeout(timer);
-  }
+  const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  return code === 0 ? stdout : null;
 }
 
 function blocksOf(window: Window): Block[] {

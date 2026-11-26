@@ -5,7 +5,7 @@ echo "/.*" >> .git/info/exclude
 git config user.name "Ben Drucker"
 git config user.email bvdrucker@gmail.com
 git config commit.gpgsign false
-mkdir -p legacy src test corpus
+mkdir -p legacy src test ops/archive
 cat > package.json <<'JSON'
 { "name": "timesheet", "type": "module", "private": true, "scripts": { "test": "bun test", "summary": "bun src/timesheet.ts" } }
 JSON
@@ -158,9 +158,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { parse, render, summarize } from "../src/timesheet.ts";
 
 const hash = createHash("sha256");
-for (const file of readdirSync("corpus").sort()) {
+for (const file of readdirSync("ops/archive").sort()) {
   try {
-    const { entries, skipped } = parse(readFileSync(`corpus/${file}`, "utf8"));
+    const { entries, skipped } = parse(readFileSync(`ops/archive/${file}`, "utf8"));
     hash.update(render(summarize(entries), skipped));
   } catch (error) {
     hash.update(String(error));
@@ -249,7 +249,16 @@ for (let i = 1; i <= 200; i++) {
     const day = f.date && j < 2 ? pick(oddDays) : pick(days);
     lines.push([day, person, hours, project].join(", "));
   }
-  await Bun.write(`corpus/${String(i).padStart(3, "0")}.csv`, lines.join("\n") + "\n");
+  await Bun.write(`ops/archive/${["2026-07","2026-08","2026-09"][Math.floor((i - 1) / 67)]}-${String(i).padStart(3, "0")}.csv`, lines.join("\n") + "\n");
 }
 '
+cat > ops/nightly.sh <<'SH'
+#!/usr/bin/env bash
+# Nightly: summarize the day's timeclock export and mail it to finance.
+set -euo pipefail
+export_file="ops/archive/$(date +%F).csv"
+timeclock export --since yesterday > "$export_file"
+python3 legacy/timesheet.py "$export_file" | mail -s "Timesheet $(date +%F)" finance@example.com
+SH
+chmod +x ops/nightly.sh
 git add -A && git commit -qm "timesheet: port the summary to TypeScript"

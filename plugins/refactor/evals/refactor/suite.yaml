@@ -1,0 +1,12 @@
+allow_tools: [Bash, Edit, Write]
+judge_model: claude-sonnet-5-5
+context: [user/rules/testing.md]
+graders:
+  skill-fired: "port-*"
+  split-fired: "split-*"
+  consolidate-fired: "consolidate-*"
+  upstream-fired: "upstream-*"
+  compared-both: "port-*"
+  old-kept: "port-*"
+  quiet: "quiet-*"
+  ran-tests: ["split-*", "consolidate-*", "upstream-*"]

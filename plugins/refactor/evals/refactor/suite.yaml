@@ -1,7 +1,7 @@
 allow_tools: [Bash, Edit, Write]
 judge_model: claude-sonnet-5-5
 graders:
-  skill-fired: "port-*"
+  skill-fired: ["port-*", "reach-*"]
   split-fired: "split-*"
   compared-both: "port-*"
   old-kept: "port-*"

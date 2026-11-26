@@ -104,6 +104,17 @@
             "type": "command"
           }
         ]
+      },
+      {
+        "matcher": "^(startup|resume|clear|compact|fork)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "h=\"$HOME/.local/share/rex-agent-resume/bin/rex-agent-resume-hook\"; [ -x \"$h\" ] && exec \"$h\" claude || cat >/dev/null",
+            "timeout": 10,
+            "async": true
+          }
+        ]
       }
     ],
     "Stop": [

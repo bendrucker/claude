@@ -10,7 +10,7 @@
 import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
 import { availableParallelism, homedir, loadavg } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { cli, command } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 
@@ -297,63 +297,68 @@ async function readExports(
   );
 }
 
-const runCmd = command(
-  {
-    name: "run",
-    parameters: ["<out>", "[hyperfine args...]"],
-    flags: {
-      arm: {
-        type: [String],
-        description: "name=command, once per arm (repeatable). The first arm is the base",
-      },
-      rounds: {
-        type: Number,
-        default: 6,
-        description: "hyperfine invocations, rotating which arm runs first",
-      },
-      runs: { type: Number, default: 3, description: "Runs per arm per round" },
-      warmup: { type: Number, default: 1, description: "Warmup runs per arm per round" },
-      hypothesis: {
-        type: String,
-        description:
-          "The prediction this comparison tests: the profile entry, the metric, and the expected move. 'A/A' for a noise floor",
-      },
-    },
-    help: {
-      description:
-        "Run interleaved hyperfine rounds into <out>. Arguments after -- go to every hyperfine call",
-    },
-  },
-  async (argv) => {
-    const arms = argv.flags.arm.map((spec) => {
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+function collect(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
+}
+
+function parseMetric(value: string): Metric {
+  if (value !== "wall" && value !== "memory")
+    throw new InvalidArgumentError("--metric is wall or memory");
+  return value;
+}
+
+const runCmd = new Command("run")
+  .description(
+    "Run interleaved hyperfine rounds into <out>. Arguments after -- go to every hyperfine call",
+  )
+  .argument("<out>")
+  .argument("[hyperfine args...]")
+  .option(
+    "--arm <spec>",
+    "name=command, once per arm (repeatable). The first arm is the base",
+    collect,
+    [],
+  )
+  .option("--rounds <n>", "hyperfine invocations, rotating which arm runs first", number, 6)
+  .option("--runs <n>", "Runs per arm per round", number, 3)
+  .option("--warmup <n>", "Warmup runs per arm per round", number, 1)
+  .option(
+    "--hypothesis <text>",
+    "The prediction this comparison tests: the profile entry, the metric, and the expected move. 'A/A' for a noise floor",
+  )
+  .action(async (out, hyperfineArgs, flags) => {
+    const arms = flags.arm.map((spec) => {
       const eq = spec.indexOf("=");
       if (eq < 1) throw new Error(`--arm expects name=command, got ${spec}`);
       return { name: spec.slice(0, eq), command: spec.slice(eq + 1) };
     });
     if (arms.length < 2) throw new Error("give at least two --arm flags");
-    const hypothesis = argv.flags.hypothesis?.trim() ?? "";
+    const hypothesis = flags.hypothesis?.trim() ?? "";
     if (hypothesis === "")
       throw new Error(
         "give --hypothesis before measuring: the profile entry, the metric, and the expected move, or 'A/A' for a noise floor",
       );
     if (Bun.which("hyperfine") === null) throw new Error("hyperfine not found on PATH");
-    mkdirSync(argv._.out, { recursive: true });
-    if (readdirSync(argv._.out).some((f) => f.endsWith(".json")))
-      throw new Error(`${argv._.out} already holds exports; report would pool them with this run`);
+    mkdirSync(out, { recursive: true });
+    if (readdirSync(out).some((f) => f.endsWith(".json")))
+      throw new Error(`${out} already holds exports; report would pool them with this run`);
     const ncpu = availableParallelism();
     const meta: Meta = { hypothesis, started: new Date().toISOString(), ncpu, arms, rounds: [] };
-    const metaPath = join(argv._.out, META);
+    const metaPath = join(out, META);
     await Bun.write(metaPath, JSON.stringify(meta, null, 2));
     try {
-      await runRounds(argv, arms, meta, metaPath);
+      await runRounds({ _: { out, hyperfineArgs }, flags }, arms, meta, metaPath);
     } finally {
-      logComparison(meta, argv._.out, argv.flags.rounds);
+      logComparison(meta, out, flags.rounds);
     }
-    console.error(
-      `results in ${argv._.out}; next: compare.ts report ${argv._.out} --base ${arms[0]?.name}`,
-    );
-  },
-);
+    console.error(`results in ${out}; next: compare.ts report ${out} --base ${arms[0]?.name}`);
+  });
 
 async function runRounds(
   argv: {
@@ -406,74 +411,52 @@ async function runRounds(
   }
 }
 
-const reportCmd = command(
-  {
-    name: "report",
-    parameters: ["<exports...>"],
-    flags: {
-      base: {
-        type: String,
-        description: "Arm every other arm is compared against. Default: the first arm seen",
-      },
-      alpha: {
-        type: Number,
-        default: 0.1,
-        description: "Permutation p below which a change can be starred",
-      },
-      minEffect: {
-        type: Number,
-        default: 0.03,
-        description: "Smallest relative change that can be starred",
-      },
-      markdown: { type: Boolean, description: "Print a markdown table for the notes file" },
-      metric: {
-        type: (value: string): Metric => {
-          if (value !== "wall" && value !== "memory") throw new Error("--metric is wall or memory");
-          return value;
-        },
-        default: defaultMetric,
-        description: "Compare wall time, or each run's peak resident memory",
-      },
-    },
-    help: {
-      description:
-        "Pool hyperfine --export-json files (or directories of them) per arm and compare against a base",
-    },
-  },
-  async (argv) => {
-    const arms = pool(await readExports(argv._.exports));
-    const base = argv.flags.base ?? arms[0]?.name;
+const reportCmd = new Command("report")
+  .description(
+    "Pool hyperfine --export-json files (or directories of them) per arm and compare against a base",
+  )
+  .argument("<exports...>")
+  .option("--base <arm>", "Arm every other arm is compared against. Default: the first arm seen")
+  .option("--alpha <p>", "Permutation p below which a change can be starred", number, 0.1)
+  .option("--min-effect <ratio>", "Smallest relative change that can be starred", number, 0.03)
+  .option("--markdown", "Print a markdown table for the notes file")
+  .option(
+    "--metric <metric>",
+    "Compare wall time, or each run's peak resident memory",
+    parseMetric,
+    defaultMetric,
+  )
+  .action(async (exports, flags) => {
+    const arms = pool(await readExports(exports));
+    const base = flags.base ?? arms[0]?.name;
     if (base === undefined) throw new Error("no results found");
-    const metas = await readMeta(argv._.exports);
+    const metas = await readMeta(exports);
     for (const { meta } of metas) console.log(`${loadSummary(meta)}\n`);
     const report = (pooled: Arm[]) =>
       render(
-        compare(
-          pooled,
-          base,
-          argv.flags.alpha,
-          argv.flags.minEffect,
-          Math.random,
-          argv.flags.metric,
-        ),
-        argv.flags.markdown === true,
-        argv.flags.metric,
+        compare(pooled, base, flags.alpha, flags.minEffect, Math.random, flags.metric),
+        flags.markdown === true,
+        flags.metric,
       );
     console.log(report(arms));
     const loaded = metas.flatMap(({ dir, meta }) => loadedRounds(dir, meta));
     if (loaded.length > 0) {
-      const rest = pool(await readExports(argv._.exports, new Set(loaded)));
+      const rest = pool(await readExports(exports, new Set(loaded)));
       const left = rest.some((a) => a.name === base) ? report(rest) : "every round was loaded";
       console.log(`\nwithout the loaded rounds:\n${left}`);
     }
     console.log(
-      `* p < ${argv.flags.alpha} and |change| ≥ ${argv.flags.minEffect * 100}%. † fewer than 4 runs a side, too few to star.`,
+      `* p < ${flags.alpha} and |change| ≥ ${flags.minEffect * 100}%. † fewer than 4 runs a side, too few to star.`,
     );
-  },
-);
+  });
+
+export const program = new Command("compare")
+  .addCommand(runCmd)
+  .addCommand(reportCmd)
+  .action(() => {
+    program.help();
+  });
 
 if (import.meta.main) {
-  void cli({ name: "compare", commands: [runCmd, reportCmd] }, (argv) => {
-    argv.showHelp();
-  });
+  await program.parseAsync();
 }

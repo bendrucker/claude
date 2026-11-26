@@ -1,1 +1,1 @@
-We ported `legacy/report.mjs` to TypeScript in `src/report.ts`, and the tests pass. Get it ready so we can switch callers over and delete the legacy version. `corpus/` has last quarter's real report inputs.
+We ported `legacy/timesheet.py` to TypeScript in `src/timesheet.ts`, and the tests pass. Get it ready so we can switch the nightly job over and delete the Python version. `corpus/` has last quarter's real exports.

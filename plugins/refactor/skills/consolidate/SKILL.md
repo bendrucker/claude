@@ -8,6 +8,8 @@ argument-hint: "[<the duplicated logic>]"
 
 Replace the copies of `$ARGUMENTS`, or the logic the user named, with one shared implementation. Every caller of every copy sees the same behavior it saw before. Each copy is the *oracle* for its own callers.
 
+When the copies reimplement a solved problem, such as escaping, parsing, or retries, use [upstream](../upstream/SKILL.md) instead and replace each copy with the library.
+
 ## Inventory
 
 Find every copy before writing the shared version. Search for the behavior as well as identical text: renamed variables, reordered branches, and a copy rewritten in another style still count. Use `ast-grep` for structural matches. Record each copy with its callers.
@@ -27,9 +29,11 @@ Stop and report when the parameters needed to cover the variations outnumber the
 
 Put the shared version where every caller can depend on it without an import cycle or a new dependency direction. Name it for what it holds. A shared module named `utils`, `helpers`, or `common` means the abstraction is not settled.
 
+When the callers cannot import each other's code, such as separately packaged plugins, publish the shared version as a package that each one declares in its own manifest and lockfile. When a package is too heavy for what is shared, as in a dependency-free hook, keep one identical copy per caller and add a test that fails when the copies differ.
+
 ## Migration
 
-Move callers to the shared version one copy at a time. Delete each copy in the change that moves its last caller. Re-run the harness after each copy, comparing that copy's callers against the shared version.
+Move callers to the shared version one copy at a time. Past about five copies, migrate one to three by hand and follow [port's scale method](../port/references/scale.md) for the rest. Delete each copy in the change that moves its last caller. Re-run the harness after each copy, comparing that copy's callers against the shared version.
 
 ## Done
 

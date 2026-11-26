@@ -14,18 +14,18 @@ A ported test suite is a weak signal. It was written against the old implementat
 
 Build the harness before porting. It runs old and new on the same input and diffs the results. Every later step reports against it.
 
-- **Inputs.** Draw them from real use first: logged invocations, fixture repos, recorded payloads, shell history. Add generated inputs for the edges real use rarely reaches. Count matches over real inputs, since a hand-picked set inflates the match rate.
+- **Inputs.** Draw them from real use first: logged invocations, fixture repos, recorded payloads, shell history. Add generated inputs for the edges real use rarely reaches. Count matches over real inputs, since a hand-picked set inflates the match rate. With no record of real use, mine the repository's callers, tests, and docs for the arguments they pass, generate the rest from the format's grammar, and report which set the match rate counts.
 - **Checkpoints.** Diff intermediate stages as well as the final output: parsed input, resolved config, the built request, the emitted bytes, exit code, stderr, files written. Report the first checkpoint that differs, since the bug is in the code that produced it. An end-to-end diff alone says only that something differs.
 - **Replay.** Run anything nondeterministic or side-effecting (network, clock, randomness, a model call, `gh`, the filesystem outside a temp dir) once, record it, and feed the recording to both implementations. Live calls on each side produce noise that hides real diffs. A side effect that runs twice, such as a write, a charge, or a filed to-do, is a bug in the harness.
 - **Normalize** only what is meaningless by contract, such as map ordering a consumer never reads. Record each normalization in the ledger as an exemption.
 
 ## Ledger
 
-Keep a ledger of divergences in the working tree, one row per distinct bug. Group diffs by *fingerprint*: the checkpoint, the field or byte offset, and the kind of difference (missing, extra, reordered, escaped, truncated). Many diffs that share a fingerprint are one row.
+Keep a ledger of divergences in a file, such as `tmp/<task>/ledger.md`, one row per distinct bug, with the fingerprint, the inputs it covers, the first checkpoint that differs, and its status: open, fixed with the commit, or exempt with who signed off. A later session resumes from the file. Group diffs by *fingerprint*: the checkpoint, the field or byte offset, and the kind of difference (missing, extra, reordered, escaped, truncated). Many diffs that share a fingerprint are one row.
 
 Work the row covering the most inputs first. A divergence early in the pipeline masks the ones after it, so expect new rows to appear as dominant ones close.
 
-Classify each row as a bug or an intended change. An intended change needs the user's sign-off, then becomes an exemption the harness skips and the PR body lists. Absent sign-off, the row is a bug.
+Classify each row as a bug or an intended change. An intended change needs the user's sign-off, then becomes an exemption the harness skips and the PR body lists. Absent sign-off, the row is a bug. With nobody present to sign off, mark the row proposed, finish the other rows, and lead the report with the proposals.
 
 ## Porting Rules
 
@@ -45,6 +45,16 @@ When the target is an interface someone else defines, such as a framework's stor
 - Treat data the old implementation already wrote as real input. The new implementation reads the existing files or rows, and the harness compares what callers get back.
 - Move callers over one at a time, re-running the harness after each.
 
+## Review
+
+Before reporting done, read the whole diff for changes that make the harness match without making the port correct:
+
+- A branch keyed on one input value, file name, or fixture.
+- A change to the harness or its recorded replays after porting started, normalizations included.
+- A test whose expected value, error type, or negative case changed.
+
+Each one is a ledger row until a general fix or a sign-off closes it.
+
 ## Done
 
 The port is done when:
@@ -54,5 +64,7 @@ The port is done when:
 - The ported tests pass with assertions no weaker than the originals.
 
 Report those numbers and the exemption list in the PR body. Keep the old implementation and the harness until the user approves cutover, then delete both in the cutover change.
+
+When the port repeats across many units, such as scripts, call sites, or modules, read [references/scale.md](references/scale.md) before the second unit.
 
 For a production service with live traffic, private payloads, or a long dual-run period, read [references/production.md](references/production.md).

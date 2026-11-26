@@ -8,8 +8,6 @@ argument-hint: "[<file, function, or class>]"
 
 Split `$ARGUMENTS`, or the code the user named, into modules with one responsibility apiece. Every caller sees the same behavior and the same exported names as before. The deliverable is a set of moves a reviewer can verify as moves.
 
-For the vocabulary of module, interface, seam, and depth, read [`LANGUAGE.md`](../../../../user/skills/improve-codebase-architecture/LANGUAGE.md) when the cut itself is in question.
-
 ## Choose the Cut
 
 Group code by the state and data it shares and by who calls it. Code that reads and writes the same fields belongs together. Code that only shares a file does not. Line count and kind of code (types, helpers, handlers) are weak signals.
@@ -19,7 +17,7 @@ Group code by the state and data it shares and by who calls it. Code that reads 
 - Give each new module a name for what it contains. A module named `utils`, `helpers`, or `common` means the cut is not settled.
 - Split into files before splitting across directories.
 
-Propose the cut to the user as a list of new modules, each with a one-line purpose and the names it takes, before moving code when the split creates more than three modules or changes any import path outside the file.
+Propose the cut to the user as a list of new modules, each with a one-line purpose and the names it takes, before moving code when the split creates more than three modules or changes any import path outside the file. With nobody present to answer, take the cut and lead the report with it.
 
 ## Exported Names
 
@@ -29,6 +27,8 @@ Propose the cut to the user as a list of new modules, each with a one-line purpo
 - When the code has no tests at its interface, write characterization tests there before moving anything, from inputs real callers pass. For untested code with complex behavior, build the differential harness in [port](../port/SKILL.md) with the pre-split version as the oracle.
 
 ## Move, Then Edit
+
+When the same split repeats across many files, split one to three by hand and follow [port's scale method](../port/references/scale.md) for the rest.
 
 Commit pure moves separately from edits. A move commit relocates code and adjusts imports, nothing else, so `git diff --color-moved` shows it as moved lines. Renames, signature changes, and cleanup go in later commits.
 

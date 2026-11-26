@@ -135,8 +135,6 @@ export function profileRefs(profile: string): {
   return { names: [...names], percents: [...percents], seconds: [...seconds] };
 }
 
-const escape = (s: string) => s.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-
 const PERCENT = /(?<![\d.])(\d+(?:\.(\d+))?)\s?%/g;
 const SECONDS = /(?<![\d.])(\d+\.(\d+))\s?s\b/g;
 
@@ -147,7 +145,7 @@ const rounds = (listed: number, cited: string, decimals: number) =>
 export function cites(entry: string, refs: ReturnType<typeof profileRefs>): boolean {
   const text = normalize(entry);
   return (
-    refs.names.some((n) => new RegExp(`(?<![\\w])${escape(n)}(?![\\w])`, "i").test(text)) ||
+    refs.names.some((n) => new RegExp(`(?<![\\w])${RegExp.escape(n)}(?![\\w])`, "i").test(text)) ||
     [...text.matchAll(PERCENT)].some(([, cited = "", decimals = ""]) =>
       refs.percents.some((v) => rounds(v, cited, decimals.length)),
     ) ||

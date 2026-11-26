@@ -220,10 +220,6 @@ export function docCommentOf(
   return null;
 }
 
-function escapeRegExp(text: string): string {
-  return text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-}
-
 /**
  * The lead a Go doc comment opens with: `Package name` for a package clause,
  * the declared name (optionally after an article) for a declaration. Null when
@@ -231,7 +227,7 @@ function escapeRegExp(text: string): string {
  */
 export function goDocLead(doc: DocComment): RegExp | null {
   if (doc.subject == null) return null;
-  const name = escapeRegExp(doc.subject);
+  const name = RegExp.escape(doc.subject);
   return doc.target === "module"
     ? new RegExp(`^Package\\s+${name}\\b`)
     : new RegExp(`^(?:(?:A|An|The)\\s+)?${name}\\b`);

@@ -76,7 +76,16 @@ describe.each(skillDirs.map(({ plugin, dir }) => [`${plugin}:${basename(dir)}`, 
   },
 );
 
-const SYSTEM_COMMANDS = new Set(["git", "wt", "claude", "agent-browser", "open", "osascript"]);
+const SYSTEM_COMMANDS = new Set([
+  "git",
+  "wt",
+  "claude",
+  "claude-sync",
+  "dotfiles-sync",
+  "agent-browser",
+  "open",
+  "osascript",
+]);
 
 const Settings = z.looseObject({
   sandbox: z.looseObject({ excludedCommands: z.array(z.string()) }),

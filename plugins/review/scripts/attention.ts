@@ -571,6 +571,22 @@ function reportQuit(pane: string, outcome: QuitOutcome): void {
   }
 }
 
+function openReviewr(paneId: string): void {
+  const workspace = process.env.HERDR_WORKSPACE_ID;
+  const open =
+    workspace == null
+      ? "none"
+      : existingReviewr(herdrJson(["pane", "list", "--workspace", workspace]), process.cwd());
+  if (typeof open === "object") {
+    console.log(`reviewr already open (${open.pane})`);
+    return;
+  }
+  openPane(
+    reviewrOpenArgs(paneId),
+    `reviewr not found: install the \`${REVIEWR_PLUGIN}\` herdr plugin`,
+  );
+}
+
 async function closeDoc(paneId: string, file: string): Promise<void> {
   const path = canonical(resolve(file));
   const recordPath = docPanePath(paneId);
@@ -664,7 +680,7 @@ const promptCmd = command(
 const openCmd = command(
   {
     name: "open",
-    help: { description: "Open a review surface beside this pane" },
+    help: { description: "Open a review surface beside this pane, or both with --diff and --doc" },
     flags: {
       diff: { type: Boolean, description: "Review the working diff" },
       doc: { type: String, description: "Review this file" },
@@ -694,31 +710,18 @@ const openCmd = command(
     const { app } = parsed.flags;
     if (app != null && !isApp(app)) fail(`--app must be ${apps.join(" or ")}`);
     if (host.kind === "rex") {
-      rexOpen(host.block, {
-        doc: doc ?? undefined,
-        base: parsed.flags.base,
-        batch: parsed.flags.batch === true,
-        app: app ?? undefined,
-      });
+      if (parsed.flags.diff) {
+        rexOpen(host.block, {
+          base: parsed.flags.base,
+          batch: parsed.flags.batch === true,
+          app: app ?? undefined,
+        });
+      }
+      if (doc != null) rexOpen(host.block, { doc });
       process.exit(0);
     }
-    if (doc != null) {
-      await openDoc(host.pane, doc);
-      process.exit(0);
-    }
-    const workspace = process.env.HERDR_WORKSPACE_ID;
-    const open =
-      workspace == null
-        ? "none"
-        : existingReviewr(herdrJson(["pane", "list", "--workspace", workspace]), process.cwd());
-    if (typeof open === "object") {
-      console.log(`reviewr already open (${open.pane})`);
-      process.exit(0);
-    }
-    openPane(
-      reviewrOpenArgs(host.pane),
-      `reviewr not found: install the \`${REVIEWR_PLUGIN}\` herdr plugin`,
-    );
+    if (parsed.flags.diff) openReviewr(host.pane);
+    if (doc != null) await openDoc(host.pane, doc);
     process.exit(0);
   },
 );
@@ -726,23 +729,21 @@ const openCmd = command(
 const closeCmd = command(
   {
     name: "close",
-    help: { description: "Quit the review surface once Ben approves" },
+    help: { description: "Quit the review surfaces once Ben approves" },
     flags: {
       diff: { type: Boolean, description: "Quit reviewr over the working diff" },
       doc: { type: String, description: "Quit plannotator-tui over this file" },
     },
   },
   async (parsed) => {
-    if (parsed.flags.diff === (parsed.flags.doc != null)) {
+    if (!parsed.flags.diff && parsed.flags.doc == null) {
       parsed.showHelp();
       process.exit(1);
     }
     const paneId = currentPane();
     if (paneId == null) return;
-    if (parsed.flags.doc != null) {
-      await closeDoc(paneId, parsed.flags.doc);
-      process.exit(0);
-    }
+    if (parsed.flags.doc != null) await closeDoc(paneId, parsed.flags.doc);
+    if (!parsed.flags.diff) process.exit(0);
     const workspace =
       process.env.HERDR_WORKSPACE_ID ?? fail("HERDR_WORKSPACE_ID unset: cannot find reviewr");
     const open = existingReviewr(

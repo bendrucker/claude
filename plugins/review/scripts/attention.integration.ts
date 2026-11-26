@@ -174,4 +174,24 @@ describe.skipIf(!ready)("attention under Rex", () => {
     expect(await reviewBlock(agent)).toBeUndefined();
     sh("rex", "block", "close", tui);
   }, 30_000);
+
+  test("a combined review opens the diff and the document in splits of their own", async () => {
+    await Bun.write(join(repo, "body.md"), "# Add subtract\n\nThe body under review.\n");
+    const before = new Set(blocks());
+    expect(open(agent, repo, "--diff", "--doc", "body.md")).toBe(
+      `opened plannotator-tui beside ${agent}\nopened plannotator-tui beside ${agent}`,
+    );
+    const splits = await until("both plannotator-tui splits", () => {
+      const added = blocks().filter((b) => !before.has(b));
+      return added.length === 2 ? added : undefined;
+    });
+    await until("the diff and the document on screen", () => {
+      const screens = splits.map(screen);
+      return screens.some((text) => text.includes("math.js")) &&
+        screens.some((text) => text.includes("The body under review"))
+        ? true
+        : undefined;
+    });
+    for (const split of splits) sh("rex", "block", "close", split);
+  }, 30_000);
 });

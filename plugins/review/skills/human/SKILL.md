@@ -2,7 +2,7 @@
 name: review:human
 description: >-
   Request Ben's own review of the working diff or a document before it leaves the machine, for architecture and slop rather than bugs. Runs after the mechanical passes (code-review or simplify, comments:audit). Use for "get my review", "let me look at this first", or as the last pre-PR pass.
-argument-hint: "[--doc <file>] [--kind <kind>] [--base <ref>] [--app hunk|plannotator] [--batch] [--browser] [--summary <text>]"
+argument-hint: "[--diff] [--doc <file>] [--kind <kind>] [--base <ref>] [--app hunk|plannotator] [--batch] [--browser] [--summary <text>]"
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts:*)"
   - Bash(rex do review_reply:*)
@@ -15,6 +15,8 @@ allowed-tools:
 # Human Review
 
 Put the change in front of Ben and act on what comes back until he approves.
+
+A request covers the diff by default, the document with `--doc <file>`, or both with `--diff --doc <file>`. Both open side by side under one request, and the review is approved only once Ben has approved each.
 
 ## Context
 
@@ -31,6 +33,8 @@ The host is herdr when the herdr pane is set, else Rex when the Rex block is set
 | Rex | plannotator-tui split. Follow Request. Hunk with `--app hunk`: follow Request, then Rex Live Notes unless `--batch` | plannotator-tui split with Approve. Follow Request |
 | none, or `--browser` | Follow Browser Gate | Follow Browser Gate |
 
+Both together open the diff's split and the document's split beside this pane.
+
 In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
 
 ## Precondition
@@ -39,8 +43,8 @@ Request after the mechanical passes have run. On an unreviewed diff, say so in t
 
 ## Request
 
-1. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts raise --kind <kind> --summary "<repo> <branch>: <what to review>"`. The kind is `code` for the diff and `doc` for a document, unless the caller passes a more specific `--kind` (`plan`, `pr-body`). A caller's `--kind` and `--summary` pass through verbatim. Outside herdr it is a no-op.
-2. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --diff`, adding `--base <ref>` when the caller resolved one and `--app` and `--batch` when given, or `open --doc <file>` for a document. Under herdr, `open --diff` re-uses a reviewr sidebar already up over this working tree, and `open --doc` reloads the plannotator-tui pane it opened earlier for the same file, keeping Ben's annotations.
+1. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts raise --kind <kind> --summary "<repo> <branch>: <what to review>"`. The kind is `code` for the diff, alone or with a document, and `doc` for a document alone, unless the caller passes a more specific `--kind` (`plan`, `pr-body`). A caller's `--kind` and `--summary` pass through verbatim. Outside herdr it is a no-op.
+2. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --diff`, adding `--base <ref>` when the caller resolved one and `--app` and `--batch` when given, `open --doc <file>` for a document, or `open --diff --doc <file>` with the diff options for both. Under herdr, `open --diff` re-uses a reviewr sidebar already up over this working tree, and `open --doc` reloads the plannotator-tui pane it opened earlier for the same file, keeping Ben's annotations.
 3. For a Hunk review under Rex without `--batch`, start `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts watch` with `Monitor` at `timeout_ms: 1800000`.
 4. End the turn with one line naming the surface and saying how notes arrive: `E` in plannotator-tui, each saved note for live Hunk, Send otherwise. Leave out any recap of the change. reviewr and plannotator-tui deliver into this pane once it is idle, so Send lands only after the turn ends.
 
@@ -48,11 +52,11 @@ Request after the mechanical passes have run. On an unreviewed diff, say so in t
 
 With herdr, the next user turn holds the comment batch plus Ben's own remarks. Each block is a `path:lines` header, the verbatim snippet, and his text, as the herdr plugin's `skills/herdr/references/reviewr.md` details. Act on all of it. Sending cleared reviewr's store, so the batch in the turn is the only copy. This plugin's `UserPromptSubmit` hook has already cleared the pane label.
 
-With plannotator-tui, the next user turn holds its feedback, a heading per file and per note. Act on all of it. Its Approve on a document ends the review.
+With plannotator-tui, the next user turn holds its feedback, a heading per file and per note. Act on all of it. Its Approve on a document ends that document's review. With both open, each split sends its own feedback, and the review ends once Ben has approved the diff and the document.
 
 With Hunk under Rex, the next turn starts with its kind. On `[review: changes]`, follow the message's instructions and end the turn, and the review continues. `[review: approved]` and `[review: dismissed]` both end the review.
 
-Until Ben says approve, ship, or no further comments, act on the batch and request again. When he does, run `attention.ts close --diff`, or `close --doc <file>`, which quits the herdr split and is a no-op under Rex. Exit 2 means the surface stayed open holding unsent comments or a draft: tell Ben and leave it. Any other failure: relay its stderr to Ben.
+Until Ben says approve, ship, or no further comments, act on the batch and request again. When he does, run `attention.ts close` with the same `--diff` and `--doc <file>` flags as `open`, which quits the herdr split and is a no-op under Rex. Exit 2 means the surface stayed open holding unsent comments or a draft: tell Ben and leave it. Any other failure: relay its stderr to Ben.
 
 ## Rex Live Notes
 

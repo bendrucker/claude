@@ -55,10 +55,6 @@ export const PROJECT_SETTINGS: Source = {
 
 export const SOURCES: Source[] = [USER_SETTINGS, ...LAYER_SETTINGS, PROJECT_SETTINGS];
 
-function quoteRegex(literal: string): string {
-  return literal.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-}
-
 /** Shell syntax that cannot appear inside an unquoted or quoted path. */
 const PATH_BODY = `[^\\s"';|&)]+`;
 
@@ -82,7 +78,9 @@ function assigned(command: string, at: number): boolean {
  * install dir) and unverifiable from a checkout, so they are left alone.
  */
 export function paths(command: string, prefixes: Record<string, string>): string[] {
-  const alternation = Object.keys(prefixes).map(quoteRegex).join("|");
+  const alternation = Object.keys(prefixes)
+    .map((prefix) => RegExp.escape(prefix))
+    .join("|");
   const pattern = new RegExp(`(${alternation})(${PATH_BODY})`, "g");
 
   return [...command.matchAll(pattern)]

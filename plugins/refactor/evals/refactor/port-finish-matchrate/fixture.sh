@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ORACLE_TOKENS="68beb4fd 31c5bb02 44c68d00 9fe9cea2 51690082 f6bd0264 d33561bd 6a780f6c 54225cb8 8f32b10c 45cab757"
+ORACLE_TOKENS="68beb4fd 31c5bb02 44c68d00 9fe9cea2 51690082 f6bd0264 d33561bd 6a780f6c 54225cb8 8f32b10c 45cab757 dc60a8a1"
 git init -q -b main
 echo "/.*" >> .git/info/exclude
 git config user.name "Ben Drucker"
@@ -377,7 +377,7 @@ def main():
         with open(path, "w", encoding="utf-8", newline="") as f:
             f.write(text)
     classes = {name: [files[position[i]] if src == "c" else f"holdout:{i}" for src, i in items] for name, items in tags.items()}
-    blob = {"holdout": holdout, "classes": {"all": files + [f"holdout:{i}" for i in range(len(holdout))], **classes}}
+    blob = {"holdout": holdout, "classes": {"all": files + [f"holdout:{i}" for i in range(len(holdout))], **classes, "archive": files}}
     with open("test/samples.bin", "wb") as f:
         f.write(base64.b64encode(gzip.compress(json.dumps(blob).encode(), mtime=0)))
 

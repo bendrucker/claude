@@ -1,0 +1,1 @@
+Use the port skill if you have it. We ported `legacy/timesheet.py` to TypeScript in `src/timesheet.ts`, and the tests pass. Get it ready so we can switch the nightly job over and delete the Python version.

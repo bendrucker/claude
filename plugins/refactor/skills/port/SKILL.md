@@ -1,6 +1,6 @@
 ---
 name: port
-description: Move code to a new implementation that must behave the same, such as a rewrite in another language, a handwritten class ported to a framework's interface, a library or engine swapped out, homegrown code replaced with the standard library or a maintained package, duplicate copies merged into one, or a script converted to TypeScript. Use when porting, converting, reimplementing, migrating, or deduplicating code (not a database schema) where existing callers must not see a difference, and when looking for hand-rolled code a library should replace.
+description: Load before changing code in any port, migration, or cutover, even when the request never says "port". That covers rewriting code in another language or as TypeScript, switching code from one library, engine, or module to another, implementing a framework's interface in place of a handwritten class, replacing homegrown code with the standard library or a package, merging duplicate copies, and finishing a port or cutting callers over to it. Inputs and callers that worked before must keep working. Also use when looking for hand-rolled code a library should replace. Not for a deliberate behavior change such as a bug fix or a new option, and not for a database schema.
 argument-hint: "[<what is being ported>]"
 ---
 

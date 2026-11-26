@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: port-wrapper-exit
+tags: [dev]
+plugins: ["../../.."]
+runs: 2
+execution:
+  model: claude-sonnet-5-5
+  max_turns: 60
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Edit, Write]
+  append_system_prompt: >-
+    This sandbox has no network access. Nobody answers while you work,
+    so put anything you need from the user in your final reply.
+    Bash can write only under /var/tmp, so keep scratch files and
+    harnesses there and change repository files with Write and Edit.
+context:
+  scaffold_script: fixture.sh

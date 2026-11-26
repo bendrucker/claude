@@ -1,0 +1,1 @@
+Port every script in `bin/` from `lib/loose.ts` to `lib/strict.ts`. The loose parser lets typos and garbage through silently (`bun bin/simulate.ts --rounds abc` happily runs zero rounds), which is why we are switching.

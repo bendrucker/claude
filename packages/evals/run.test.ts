@@ -11,6 +11,7 @@ import {
   prepare,
   sessionEnv,
   splitCases,
+  splitKeepTemp,
   strayArgs,
 } from "./run";
 import { casePlugins, withDependencies } from "./suite";
@@ -218,6 +219,28 @@ test("collectTraces copies kept traces and collected files beside the results an
   );
   expect(await Bun.file(join(output, "traces/one-with-1.jsonl")).exists()).toBe(false);
   expect(await Bun.file(trace).exists()).toBe(false);
+});
+
+test("collectTraces with keep leaves the runner's temp dirs where the aggregate's tracePath points", async () => {
+  const output = mkdtempSync(join(tmpdir(), "run-output-"));
+  const kept = mkdtempSync(join(tmpdir(), "e-"));
+  const trace = join(kept, "out/trace.jsonl");
+  await Bun.write(trace, '{"type":"result","result":"reply"}');
+  await Bun.write(join(kept, "home/cwd/package.json"), "{}");
+  await Bun.write(
+    join(output, "aggregate-result.json"),
+    JSON.stringify({ cases: [{ name: "one", arms: { with: [{ tracePath: trace }] } }] }),
+  );
+  await collectTraces(output, [], { keep: true });
+  expect(await read(join(output, "traces/one-with-0.jsonl"))).toContain("reply");
+  expect(await read(join(kept, "home/cwd/package.json"))).toBe("{}");
+});
+
+test.each<{ args: string[]; keep: boolean; rest: string[] }>([
+  { args: ["--keep-temp", "--tag", "dev"], keep: true, rest: ["--tag", "dev"] },
+  { args: ["--tag", "dev"], keep: false, rest: ["--tag", "dev"] },
+])("splitKeepTemp($args)", ({ args, keep, rest }) => {
+  expect(splitKeepTemp(args)).toEqual([keep, rest]);
 });
 
 test.each([

@@ -240,6 +240,15 @@ export function splitCases(args: string[]): [cases: string[], rest: string[]] {
   return [cases, rest];
 }
 
+/**
+ * Splits `--keep-temp` off the runner's arguments. The adapter always passes it so traces can be
+ * copied out, and this reports whether the caller also asked to keep the runner's temp dirs.
+ */
+export function splitKeepTemp(args: string[]): [keep: boolean, rest: string[]] {
+  const rest = args.filter((arg) => arg !== "--keep-temp");
+  return [rest.length < args.length, rest];
+}
+
 /** Deletes the staged case directories that don't match any glob, and returns the rest. */
 export async function keepCases(dir: string, globs: string[]): Promise<string[]> {
   const patterns = globs.map((g) => new Bun.Glob(g));
@@ -317,9 +326,14 @@ async function exists(path: string): Promise<boolean> {
  * Copies each run's trace into `<output>/traces/<case>-<arm>-<n>.jsonl`, and each `collect` path
  * from its working directory into `<output>/artifacts/<case>-<arm>-<n>/`. The runner writes both
  * inside its temp directories and deletes them unless run with `--keep-temp`, so this copies them
- * out and then removes those directories.
+ * out and then removes those directories, unless `keep` leaves them for a later pass that reads
+ * each run's workspace through the aggregate's `tracePath`.
  */
-export async function collectTraces(output: string, collect: string[] = []): Promise<void> {
+export async function collectTraces(
+  output: string,
+  collect: string[] = [],
+  { keep = false }: { keep?: boolean } = {},
+): Promise<void> {
   const path = resultPath(output);
   if (!(await Bun.file(path).exists())) return;
   const copies = [...eachRun(await readResult(path))].map(
@@ -338,6 +352,7 @@ export async function collectTraces(output: string, collect: string[] = []): Pro
           await $`mkdir -p ${dirname(to)} && cp -R ${from} ${to}`.quiet();
         }),
       );
+      if (keep) return;
       // The runner leaves a write-only `sealed` directory that blocks a plain rm.
       await $`chmod -R u+rwx ${kept}/sealed ${kept}; rm -rf ${kept}`.nothrow().quiet();
     },

@@ -4,7 +4,15 @@ import type { Adapter, Transcript } from "../adapter";
 import { listTraces, resultPath, tracePath } from "../layout";
 import { regrade } from "../regrade";
 import { erroredRuns, readResult } from "../result";
-import { collectTraces, keepCases, pluginErrors, prepare, sessionEnv, splitCases } from "../run";
+import {
+  collectTraces,
+  keepCases,
+  pluginErrors,
+  prepare,
+  sessionEnv,
+  splitCases,
+  splitKeepTemp,
+} from "../run";
 import { scoreSuite } from "../score";
 import { loadTags, readSuite } from "../suite";
 import { calls, type Measured, traceMeasures, traceReply } from "../trace";
@@ -25,7 +33,8 @@ export const native: Adapter = {
     const repo = (await $`git rev-parse --show-toplevel`.text()).trim();
     const suite = relative(repo, resolve(suiteArg));
     const config = await readSuite(join(repo, suite));
-    const [globs, args] = splitCases(passed);
+    const [globs, rest] = splitCases(passed);
+    const [keep, args] = splitKeepTemp(rest);
     const { target, evalDir } = await prepare(repo, suite, ref, remove);
     if (globs.length > 0) await keepCases(join(target, evalDir), globs);
     const stamp = new Date()
@@ -63,7 +72,7 @@ export const native: Adapter = {
       { env: sessionEnv(), stdio: ["inherit", "inherit", "inherit"] },
     );
     const code = await proc.exited;
-    await collectTraces(output, config.collect);
+    await collectTraces(output, config.collect, { keep });
     await $`rm -rf ${dirname(target)}`.quiet();
     if (await Bun.file(resultPath(output)).exists()) await scoreSuite(join(repo, suite), output);
     const loadErrors = await pluginErrors(output);

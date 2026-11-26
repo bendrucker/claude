@@ -18,7 +18,7 @@ When asked to look for candidates rather than replace a named one, search for ha
 
 Replace when the code implements a format or protocol with a spec (CSV, YAML, semver, shell quoting, URLs), escapes or encodes anything that reaches a shell, regex, HTML, or SQL, coordinates concurrency, retries, or timeouts, or has already needed fixes for inputs nobody anticipated.
 
-Keep the homegrown code, and say why, when it is a total function over a small input domain the code fully controls, when the repository's rules bar the dependency in that location (a dependency-free hook, a plugin that cannot import shared code), or when the closest library's semantics fit worse than the code it replaces.
+Keep the homegrown code, and say why, when it is a total function over a small input domain the code fully controls, when the project bars new dependencies in that location, or when the closest library's semantics fit worse than the code it replaces.
 
 Pick the replacement in this order:
 

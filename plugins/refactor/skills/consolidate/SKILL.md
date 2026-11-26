@@ -29,7 +29,7 @@ Stop and report when the parameters needed to cover the variations outnumber the
 
 Put the shared version where every caller can depend on it without an import cycle or a new dependency direction. Name it for what it holds. A shared module named `utils`, `helpers`, or `common` means the abstraction is not settled.
 
-When the callers cannot import each other's code, such as separately packaged plugins, publish the shared version as a package that each one declares in its own manifest and lockfile. When a package is too heavy for what is shared, as in a dependency-free hook, keep one identical copy per caller and add a test that fails when the copies differ.
+When the copies live in separate packages or repositories, the shared version becomes a package that each one depends on.
 
 ## Migration
 

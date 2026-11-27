@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { table } from "table";
 import { emittedOf, RunLogEntry, type RunOutcome, resolveLogPath } from "../../../hooks/run-log";
 
@@ -229,41 +229,33 @@ export async function readLog(path: string, since?: string): Promise<RunLogEntry
   return Number.isNaN(cutoff) ? entries : entries.filter((entry) => Date.parse(entry.ts) >= cutoff);
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "hook-health",
-    help: {
-      description:
-        "Read the writing-hooks run log and report outcomes, latency, and how often each check's alerts were acted on.",
-    },
-    flags: {
-      log: {
-        type: String,
-        description: "Log path (default: WRITING_HOOKS_LOG or ~/.claude/writing-hooks/log.jsonl)",
-      },
-      since: {
-        type: String,
-        description: "Only count entries at or after this date (ISO)",
-      },
-      json: {
-        type: Boolean,
-        description: "Emit the summary as JSON instead of tables",
-      },
-    },
+export const program = new Command("hook-health")
+  .description(
+    "Read the writing-hooks run log and report outcomes, latency, and how often each check's alerts were acted on.",
+  )
+  .option(
+    "--log <path>",
+    "Log path (default: WRITING_HOOKS_LOG or ~/.claude/writing-hooks/log.jsonl)",
+  )
+  .option("--since <date>", "Only count entries at or after this date (ISO)")
+  .option("--json", "Emit the summary as JSON instead of tables")
+  .action(async (flags) => {
+    const path = flags.log ?? resolveLogPath();
+    if (path == null || path === "") {
+      console.error("Logging is disabled (WRITING_HOOKS_LOG). Pass --log <path>.");
+      process.exit(1);
+    }
+
+    const entries = await readLog(path, flags.since);
+    if (entries.length === 0) {
+      console.error(`No log entries at ${path}. The hook writes one line per run.`);
+      process.exit(1);
+    }
+
+    const health = summarize(entries);
+    console.log(flags.json ? JSON.stringify(health, null, 2) : renderReport(health));
   });
 
-  const path = argv.flags.log ?? resolveLogPath();
-  if (path == null || path === "") {
-    console.error("Logging is disabled (WRITING_HOOKS_LOG). Pass --log <path>.");
-    process.exit(1);
-  }
-
-  const entries = await readLog(path, argv.flags.since);
-  if (entries.length === 0) {
-    console.error(`No log entries at ${path}. The hook writes one line per run.`);
-    process.exit(1);
-  }
-
-  const health = summarize(entries);
-  console.log(argv.flags.json ? JSON.stringify(health, null, 2) : renderReport(health));
+if (import.meta.main) {
+  await program.parseAsync();
 }

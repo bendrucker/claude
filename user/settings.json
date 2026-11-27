@@ -104,6 +104,17 @@
             "type": "command"
           }
         ]
+      },
+      {
+        "matcher": "^(startup|resume|clear|compact|fork)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "h=\"$HOME/.local/share/rex-agent-resume/bin/rex-agent-resume-hook\"; [ -x \"$h\" ] && exec \"$h\" claude || cat >/dev/null",
+            "timeout": 10,
+            "async": true
+          }
+        ]
       }
     ],
     "Stop": [
@@ -156,7 +167,7 @@
       "options": {
         "auto_merge": true,
         "stack_file": "wt/stack",
-        "body_review_skill": "review:human"
+        "review_skill": "review:human"
       }
     },
     "things@bendrucker": {
@@ -376,6 +387,8 @@
       "git:*",
       "wt:*",
       "claude:*",
+      "claude-sync:*",
+      "dotfiles-sync:*",
       "agent-browser:*",
       "open:*",
       "osascript:*",

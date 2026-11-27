@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 
 // Re-arming is idempotent: GitLab returns 409 "already set to Auto-Merge" when the
@@ -246,33 +246,22 @@ export async function currentBranch(): Promise<string> {
   return branch;
 }
 
-if (import.meta.main) {
-  try {
-    const argv = cli({
-      name: "merge",
-      parameters: ["[refs...]"],
-      flags: {
-        autoMerge: { type: Boolean, description: "Enable auto-merge", default: false },
-        squash: { type: Boolean, description: "Squash commits when merging", default: false },
-        sha: { type: String, description: "Merge only if the source branch head matches this SHA" },
-        repo: {
-          type: String,
-          alias: "R",
-          description: "Target group/project instead of the checkout",
-        },
-        status: {
-          type: Boolean,
-          description:
-            "Print one JSON readiness line per MR (branch or iid) and exit without merging",
-          default: false,
-        },
-      },
-    });
+export const program = new Command("merge")
+  .argument("[refs...]")
+  .option("--auto-merge", "Enable auto-merge", false)
+  .option("--squash", "Squash commits when merging", false)
+  .option("--sha <sha>", "Merge only if the source branch head matches this SHA")
+  .option("-R, --repo <repo>", "Target group/project instead of the checkout")
+  .option(
+    "--status",
+    "Print one JSON readiness line per MR (branch or iid) and exit without merging",
+    false,
+  )
+  .action(async (argRefs, flags) => {
+    const actions = glabActions(flags.repo);
+    const refs = argRefs.length > 0 ? argRefs : [await currentBranch()];
 
-    const actions = glabActions(argv.flags.repo);
-    const refs = argv._.refs.length > 0 ? argv._.refs : [await currentBranch()];
-
-    if (argv.flags.status) {
+    if (flags.status) {
       for (const result of await status(refs, actions)) console.log(JSON.stringify(result));
     } else {
       const [ref, ...extra] = refs;
@@ -281,10 +270,15 @@ if (import.meta.main) {
       }
       await merge(
         ref,
-        { autoMerge: argv.flags.autoMerge, squash: argv.flags.squash, sha: argv.flags.sha },
+        { autoMerge: flags.autoMerge, squash: flags.squash, sha: flags.sha },
         actions,
       );
     }
+  });
+
+if (import.meta.main) {
+  try {
+    await program.parseAsync();
   } catch (error) {
     console.error(errorText(error));
     process.exit(1);

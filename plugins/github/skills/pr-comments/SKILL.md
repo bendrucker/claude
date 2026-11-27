@@ -29,7 +29,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts react <thread-id> [--down] [
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts resolve <thread-id>
 ```
 
-`reply` also takes `--bodyFile <path>` or stdin. Upload a screenshot for a reply through the endpoint in `github:attach`, since `gh`'s `--attach` does not reach review threads.
+`reply` also takes `--body-file <path>` or stdin. Upload a screenshot for a reply through the endpoint in `github:attach`, since `gh`'s `--attach` does not reach review threads.
 
 Resolve each thread together with a reply or a reaction, through `reply --resolve` or `react --resolve`. The reply or reaction records why the thread closed. React with a thumbs up where an acknowledgment reply would add nothing (test coverage, a rename, an obvious guard). The reaction goes on the thread's first comment.
 

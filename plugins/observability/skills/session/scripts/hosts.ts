@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { join } from "node:path";
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 import { getDataDir, LOCAL_HOST, listImportedHosts } from "./db";
@@ -8,17 +8,20 @@ import { errorClass } from "./events";
 import { withReader } from "./index-writer";
 import { list, s3Location, type Staleness, uploadStaleness } from "./pull";
 
-const argv = cli({
-  name: "hosts",
-  flags: {
-    staleDays: {
-      type: Number,
-      description:
-        "Flag an s3:// host whose newest uploaded object is older than this many days, and exit 1",
-      default: 3,
-    },
-  },
-});
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+export const program = new Command("hosts").option(
+  "--stale-days <days>",
+  "Flag an s3:// host whose newest uploaded object is older than this many days, and exit 1",
+  number,
+  3,
+);
+
+const flags = (await program.parseAsync()).opts();
 
 const dataDir = getDataDir();
 
@@ -48,7 +51,7 @@ async function uploads(source: string): Promise<Staleness | Error | undefined> {
   if (location === undefined) return undefined;
   try {
     const objects = await list(location.bucket, location.prefix);
-    return uploadStaleness(objects, Date.now(), argv.flags.staleDays);
+    return uploadStaleness(objects, Date.now(), flags.staleDays);
   } catch (error) {
     return new Error(errorClass(error));
   }
@@ -90,7 +93,7 @@ const warnings = imported.flatMap(({ label }, i) => {
   if (upload?.stale !== true) return [];
   const last =
     upload.newest === undefined ? "no uploads" : `newest upload ${minute(upload.newest)} UTC`;
-  return [`stale: ${label} ${last}, threshold ${argv.flags.staleDays} day(s)`];
+  return [`stale: ${label} ${last}, threshold ${flags.staleDays} day(s)`];
 });
 for (const warning of warnings) console.error(warning);
 if (warnings.length > 0) process.exitCode = 1;

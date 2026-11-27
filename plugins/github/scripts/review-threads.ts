@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli, command } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 
 export const REPLY_MUTATION = `
@@ -69,46 +69,29 @@ async function readBody(body?: string, file?: string): Promise<string> {
   return (await Bun.stdin.text()).trim();
 }
 
-const replyCmd = command(
-  {
-    name: "reply",
-    parameters: ["<thread-id>"],
-    flags: {
-      body: { type: String, description: "Reply text" },
-      bodyFile: { type: String, description: "Read reply from file (default: stdin)" },
-      resolve: {
-        type: Boolean,
-        description: "Resolve the thread after replying",
-        default: false,
-      },
-    },
-  },
-  async (parsed) => {
-    const threadId = parsed._.threadId;
-    const body = await readBody(parsed.flags.body, parsed.flags.bodyFile);
+const replyCmd = new Command("reply")
+  .argument("<thread-id>")
+  .option("--body <text>", "Reply text")
+  .option("--body-file <path>", "Read reply from file (default: stdin)")
+  .option("--resolve", "Resolve the thread after replying", false)
+  .action(async (threadId, flags) => {
+    const body = await readBody(flags.body, flags.bodyFile);
     if (body === "") {
       console.error("Reply body is empty");
       process.exit(1);
     }
 
     await ghGraphQL(z.unknown(), REPLY_MUTATION, { threadId, body });
-    if (parsed.flags.resolve) {
+    if (flags.resolve) {
       await ghGraphQL(z.unknown(), RESOLVE_MUTATION, { threadId });
     }
-    console.error(`Replied to ${threadId}${parsed.flags.resolve ? " and resolved" : ""}`);
-  },
-);
+    console.error(`Replied to ${threadId}${flags.resolve ? " and resolved" : ""}`);
+  });
 
-const resolveCmd = command(
-  {
-    name: "resolve",
-    parameters: ["<thread-id>"],
-  },
-  async (parsed) => {
-    await ghGraphQL(z.unknown(), RESOLVE_MUTATION, { threadId: parsed._.threadId });
-    console.error(`Resolved ${parsed._.threadId}`);
-  },
-);
+const resolveCmd = new Command("resolve").argument("<thread-id>").action(async (threadId) => {
+  await ghGraphQL(z.unknown(), RESOLVE_MUTATION, { threadId });
+  console.error(`Resolved ${threadId}`);
+});
 
 const ThreadCommentResponse = z.looseObject({
   data: z.looseObject({
@@ -129,46 +112,31 @@ async function firstCommentId(threadId: string): Promise<string> {
   return id;
 }
 
-const reactCmd = command(
-  {
-    name: "react",
-    parameters: ["<thread-id>"],
-    flags: {
-      down: {
-        type: Boolean,
-        description: "React with thumbs down instead of thumbs up",
-        default: false,
-      },
-      resolve: {
-        type: Boolean,
-        description: "Resolve the thread after reacting",
-        default: false,
-      },
-    },
-  },
-  async (parsed) => {
-    const threadId = parsed._.threadId;
-    const content = parsed.flags.down ? "THUMBS_DOWN" : "THUMBS_UP";
+const reactCmd = new Command("react")
+  .argument("<thread-id>")
+  .option("--down", "React with thumbs down instead of thumbs up", false)
+  .option("--resolve", "Resolve the thread after reacting", false)
+  .action(async (threadId, flags) => {
+    const content = flags.down ? "THUMBS_DOWN" : "THUMBS_UP";
     const subjectId = await firstCommentId(threadId);
 
     await ghGraphQL(z.unknown(), REACT_MUTATION, { subjectId, content });
-    if (parsed.flags.resolve) {
+    if (flags.resolve) {
       await ghGraphQL(z.unknown(), RESOLVE_MUTATION, { threadId });
     }
     console.error(
-      `Reacted ${parsed.flags.down ? "👎" : "👍"} to ${threadId}${parsed.flags.resolve ? " and resolved" : ""}`,
+      `Reacted ${flags.down ? "👎" : "👍"} to ${threadId}${flags.resolve ? " and resolved" : ""}`,
     );
-  },
-);
+  });
+
+export const program = new Command("review-threads")
+  .addCommand(replyCmd)
+  .addCommand(resolveCmd)
+  .addCommand(reactCmd)
+  .action(() => {
+    program.help();
+  });
 
 if (import.meta.main) {
-  await cli(
-    {
-      name: "review-threads",
-      commands: [replyCmd, resolveCmd, reactCmd],
-    },
-    (parsed) => {
-      parsed.showHelp();
-    },
-  );
+  await program.parseAsync();
 }

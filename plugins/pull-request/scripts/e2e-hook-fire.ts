@@ -143,23 +143,18 @@ async function runClaude(cwd: string, binDir: string, prompt: string): Promise<R
       env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
       stdout: "pipe",
       stderr: "pipe",
+      timeout: RUN_TIMEOUT_MS,
+      killSignal: "SIGKILL",
     },
   );
-
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    proc.kill("SIGKILL");
-  }, RUN_TIMEOUT_MS);
 
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
   ]);
   const exitCode = await proc.exited;
-  clearTimeout(timer);
 
-  return { output: `${stdout}${stderr}`, timedOut, exitCode };
+  return { output: `${stdout}${stderr}`, timedOut: proc.signalCode === "SIGKILL", exitCode };
 }
 
 async function createCount(logPath: string, marker: string): Promise<number> {

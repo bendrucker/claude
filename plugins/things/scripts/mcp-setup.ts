@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 
 export const SERVER_NAME = "things";
 
@@ -118,24 +118,25 @@ export const claudeCli: ClaudeActions = {
   },
 };
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "mcp-setup",
-    parameters: ["[url]"],
-    help: {
-      description: `Configure the ${SERVER_NAME} MCP server at user scope and log in. Takes the URL from the argument or THINGS_MCP_URL.`,
-    },
+export const program = new Command("mcp-setup")
+  .description(
+    `Configure the ${SERVER_NAME} MCP server at user scope and log in. Takes the URL from the argument or THINGS_MCP_URL.`,
+  )
+  .argument("[url]")
+  .action(async (url) => {
+    try {
+      const result = await setup(resolveUrl(url, process.env), claudeCli);
+      console.log(
+        result.configured === "added"
+          ? `configured ${SERVER_NAME} at ${result.url}`
+          : `${SERVER_NAME} already points at ${result.url}`,
+      );
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
   });
 
-  try {
-    const result = await setup(resolveUrl(argv._.url, process.env), claudeCli);
-    console.log(
-      result.configured === "added"
-        ? `configured ${SERVER_NAME} at ${result.url}`
-        : `${SERVER_NAME} already points at ${result.url}`,
-    );
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
+if (import.meta.main) {
+  await program.parseAsync();
 }

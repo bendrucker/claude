@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@commander-js/extra-typings": "~15.0.0",
     "acorn": "^8.15.0",
-    "cleye": "^2.0.0",
+    "commander": "~15.0.0",
     "zod": "^4.4.3"
   }
 }

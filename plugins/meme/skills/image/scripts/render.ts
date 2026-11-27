@@ -8,7 +8,7 @@ import {
   loadImage,
   type SKRSContext2D,
 } from "@napi-rs/canvas";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import sharp from "sharp";
 import {
   captionBarHeight,
@@ -275,61 +275,54 @@ export async function render(
   return { outPath: absolute, width: canvas.width, height: canvas.height, bars, warnings };
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "render",
-    parameters: ["<image>"],
-    help: {
-      description: "Overlay meme text on an image and write a PNG.",
-    },
-    flags: {
-      top: { type: String, description: "Classic Impact macro text at the top" },
-      bottom: { type: String, description: "Classic Impact macro text at the bottom" },
-      subtitle: { type: String, description: "TV-subtitle text at the bottom" },
-      caption: { type: String, description: "White-bar caption text (expands the canvas)" },
-      captionPosition: {
-        type: String,
-        description: "Caption bar placement: top or bottom (default: top)",
-      },
-      spec: {
-        type: String,
-        alias: "s",
-        description: "Path to a JSON layout spec file (mutually exclusive with text flags)",
-      },
-      out: { type: String, alias: "o", description: "Output PNG path (required)" },
-    },
+export const program = new Command("render")
+  .description("Overlay meme text on an image and write a PNG.")
+  .argument("<image>")
+  .option("--top <text>", "Classic Impact macro text at the top")
+  .option("--bottom <text>", "Classic Impact macro text at the bottom")
+  .option("--subtitle <text>", "TV-subtitle text at the bottom")
+  .option("--caption <text>", "White-bar caption text (expands the canvas)")
+  .option("--caption-position <position>", "Caption bar placement: top or bottom (default: top)")
+  .option(
+    "-s, --spec <path>",
+    "Path to a JSON layout spec file (mutually exclusive with text flags)",
+  )
+  .option("-o, --out <path>", "Output PNG path (required)")
+  .action(async (image, flags) => {
+    const { top, bottom, subtitle, caption, captionPosition, spec: specPath, out } = flags;
+    if (out == null || out === "") {
+      console.error("error: --out is required");
+      process.exit(1);
+    }
+    if (
+      specPath != null &&
+      specPath !== "" &&
+      ((top != null && top !== "") ||
+        (bottom != null && bottom !== "") ||
+        (subtitle != null && subtitle !== "") ||
+        (caption != null && caption !== "") ||
+        (captionPosition != null && captionPosition !== ""))
+    ) {
+      console.error("error: --spec is mutually exclusive with --top/--bottom/--subtitle/--caption");
+      process.exit(1);
+    }
+
+    try {
+      const spec =
+        specPath != null && specPath !== ""
+          ? validateSpec(await Bun.file(specPath).json())
+          : specFromFlags({ top, bottom, subtitle, caption, captionPosition });
+      const result = await render(spec, image, out);
+      for (const warning of result.warnings) {
+        console.error(`warning: ${warning}`);
+      }
+      console.log(result.outPath);
+    } catch (error) {
+      console.error(`error: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
   });
 
-  const { top, bottom, subtitle, caption, captionPosition, spec: specPath, out } = argv.flags;
-  if (out == null || out === "") {
-    console.error("error: --out is required");
-    process.exit(1);
-  }
-  if (
-    specPath != null &&
-    specPath !== "" &&
-    ((top != null && top !== "") ||
-      (bottom != null && bottom !== "") ||
-      (subtitle != null && subtitle !== "") ||
-      (caption != null && caption !== "") ||
-      (captionPosition != null && captionPosition !== ""))
-  ) {
-    console.error("error: --spec is mutually exclusive with --top/--bottom/--subtitle/--caption");
-    process.exit(1);
-  }
-
-  try {
-    const spec =
-      specPath != null && specPath !== ""
-        ? validateSpec(await Bun.file(specPath).json())
-        : specFromFlags({ top, bottom, subtitle, caption, captionPosition });
-    const result = await render(spec, argv._.image, out);
-    for (const warning of result.warnings) {
-      console.error(`warning: ${warning}`);
-    }
-    console.log(result.outPath);
-  } catch (error) {
-    console.error(`error: ${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
-  }
+if (import.meta.main) {
+  await program.parseAsync();
 }

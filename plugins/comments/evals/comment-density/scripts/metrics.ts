@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { join } from "node:path";
 import { table } from "table";
 import { z } from "zod";
@@ -91,26 +91,20 @@ const Scores = z
   })
   .loose();
 
-async function main(): Promise<void> {
-  const argv = cli({
-    name: "metrics",
-    help: {
-      description: "Compute eval metrics from scores.json plus labels, append to history.jsonl.",
-    },
-    flags: {
-      scores: {
-        type: String,
-        description: "Path to the scores JSON from score.ts",
-        default: join(root, "results", "scores.json"),
-      },
-      note: {
-        type: String,
-        description: "Tag for this run in history.jsonl",
-      },
-    },
+export const program = new Command("metrics")
+  .description("Compute eval metrics from scores.json plus labels, append to history.jsonl.")
+  .option(
+    "--scores <path>",
+    "Path to the scores JSON from score.ts",
+    join(root, "results", "scores.json"),
+  )
+  .option("--note <tag>", "Tag for this run in history.jsonl")
+  .action(async (flags) => {
+    await main(flags);
   });
 
-  const scores = await decodeFile(Scores, argv.flags.scores);
+async function main(flags: { scores: string; note?: string }): Promise<void> {
+  const scores = await decodeFile(Scores, flags.scores);
   const commitLabels = await decodeFile(z.array(CommitLabel), join(root, "labels", "commits.json"));
   const sessionLabels = await decodeFile(
     z.array(SessionLabel),
@@ -209,7 +203,7 @@ async function main(): Promise<void> {
 
   const record = {
     at: new Date().toISOString(),
-    note: argv.flags.note ?? null,
+    note: flags.note ?? null,
     metrics,
     counts,
   };
@@ -232,12 +226,12 @@ async function main(): Promise<void> {
       ["objective (rho + sessionPrecision)", fmt(metrics.objective), ""],
     ]),
   );
-  const noteSuffix = argv.flags.note == null ? "" : `, note: ${argv.flags.note}`;
+  const noteSuffix = flags.note == null ? "" : `, note: ${flags.note}`;
   console.log(
     `commits ${counts.commitsMeasurable}/${counts.commitsLabeled} measurable, sessions ${counts.sessionsMeasurable}/${counts.sessionsLabeled}, complaints ${counts.complaintsMeasurable}/${counts.complaintsLabeled}${noteSuffix}`,
   );
 }
 
 if (import.meta.main) {
-  await main();
+  await program.parseAsync();
 }

@@ -11,6 +11,7 @@
     "gitlab@bendrucker": true,
     "herdr@bendrucker": true,
     "load@bendrucker": true,
+    "mod-events@bendrucker": true,
     "plan@bendrucker": true
   },
   "cleanupPeriodDays": 90,

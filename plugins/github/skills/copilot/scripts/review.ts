@@ -4,7 +4,7 @@ import { mkdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { $ } from "bun";
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { getBorderCharacters, table } from "table";
 import { z } from "zod";
 
@@ -631,52 +631,23 @@ async function collectContents(diff: Diff, cwd: string, maxBytes: number) {
   return { contents, skipped };
 }
 
-async function main(): Promise<void> {
-  const argv = cli({
-    name: "copilot-review",
-    flags: {
-      base: {
-        type: String,
-        description: "Base ref to diff against (default: upstream, then origin/main)",
-      },
-      model: {
-        type: String,
-        description: "Copilot model",
-        default: DEFAULT_MODEL,
-      },
-      angles: {
-        type: Number,
-        description: `Independent review angles to run, 1 to ${MAX_ANGLES}. Each is one more billed call`,
-        default: 1,
-      },
-      maxBytes: {
-        type: Number,
-        description: "Refuse a prompt larger than this many bytes",
-        default: DEFAULT_MAX_BYTES,
-      },
-      dryRun: {
-        type: Boolean,
-        description: "Print the prompts and their size, spend nothing",
-        default: false,
-      },
-      force: {
-        type: Boolean,
-        description: "Run even when a prompt exceeds --max-bytes",
-        default: false,
-      },
-      status: {
-        type: Boolean,
-        description: "Print the budget tier and the band table, spend nothing",
-        default: false,
-      },
-      agentic: {
-        type: Boolean,
-        description:
-          "Review from a disposable checkout with tools, not inlined text. Abundant tier only",
-        default: false,
-      },
-    },
-  });
+function parseNumber(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+async function main(flags: {
+  base?: string | undefined;
+  model: string;
+  angles: number;
+  maxBytes: number;
+  dryRun: boolean;
+  force: boolean;
+  status: boolean;
+  agentic: boolean;
+}): Promise<void> {
+  const argv = { flags };
 
   if (argv.flags.status) {
     printStatus(readMeter(new Date()));
@@ -899,6 +870,31 @@ async function main(): Promise<void> {
   process.exit(failed ? 1 : 0);
 }
 
-if (import.meta.main) {
-  await main();
-}
+export const program = new Command("copilot-review")
+  .option("--base <ref>", "Base ref to diff against (default: upstream, then origin/main)")
+  .option("--model <name>", "Copilot model", DEFAULT_MODEL)
+  .option(
+    "--angles <n>",
+    `Independent review angles to run, 1 to ${MAX_ANGLES}. Each is one more billed call`,
+    parseNumber,
+    1,
+  )
+  .option(
+    "--max-bytes <n>",
+    "Refuse a prompt larger than this many bytes",
+    parseNumber,
+    DEFAULT_MAX_BYTES,
+  )
+  .option("--dry-run", "Print the prompts and their size, spend nothing", false)
+  .option("--force", "Run even when a prompt exceeds --max-bytes", false)
+  .option("--status", "Print the budget tier and the band table, spend nothing", false)
+  .option(
+    "--agentic",
+    "Review from a disposable checkout with tools, not inlined text. Abundant tier only",
+    false,
+  )
+  .action(async (flags) => {
+    await main(flags);
+  });
+
+if (import.meta.main) await program.parseAsync();

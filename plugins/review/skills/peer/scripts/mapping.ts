@@ -1,22 +1,17 @@
-import { cli, command } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { decodeComments, type ReviewComment } from "./comment";
 import { parseDiff } from "./diff";
 import { toGitHubComment, toGitLabPosition, validateInDiff } from "./platform";
 
-const mapCmd = command(
-  {
-    name: "map",
-    flags: {
-      platform: { type: String, description: "Target platform: github or gitlab" },
-      comments: { type: String, description: "Path to comments JSON ({comments:[...]} or [...])" },
-      diff: { type: String, description: "Path to unified diff text" },
-      commit: { type: String, description: "Head commit SHA" },
-      base: { type: String, description: "Base SHA (gitlab)" },
-      start: { type: String, description: "Start SHA (gitlab)" },
-    },
-  },
-  async (parsed) => {
-    const { platform, comments, diff, commit, base, start } = parsed.flags;
+const mapCmd = new Command("map")
+  .option("--platform <platform>", "Target platform: github or gitlab")
+  .option("--comments <path>", "Path to comments JSON ({comments:[...]} or [...])")
+  .option("--diff <path>", "Path to unified diff text")
+  .option("--commit <sha>", "Head commit SHA")
+  .option("--base <sha>", "Base SHA (gitlab)")
+  .option("--start <sha>", "Start SHA (gitlab)")
+  .action(async (flags) => {
+    const { platform, comments, diff, commit, base, start } = flags;
 
     if (platform !== "github" && platform !== "gitlab") {
       console.error("--platform must be github or gitlab");
@@ -67,12 +62,11 @@ const mapCmd = command(
     }
 
     console.log(JSON.stringify({ platform, payloads, dropped }, null, 2));
-  },
-);
+  });
+
+// A bare invocation runs nothing and exits 0.
+export const program = new Command("mapping").addCommand(mapCmd).action(() => undefined);
 
 if (import.meta.main) {
-  await cli({
-    name: "mapping",
-    commands: [mapCmd],
-  });
+  await program.parseAsync();
 }

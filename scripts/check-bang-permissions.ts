@@ -98,7 +98,7 @@ function globToRegExp(glob: string, separator: boolean): RegExp {
       if (part === "/**") return "(?:/.*)?";
       if (part === "**") return ".*";
       if (part === "*") return separator ? "[^/]*" : ".*";
-      return part.replaceAll(/[.+?^${}()|[\]\\]/g, String.raw`\$&`);
+      return RegExp.escape(part);
     })
     .join("");
   return new RegExp(`^${pattern}$`, "s");

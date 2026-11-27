@@ -71,7 +71,7 @@ With the `x-callback-url` plugin installed, the scripts read Things' response th
 - `add`, `update`, and `inbox.ts`: a link to the todo. Present it.
 - `json`: `x-things-ids=["id1","id2"]`. Present a bulleted list of each todo's title linked as `${user_config.link_base}<id>`.
 
-`--callback=false` switches `url.ts` to fire-and-forget `open -g`. Without xcall it falls back to that silently.
+`--no-callback` switches `url.ts` to fire-and-forget `open -g`. Without xcall it falls back to that silently.
 
 On the fallback path `url.ts` exits 0 with empty stdout after a successful write. Judge failure by a non-zero exit and stderr. Confirm a silent write with `things:jxa` before retrying, since a repeated `add` creates duplicates. `inbox.ts` (`captured: <title>`) and `reorder.ts` always print on success, so silence from them is a failure.
 

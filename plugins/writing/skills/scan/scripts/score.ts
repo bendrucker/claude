@@ -2,7 +2,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { table } from "table";
 import { lintFile, valeWords } from "../../../detection/vale";
 import { readInput } from "../../../scripts/io";
@@ -65,27 +65,18 @@ export function renderTable(report: ScoreReport): string {
   return `${header}\n${table([["Check", "Hits", "Density /1k"], ...rows])}`.trimEnd();
 }
 
+export const program = new Command("score")
+  .description(
+    "Score one input (file path, inline text, or stdin) for trope density per 1000 words. Informational: always exits 0.",
+  )
+  .argument("[input]")
+  .option("--json", "Emit the report as JSON for comparing two runs", false)
+  .action(async (input, flags) => {
+    const { text, filePath } = await readInput(input);
+    const report = filePath === undefined ? await scoreText(text) : await scoreFile(filePath);
+    console.log(flags.json ? JSON.stringify(report, null, 2) : renderTable(report));
+  });
+
 if (import.meta.main) {
-  await cli(
-    {
-      name: "score",
-      parameters: ["[input]"],
-      help: {
-        description:
-          "Score one input (file path, inline text, or stdin) for trope density per 1000 words. Informational: always exits 0.",
-      },
-      flags: {
-        json: {
-          type: Boolean,
-          description: "Emit the report as JSON for comparing two runs",
-          default: false,
-        },
-      },
-    },
-    async (argv) => {
-      const { text, filePath } = await readInput(argv._.input);
-      const report = filePath === undefined ? await scoreText(text) : await scoreFile(filePath);
-      console.log(argv.flags.json ? JSON.stringify(report, null, 2) : renderTable(report));
-    },
-  );
+  await program.parseAsync();
 }

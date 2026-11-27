@@ -1,6 +1,6 @@
 import { extname, resolve } from "node:path";
 
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { type Browser, chromium } from "playwright";
 
 export interface RenderOptions {
@@ -58,45 +58,45 @@ export async function renderFile(
   }
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "render-html",
-    parameters: ["<files...>"],
-    flags: {
-      scale: {
-        type: Number,
-        description: "Scale factor for rendering",
-        default: 1,
-      },
-    },
-  });
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
 
-  const args = argv._.files;
-  const scale = argv.flags.scale;
+export const program = new Command("render-html")
+  .argument("<files...>")
+  .option("--scale <n>", "Scale factor for rendering", number, 1)
+  .action(async (args, flags) => {
+    const scale = flags.scale;
 
-  const lastArg = args.at(-1);
-  const hasOutputPath = lastArg !== undefined && extname(lastArg) === ".png";
-  const outputPath = hasOutputPath ? lastArg : undefined;
-  const files = hasOutputPath ? args.slice(0, -1) : args;
+    const lastArg = args.at(-1);
+    const hasOutputPath = lastArg !== undefined && extname(lastArg) === ".png";
+    const outputPath = hasOutputPath ? lastArg : undefined;
+    const files = hasOutputPath ? args.slice(0, -1) : args;
 
-  if (files.length === 0) {
-    console.error("No HTML files provided");
-    process.exit(1);
-  }
-
-  if (hasOutputPath && files.length > 1) {
-    console.error("Cannot specify output path with multiple input files");
-    process.exit(1);
-  }
-
-  for (const file of files) {
-    try {
-      // oxlint-disable-next-line no-await-in-loop -- each render drives a headless browser and prints its result before the next starts.
-      const result = await renderFile(file, outputPath, { scale });
-      console.log(`Rendered ${result.input} to ${result.output}`);
-    } catch (error) {
-      console.error(`Failed ${file}: ${error instanceof Error ? error.message : String(error)}`);
+    if (files.length === 0) {
+      console.error("No HTML files provided");
       process.exit(1);
     }
-  }
+
+    if (hasOutputPath && files.length > 1) {
+      console.error("Cannot specify output path with multiple input files");
+      process.exit(1);
+    }
+
+    for (const file of files) {
+      try {
+        // oxlint-disable-next-line no-await-in-loop -- each render drives a headless browser and prints its result before the next starts.
+        const result = await renderFile(file, outputPath, { scale });
+        console.log(`Rendered ${result.input} to ${result.output}`);
+      } catch (error) {
+        console.error(`Failed ${file}: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    }
+  });
+
+if (import.meta.main) {
+  await program.parseAsync();
 }

@@ -4,7 +4,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Glob } from "bun";
-import { cli, command } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 import { stripCommentMarkers } from "../apply/edits";
@@ -535,52 +535,40 @@ async function score(jobDir: string | undefined, gate: boolean): Promise<number>
   return gateOn(fixtures, alignVerdicts(fixtures, await readJobVerdicts(jobDir)), gate);
 }
 
-const GATE_FLAG = {
-  type: Boolean,
-  default: false,
-  description:
-    "Exit non-zero when the judge drops a must-keep fact, keeps too much of a gold trim, or slop recall falls under the floor",
-} as const;
-
-if (import.meta.main) {
-  // cleye runs one handler synchronously, either a command's or the root's, so
-  // the handler parks its work here for the top-level await below. `--help`
-  // parks nothing and exits 0.
-  let task: Promise<number> | undefined;
-
-  const buildCmd = command(
-    {
-      name: "build",
-      flags: {
-        jobBase: { type: String, default: EVAL_JOB_BASE, description: "Where the job dir lands" },
-      },
-    },
-    (parsed) => {
-      task = build(parsed.flags.jobBase);
-    },
-  );
-
-  const scoreCmd = command(
-    {
-      name: "score",
-      flags: {
-        job: { type: String, description: "The job dir printed by build" },
-        gate: GATE_FLAG,
-      },
-    },
-    (parsed) => {
-      task = score(parsed.flags.job, parsed.flags.gate);
-    },
-  );
-
-  await cli({ name: "eval", commands: [buildCmd, scoreCmd] }, (parsed) => {
-    parsed.showHelp();
-  });
-
+/** Exit with a subcommand's status, printing a thrown error's message instead of its stack. */
+async function settle(task: Promise<number>): Promise<never> {
   process.exit(
-    await (task?.catch((error: unknown) => {
+    await task.catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));
       return 1;
-    }) ?? 0),
+    }),
   );
+}
+
+const buildCmd = new Command("build")
+  .option("--job-base <dir>", "Where the job dir lands", EVAL_JOB_BASE)
+  .action(async (flags) => {
+    await settle(build(flags.jobBase));
+  });
+
+const scoreCmd = new Command("score")
+  .option("--job <dir>", "The job dir printed by build")
+  .option(
+    "--gate",
+    "Exit non-zero when the judge drops a must-keep fact, keeps too much of a gold trim, or slop recall falls under the floor",
+    false,
+  )
+  .action(async (flags) => {
+    await settle(score(flags.job, flags.gate));
+  });
+
+export const program = new Command("eval")
+  .addCommand(buildCmd)
+  .addCommand(scoreCmd)
+  .action(() => {
+    program.help();
+  });
+
+if (import.meta.main) {
+  await program.parseAsync();
 }

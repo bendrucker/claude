@@ -5,7 +5,7 @@ description: Type-safe CLI argument parsing with commander and @commander-js/ext
 
 # CLI
 
-New scripts parse arguments with [commander](https://github.com/tj/commander.js) through [`@commander-js/extra-typings`](https://github.com/commander-js/extra-typings), which infers each option's and argument's type from its flag string. Scripts still on cleye migrate to commander over time.
+New scripts parse arguments with [commander](https://github.com/tj/commander.js) through [`@commander-js/extra-typings`](https://github.com/commander-js/extra-typings), which infers each option's and argument's type from its flag string.
 
 Import `Command`, `Option`, and the error classes from `@commander-js/extra-typings`. Importing them from `commander` drops the inference and types every option as `any`.
 

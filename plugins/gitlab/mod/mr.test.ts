@@ -67,8 +67,8 @@ const fb = (
   kind: "feedback",
   author,
   approval,
-  notes: (typeof notes === "number" ? Array.from({ length: notes }, () => "") : notes).map(
-    (note) => (typeof note === "string" ? { body: note } : note),
+  notes: (typeof notes === "number" ? Array.from({ length: notes }, () => "") : notes).map((note) =>
+    typeof note === "string" ? { body: note } : note,
   ),
 });
 

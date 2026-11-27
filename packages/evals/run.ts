@@ -9,7 +9,14 @@ import { shareGraders } from "./graders";
 import { artifactsPath, casePath, listCases, resultPath, tracePath } from "./layout";
 import { eachRun, readResult } from "./result";
 import { stage } from "./stage";
-import { casePlugins, listedPlugins, readSuite, type SuiteFile, withDependencies } from "./suite";
+import {
+  casePlugins,
+  foreignDependencies,
+  listedPlugins,
+  readSuite,
+  type SuiteFile,
+  withDependencies,
+} from "./suite";
 import { contextHooks, wrap } from "./wrap";
 
 export interface Staged {
@@ -17,13 +24,35 @@ export interface Staged {
   evalDir: string;
 }
 
-/** Appends each staged case's missing plugin dependencies to its `plugins:` list. */
-async function addCaseDependencies(repo: string, suite: string, root: string): Promise<void> {
+/**
+ * Appends each staged case's missing plugin dependencies to its `plugins:` list. A dependency
+ * from another marketplace gets an empty stand-in under `<plugins>/.foreign/`: the runner loads
+ * plugins inline only, and an inline plugin of the same name satisfies the dependency, which
+ * otherwise fails as `dependency-unsatisfied` and keeps the dependent plugin from loading.
+ */
+async function addCaseDependencies(
+  repo: string,
+  suite: string,
+  root: string,
+  plugins: string,
+): Promise<void> {
   const names = await listCases(join(root, suite));
   await Promise.all(
     names.map(async (name) => {
       const listed = await listedPlugins(root, suite, name);
-      const missing = (await withDependencies(repo, listed)).filter((p) => !listed.includes(p));
+      const resolved = await withDependencies(repo, listed);
+      const foreign = (await foreignDependencies(repo, resolved)).map((dep) =>
+        join(plugins, ".foreign", dep),
+      );
+      await Promise.all(
+        foreign.map((dir) =>
+          Bun.write(
+            join(root, dir, ".claude-plugin/plugin.json"),
+            JSON.stringify({ name: basename(dir) }),
+          ),
+        ),
+      );
+      const missing = [...resolved, ...foreign].filter((p) => !listed.includes(p));
       if (missing.length === 0) return;
       const path = casePath(join(root, suite), name);
       const doc = parseDocument(await Bun.file(path).text());
@@ -164,7 +193,7 @@ async function stagePlugins(
   // The suite always comes from the working tree, so every ref is graded by the same cases.
   await $`rm -rf ${join(root, suite)}`.quiet();
   await stage(repo, undefined, [suite], root);
-  await addCaseDependencies(repo, suite, root);
+  await addCaseDependencies(repo, suite, root, dirname(owner));
   await Promise.all(
     plugins.map(async (p) => {
       if (!(await Bun.file(join(root, p, "package-lock.json")).exists())) return;

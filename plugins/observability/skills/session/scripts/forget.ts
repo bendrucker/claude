@@ -1,22 +1,16 @@
 #!/usr/bin/env bun
 import { rm } from "node:fs/promises";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { forgetHost, getDataDir, importRoot, isHostLabel, LOCAL_HOST } from "./db";
 import { dirExists } from "./file-catalog";
 import { withWriter } from "./index-writer";
 
-const argv = cli({
-  name: "forget",
-  flags: {
-    host: {
-      type: String,
-      description: "Imported host label to remove (rows and synced files)",
-      required: true as const,
-    },
-  },
-});
+export const program = new Command("forget").option(
+  "--host <label>",
+  "Imported host label to remove (rows and synced files)",
+);
 
-const label = argv.flags.host;
+const label = (await program.parseAsync()).opts().host;
 
 if (label == null || label === "") {
   console.error("--host is required.");

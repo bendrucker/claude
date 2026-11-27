@@ -262,7 +262,7 @@ function expandPlaceholders(endpoint: string, args: Args): string {
   for (const pair of args.flags.get("--placeholder") ?? []) {
     const eq = pair.indexOf("=");
     if (eq < 1) continue;
-    const key = pair.slice(0, eq).replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+    const key = RegExp.escape(pair.slice(0, eq));
     out = out.replaceAll(
       new RegExp(`:${key}(?![A-Za-z0-9_])`, "g"),
       encodeURIComponent(pair.slice(eq + 1)),

@@ -1,0 +1,16 @@
+schema_version: "1.1"
+name: port-degenerate-rerun
+tags: [dev, mined]
+plugins: ["../../.."]
+runs: 2
+execution:
+  model: claude-sonnet-5-5
+  max_turns: 60
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Edit, Write]
+  append_system_prompt: >-
+    This sandbox has no network access. Nobody answers while you work,
+    so decide on your own, and put any question or anything that needs the
+    user's sign-off in your final reply.
+context:
+  scaffold_script: fixture.sh

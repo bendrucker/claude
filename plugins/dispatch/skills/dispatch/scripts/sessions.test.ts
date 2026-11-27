@@ -11,33 +11,9 @@ import {
   listLiveSessions,
   loadDescriptions,
   parseDescriptions,
-  recentAreas,
   renderSessions,
   type RexRunner,
 } from "./sessions";
-import { type DispatchLedgerRow, parseLedgerLine, type LedgerRow } from "./ledger";
-
-const NOW = new Date("2026-11-24T00:00:00Z");
-
-function row(ts: string, rexSession?: string): LedgerRow {
-  const result: DispatchLedgerRow = {
-    ts,
-    task: "t",
-    repo: "/r",
-    branch: "b",
-    path: null,
-    mux: "rex",
-    target: null,
-    host: null,
-    name: "n",
-    session: null,
-    sender: null,
-    outcome: "dispatched",
-  };
-  if (rexSession != null) result.rexSession = rexSession;
-  return result;
-}
-
 test("a missing sessions file yields no descriptions and no warning", async () => {
   const dir = await mkdtemp(join(tmpdir(), "sessions-"));
   const result = await loadDescriptions(join(dir, "sessions.toml"));
@@ -100,26 +76,6 @@ test("ordered sessions sort first and move to the top of Rex's list", async () =
   ]);
 });
 
-test("recent areas keep non-live labels from the last 14 days", () => {
-  const rows = [
-    row("2026-11-20T00:00:00Z", "Area A"),
-    row("2026-11-20T00:00:00Z", "Area B"),
-    row("2026-11-21T00:00:00Z", "Area B"),
-    row("2026-11-01T00:00:00Z", "Area C"),
-    row("2026-11-22T00:00:00Z"),
-    row("not a date", "Area D"),
-  ];
-  expect(recentAreas(rows, new Set(["Area A"]), NOW)).toEqual(["Area B"]);
-});
-
-test("old ledger rows without rexSession stay valid", () => {
-  const line = JSON.stringify({ ...row("2026-11-20T00:00:00Z") });
-  expect(parseLedgerLine(line)).not.toBeNull();
-  expect(parseLedgerLine(JSON.stringify(row("2026-11-20T00:00:00Z", "Area A")))).toMatchObject({
-    rexSession: "Area A",
-  });
-});
-
 function fakeRex(options: { failServer?: string } = {}): { run: RexRunner; calls: string[][] } {
   const calls: string[][] = [];
   const run: RexRunner = (argv) => Promise.resolve(respond(argv));
@@ -171,7 +127,7 @@ test("an unreachable host raises HostUnreachableError and routes through -S", as
   expect(calls[0]).toEqual(["rex", "-S", "host-b", "ls", "--json"]);
 });
 
-test("the table lists each session with its description and the recent areas", () => {
+test("the table lists each session with its tabs, directories, and description", () => {
   const output = renderSessions(
     [
       {
@@ -181,11 +137,7 @@ test("the table lists each session with its description and the recent areas", (
         cwds: ["/work/a", "/work/b"],
       },
     ],
-    new Map([
-      ["Area A", "First area"],
-      ["Area B", "Second area"],
-    ]),
-    ["Area B", "Area C"],
+    new Map([["Area A", "First area"]]),
   );
   expect(output).toContain("SESSION");
   expect(output).toContain("Area A");
@@ -193,13 +145,6 @@ test("the table lists each session with its description and the recent areas", (
   expect(output).toContain("/work/a");
   expect(output).toContain("/work/b");
   expect(output).toContain("First area");
-  expect(output).toContain("Recent areas");
-  expect(output).toContain("  Area B: Second area");
-  expect(output).toContain("  Area C\n");
-});
-
-test("the table omits the recent areas section when there are none", () => {
-  expect(renderSessions([], new Map(), [])).not.toContain("Recent areas");
 });
 
 test.each<{

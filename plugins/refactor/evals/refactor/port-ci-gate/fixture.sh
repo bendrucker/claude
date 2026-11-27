@@ -8,8 +8,13 @@ git config commit.gpgsign false
 mkdir -p bin src scripts test types data .github/workflows
 
 # The run has no network, so the type checker comes from the host's TypeScript install.
-tsc_bin=$(command -v tsc) || { echo "fixture needs tsc on PATH" >&2; exit 1; }
-typescript=$(cd "$(dirname "$(readlink -f "$tsc_bin")")/.." && pwd)
+repo_ts="$(cd "$(dirname "$0")/../../../../.." && pwd)/node_modules/typescript"
+if [ -d "$repo_ts" ]; then
+  typescript=$repo_ts
+else
+  tsc_bin=$(command -v tsc) || { echo "fixture needs the repo's typescript install or tsc on PATH" >&2; exit 1; }
+  typescript=$(cd "$(dirname "$(readlink -f "$tsc_bin")")/.." && pwd)
+fi
 mkdir -p node_modules/.bin
 ln -s "$typescript" node_modules/typescript
 ln -s ../typescript/bin/tsc node_modules/.bin/tsc

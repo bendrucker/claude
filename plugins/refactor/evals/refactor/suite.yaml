@@ -1,5 +1,6 @@
 allow_tools: [Bash, Edit, Write]
 judge_model: claude-sonnet-5-5
+collect: [package.json, bunfig.toml, README.md, bin, lib, src, legacy, harness, scripts, config, data, ops, vendor, corpus, test, tmp]
 graders:
   skill-fired: ["port-*", "reach-*"]
   split-fired: "split-*"

@@ -1,0 +1,1 @@
+We're adopting agentkit's `MessageStore` interface (vendored in `vendor/agentkit`). Port our `HistoryStore` to implement it and move the callers in `src/` over. The session files already under `data/history/` have to keep working.

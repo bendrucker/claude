@@ -135,6 +135,11 @@
       "source": "./plugins/mod-events"
     },
     {
+      "name": "refactor",
+      "description": "Behavior-preserving refactors: port and split",
+      "source": "./plugins/refactor"
+    },
+    {
       "name": "tech-spec",
       "description": "Create and review technical specifications",
       "source": "./plugins/tech-spec"

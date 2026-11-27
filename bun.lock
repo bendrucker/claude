@@ -452,6 +452,14 @@
         "@hegeldev/hegel": "^0.5.0",
       },
     },
+    "plugins/refactor": {
+      "name": "refactor",
+      "dependencies": {
+        "@commander-js/extra-typings": "~15.0.0",
+        "commander": "~15.0.0",
+        "zod": "^4.4.3",
+      },
+    },
     "plugins/review": {
       "name": "@bendrucker/claude-review",
       "dependencies": {
@@ -1761,6 +1769,8 @@
     "read-pkg-up": ["read-pkg-up@7.0.1", "", { "dependencies": { "find-up": "^4.1.0", "read-pkg": "^5.2.0", "type-fest": "^0.8.1" } }, "sha512-zK0TB7Xd6JpCLmlLmufqykGE+/TlOePD6qKClNW7hHDKFh/J7/7gCWGR7joEQEW1bKq3a3yUZSObOoWLFQ4ohg=="],
 
     "redent": ["redent@3.0.0", "", { "dependencies": { "indent-string": "^4.0.0", "strip-indent": "^3.0.0" } }, "sha512-6tDA8g98We0zd0GvVeMT9arEOnTw9qM03L9cJXaCjrip1OO764RDBLBfrB4cwzNGDj5OA5ioymC9GkizgWJDUg=="],
+
+    "refactor": ["refactor@workspace:plugins/refactor"],
 
     "regenerator-runtime": ["regenerator-runtime@0.11.1", "", {}, "sha512-MguG95oij0fC3QV3URf4V2SDYGJhJnJGqvIIgdECeODCT98wSWDAJ94SSuVpYQUoTcGUIL6L4yNB7j1DFFHSBg=="],
 

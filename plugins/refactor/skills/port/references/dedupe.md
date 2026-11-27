@@ -14,7 +14,7 @@ Copies drift, so expect them to disagree. Build the harness with every copy and 
 
 Classify each row:
 
-- **Drift.** One copy has a bug or a stale rule the others fixed. Pick the behavior the shared version keeps, and get the user's sign-off, because callers of the losing copy see a change. Never pick by majority.
+- **Drift.** One copy has a bug or a stale rule the others fixed. Pick the behavior the shared version keeps, and get the user's sign-off, because callers of the losing copy see a change. Never pick by majority. With nobody present to sign off, pick the behavior with a stated reason, mark the row proposed, and finish the merge and the harness run anyway. The report then shows each proposal against a working shared version.
 - **Variation.** Callers need different behavior. Make it a parameter of the shared version, named for the reason the callers differ.
 
 Stop and report when the parameters needed to cover the variations outnumber the lines the merge removes. The copies are different things that look alike, and leaving them separate is the correct outcome.

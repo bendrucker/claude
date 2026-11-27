@@ -2,9 +2,9 @@
 
 Use this when the new implementation is the standard library or a maintained package and the old one is code the project wrote itself. Generated code reinvents solved problems readily. The reinvention handles the inputs its author pictured and fails on the rest of the spec.
 
-## Find Candidates
+## Copies
 
-When asked to look for candidates rather than replace a named one, search for hand-written versions of the patterns in [patterns.md](patterns.md). Count the copies of each. A pattern copied into several files is a stronger candidate than one copy. Replace every copy rather than consolidating them first: once each copy calls the library, nothing is left to share.
+When the same hand-roll appears in several files, replace every copy rather than consolidating them first: once each copy calls the library, nothing is left to share. To search a repository for candidates, use the `candidates` skill.
 
 ## Decide
 

@@ -32,7 +32,7 @@ import { type ResolveRepo, resolveRepo } from "./repo";
 import { requiredJson } from "./required";
 import { type Pause, type Runner, spawnRunner } from "./runner";
 import { readSender, withSender } from "./sender";
-import { createSessionsCommand, currentSession, resolveSessionLabel } from "./sessions";
+import { createSessionsCommand, currentSession } from "./sessions";
 import {
   mergeSettings,
   parseSettings,
@@ -484,10 +484,6 @@ export const program = new Command("dispatch")
       (flags.host == null && mux === "rex"
         ? await currentSession(process.env, spawnRunner)
         : undefined);
-    const rexSession =
-      mux === "rex" && rexSessionValue != null && rexSessionValue !== "" && flags.host == null
-        ? await resolveSessionLabel(spawnRunner, rexSessionValue)
-        : undefined;
 
     // The session is already running and the caller needs its identifiers, so a
     // ledger failure warns rather than failing the dispatch.
@@ -513,7 +509,6 @@ export const program = new Command("dispatch")
           sender: sender?.name ?? null,
           outcome,
         };
-        if (rexSession != null) row.rexSession = rexSession;
         appendDispatch(row, resolveDataDir(flags.dataDir));
       } catch (error) {
         process.stderr.write(

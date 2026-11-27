@@ -86,7 +86,7 @@ The `❯` line at the bottom of a Claude pane shows Claude Code's own prompt sug
 
 ## Sessions
 
-A tab or pane can't move between Rex sessions, so choose the session before opening one. A tab already in the wrong session stays there unless the user moves it.
+Move a tab to another session with `rex window move <window> --to <session>`. Its panes keep running with their scrollback. Move a tab you opened, or one the user asks you to move. A pane moves with its tab.
 
 Keep at most 4 tiled panes visible in a tab. Float an extra pane, then minimize its layer:
 

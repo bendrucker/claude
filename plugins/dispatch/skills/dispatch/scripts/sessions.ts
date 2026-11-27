@@ -4,10 +4,6 @@ import { Command } from "@commander-js/extra-typings";
 import { parse as parseToml } from "smol-toml";
 import { table } from "table";
 import { z } from "zod";
-import { isClosedRow, type LedgerRow, readLedger, resolveDataDir } from "./ledger";
-
-const RECENT_DAYS = 14;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface Result {
   code: number;
@@ -98,22 +94,6 @@ export async function applyOrder(
   }
 }
 
-export function recentAreas(
-  rows: readonly LedgerRow[],
-  live: ReadonlySet<string>,
-  now: Date,
-): string[] {
-  const cutoff = now.getTime() - RECENT_DAYS * DAY_MS;
-  const areas = new Set<string>();
-  for (const row of rows) {
-    if (isClosedRow(row) || row.rexSession == null) continue;
-    const ts = Date.parse(row.ts);
-    if (Number.isNaN(ts) || ts < cutoff) continue;
-    if (!live.has(row.rexSession)) areas.add(row.rexSession);
-  }
-  return [...areas].toSorted();
-}
-
 const SessionListSchema = z.object({
   sessions: z.array(z.object({ session_id: z.string(), label: z.string() })),
 });
@@ -196,7 +176,6 @@ export async function listLiveSessions(run: RexRunner, server?: string): Promise
 export function renderSessions(
   sessions: readonly LiveSession[],
   descriptions: ReadonlyMap<string, string>,
-  areas: readonly string[],
 ): string {
   const rows = [
     ["SESSION", "TABS", "CWDS", "DESCRIPTION"],
@@ -207,25 +186,7 @@ export function renderSessions(
       descriptions.get(s.label) ?? "",
     ]),
   ];
-  const lines = [table(rows, { drawHorizontalLine: () => false }).trimEnd()];
-  if (areas.length > 0) {
-    lines.push("", `Recent areas (last ${RECENT_DAYS} days, no live session):`);
-    for (const area of areas) {
-      const description = descriptions.get(area);
-      lines.push(description == null ? `  ${area}` : `  ${area}: ${description}`);
-    }
-  }
-  return `${lines.join("\n")}\n`;
-}
-
-export async function resolveSessionLabel(run: RexRunner, session: string): Promise<string> {
-  try {
-    const list = await rexJson(run, undefined, ["ls", "--json"], SessionListSchema);
-    const match = list.sessions.find((s) => s.session_id === session || s.label === session);
-    return match?.label ?? session;
-  } catch {
-    return session;
-  }
+  return `${table(rows, { drawHorizontalLine: () => false }).trimEnd()}\n`;
 }
 
 const BlockSessionSchema = z.object({ session_id: z.string().min(1) });
@@ -257,7 +218,6 @@ export function createSessionsCommand(run: RexRunner): Command {
   return new Command("sessions")
     .description("List live Rex sessions with their tabs, directories, and descriptions.")
     .option("--host <label>", "list this saved host's sessions instead (`rex hosts list`)")
-    .option("--data-dir <dir>", "dispatch ledger directory; defaults to the plugin data dir")
     .option("--sessions-file <file>", "descriptions file", defaultSessionsFile())
     .option("--apply-order", "move sessions with an `order` to the top of Rex's session list")
     .action(async (options) => {
@@ -276,14 +236,6 @@ export function createSessionsCommand(run: RexRunner): Command {
       if (warning != null) process.stderr.write(`warning: ${warning}\n`);
       const sessions = sortSessions(live, orders);
       if (options.applyOrder) await applyOrder(run, options.host, sessions, orders);
-      const areas =
-        options.host == null
-          ? recentAreas(
-              readLedger(resolveDataDir(options.dataDir)),
-              new Set(sessions.map((s) => s.label)),
-              new Date(),
-            )
-          : [];
-      process.stdout.write(renderSessions(sessions, descriptions, areas));
+      process.stdout.write(renderSessions(sessions, descriptions));
     });
 }

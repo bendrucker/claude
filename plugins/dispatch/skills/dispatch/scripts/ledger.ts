@@ -23,8 +23,6 @@ const DispatchRowSchema = z.object({
   title: z.string().optional(),
   place: z.enum(["pane", "tab", "bg"]).optional(),
   session: z.string().nullable(),
-  // The Rex session label, not the session id.
-  rexSession: z.string().optional(),
   // The name the dispatched session reaches its dispatcher by.
   sender: z.string().nullable(),
   // `failed` is a dispatch that reused a worktree it did not create.

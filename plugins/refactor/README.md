@@ -4,6 +4,7 @@ Behavior-preserving refactors, with the old behavior checked against the new cod
 
 ## Skills
 
+- `candidates`: survey a repository for refactoring targets (library replacements, splits, duplicate merges) and rank them with run-verified behavior differences, without changing code.
 - `port`: move code to a new implementation (another language, a framework's interface, a swapped engine, a library replacing homegrown code, one version replacing duplicate copies) with a differential harness that treats the old code as the oracle.
 - `split`: break a monolithic file, class, or function into modules while keeping its exported names and tests unchanged.
 

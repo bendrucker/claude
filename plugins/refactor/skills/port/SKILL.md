@@ -1,6 +1,6 @@
 ---
 name: port
-description: Load before changing code in any port, migration, or cutover, even when the request never says "port", and whenever an existing script, service, or module is being retired, deleted, or switched off because a newer implementation now does its job, in any language. That covers rewriting code in another language or as TypeScript, switching code from one library, engine, or module to another, implementing a framework's interface in place of a handwritten class, replacing homegrown code with the standard library or a package, merging duplicate copies, and finishing a port or cutting callers over to it. Inputs and callers that worked before must keep working. Also use when looking for hand-rolled code a library should replace. Not for a deliberate behavior change such as a bug fix or a new option, and not for a database schema.
+description: Load before changing code in any port, migration, or cutover, even when the request never says "port", and whenever an existing script, service, or module is being retired, deleted, or switched off because a newer implementation now does its job, in any language. That covers rewriting code in another language or as TypeScript, switching code from one library, engine, or module to another, implementing a framework's interface in place of a handwritten class, replacing homegrown code with the standard library or a package, merging duplicate copies, and finishing a port or cutting callers over to it. Inputs and callers that worked before must keep working. Not for a deliberate behavior change such as a bug fix or a new option, and not for a database schema.
 argument-hint: "[<what is being ported>]"
 ---
 
@@ -32,7 +32,7 @@ The port is done when every ledger row is closed or signed off and the harness m
 
 When the target is an interface someone else defines, such as a framework's store or client protocol, read [references/interface.md](references/interface.md).
 
-When the new implementation is a library replacing code the project wrote itself, or when asked to find such code, read [references/upstream.md](references/upstream.md).
+When the new implementation is a library replacing code the project wrote itself, read [references/upstream.md](references/upstream.md).
 
 When several copies of the same logic become one shared version, read [references/dedupe.md](references/dedupe.md).
 

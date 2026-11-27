@@ -7,4 +7,5 @@ graders:
   compared-both: "port-*"
   old-kept: "port-*"
   quiet: "quiet-*"
+  candidates-fired: "candidates-*"
   ran-tests: ["split-*", "port-dedupe-*", "port-upstream-*"]

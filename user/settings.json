@@ -142,7 +142,7 @@
           "duckdb:4:(?:^|/)duckdb(?=\\s|$)"
         ],
         "remind": 3,
-        "warn": 6,
+        "warn": 5,
         "refuse": 0
       }
     },

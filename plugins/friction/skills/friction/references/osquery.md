@@ -6,7 +6,7 @@ osqueryd's snapshot log is the main source for contention. The loader expects th
 
 | Snapshot | Interval | What it records |
 | --- | --- | --- |
-| `pressure` | 10 s | Memory pressure level, available %, swap, `load1` |
+| `pressure` | 10 s | Memory pressure level, available %, swap, `load1`, logical `cores` |
 | `procs` | 60 s | Processes above 64 MB footprint, 60 s CPU, or 256 MB written |
 | `host_cpu` | 10 s | Cumulative `user`, `nice`, `system`, and `idle` ticks summed over cores |
 | `proc_groups` | 10 s | Per-name process count, thread total, cumulative CPU |
@@ -20,6 +20,7 @@ osqueryd's snapshot log is the main source for contention. The loader expects th
 - osquery reports -1 threads for a process it can't read, so `thread-hogs` undercounts names owned by other users.
 - `heavy-writers` returns the `cwd`. Name the target by what the process was doing (a session-index refresh, a bench run), never by the path.
 - `memory`: `lvl` is macOS's memory pressure level, where 2 is warn and 4 is critical. Record a finding only for a stretch at 2 or above longer than a minute.
+- `load-thresholds` suggests the `load` mod's `remind`, `warn`, and `refuse` from how idle the CPU was at each load per core. Compare them on the weekly window with the `load@bendrucker` options in `user/settings.json`. A suggestion a full step or more from the setting is a finding. A NULL suggestion means the window never reached that load, so it says nothing about the setting, except that `refuse` belongs at `0` while every weekly run leaves it NULL. It is empty on a machine whose `pressure` query predates `cores`.
 - `background-cpu` needs 20 hours of one process, so it fires only on the weekly window. Record it at `low`.
 - Only about a third of `bun`/`duckdb` pids carry a `proc_tags` session tag, so treat an untagged process as unknown, not as unrelated to Claude.
 
@@ -35,3 +36,4 @@ The fingerprint is `type|target`, so each query names its symptom the same way e
 | `heavy-writers`, `write-rate` | `contention` | the activity from this list, else the process name: `session-index refresh`, `agent worktree build`, `benchmark run` |
 | `memory` | `contention` | `memory pressure` |
 | `background-cpu` | `contention` | the process name |
+| `load-thresholds`, a suggestion a step or more from the setting | `config-drift` | `load thresholds` |

@@ -256,35 +256,37 @@ describe("osquery", () => {
     expect(rows).toEqual([{ day: DAY, warn_s: "60", max_swap_mb: 0, min_avail_pct: 50 }]);
   });
 
-  // Each stretch runs `minutes` at a load per core on 10 cores with a fixed idle share.
+  // Each stretch runs `minutes` at a load per core with a fixed idle share.
   type Stretch = [minutes: number, perCore: number, idle: number];
-  const stretches = (spans: Stretch[], cores: number | null = 10) => {
-    const ends = spans.map(
-      (_, i) => T0 + 60 * spans.slice(0, i + 1).reduce((sum, [m]) => sum + m, 0),
+  const stretches = (spans: Stretch[], cores: number | undefined) => {
+    const timeline = spans.flatMap(([minutes, perCore, idle]) =>
+      Array.from({ length: minutes * 6 }, () => ({ perCore, idle })),
     );
-    const at = (t: number) => spans[ends.findIndex((end) => t < end)] ?? spans[0];
-    const cpu = hostCpu((t) => at(t)[2]);
-    const minutes = spans.reduce((sum, [m]) => sum + m, 0);
+    const cpu = hostCpu((t) => timeline[(t - T0) / 10]?.idle ?? 0);
     return [
       cpu(T0 - 10),
-      ...every10s(T0, minutes, cpu),
-      ...every10s(T0, minutes, (t) => pressure(t, at(t)[1] * 10, 1, cores ?? undefined)),
+      ...timeline.flatMap(({ perCore }, i) => [
+        cpu(T0 + i * 10),
+        pressure(T0 + i * 10, perCore * 10, 1, cores),
+      ]),
     ];
   };
 
   test.each<{
     name: string;
     spans: Stretch[];
-    cores?: number | null;
-    expected: Record<string, unknown>;
+    cores: number | undefined;
+    expected: { remind: number | null; warn: number | null; refuse: number | null; hours: number };
   }>([
     {
       name: "calm machine suggests nothing",
+      cores: 10,
       spans: [[60, 0.5, 80]],
       expected: { remind: null, warn: null, refuse: null, hours: 1 },
     },
     {
       name: "busy load with spare CPU suggests remind only",
+      cores: 10,
       spans: [
         [120, 1, 70],
         [40, 3, 25],
@@ -294,6 +296,7 @@ describe("osquery", () => {
     },
     {
       name: "saturated load suggests all three",
+      cores: 10,
       spans: [
         [120, 1, 70],
         [40, 3, 25],
@@ -304,7 +307,7 @@ describe("osquery", () => {
     {
       name: "samples without a core count are skipped",
       spans: [[60, 6, 5]],
-      cores: null,
+      cores: undefined,
       expected: { remind: null, warn: null, refuse: null, hours: 0 },
     },
   ])("load thresholds: $name", async ({ spans, cores, expected }) => {

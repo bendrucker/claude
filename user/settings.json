@@ -141,9 +141,9 @@
           "build:4:\\bplaywright(?:/test/cli\\.js)? test\\b",
           "duckdb:4:(?:^|/)duckdb(?=\\s|$)"
         ],
-        "remind": 1.5,
-        "warn": 3,
-        "refuse": 4
+        "remind": 3,
+        "warn": 6,
+        "refuse": 0
       }
     },
     "linear@bendrucker": {

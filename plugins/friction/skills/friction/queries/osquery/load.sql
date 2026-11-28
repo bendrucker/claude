@@ -12,7 +12,7 @@ WHERE unixTime < win_end() AND unixTime >= win_start() - 600;
 
 CREATE TABLE pressure AS
 SELECT DISTINCT t, (j->>'pressure_level')::INT AS lvl, (j->>'available_pct')::INT AS avail,
-  (j->>'swap_used_mb')::DOUBLE AS swap, (j->>'load1')::DOUBLE AS load1
+  (j->>'swap_used_mb')::DOUBLE AS swap, (j->>'load1')::DOUBLE AS load1, (j->>'cores')::INT AS cores
 FROM snaps WHERE name = 'pressure' AND t >= win_start();
 
 CREATE TABLE cpu AS

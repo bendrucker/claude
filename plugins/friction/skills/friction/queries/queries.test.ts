@@ -19,10 +19,18 @@ interface Snapshot {
   rows: Record<string, number | string>[];
 }
 
-const pressure = (t: number, load1: number, lvl = 1): Snapshot => ({
+const pressure = (t: number, load1: number, lvl = 1, cores?: number): Snapshot => ({
   name: "pressure",
   t,
-  rows: [{ pressure_level: lvl, available_pct: 50, swap_used_mb: 0, load1 }],
+  rows: [
+    {
+      pressure_level: lvl,
+      available_pct: 50,
+      swap_used_mb: 0,
+      load1,
+      ...(cores !== undefined && { cores }),
+    },
+  ],
 });
 
 const proc = (t: number, pid: number, name: string, cpuMs: number, written: number): Snapshot => ({
@@ -246,6 +254,65 @@ describe("osquery", () => {
       "memory",
     );
     expect(rows).toEqual([{ day: DAY, warn_s: "60", max_swap_mb: 0, min_avail_pct: 50 }]);
+  });
+
+  // Each stretch runs `minutes` at a load per core with a fixed idle share.
+  type Stretch = [minutes: number, perCore: number, idle: number];
+  const stretches = (spans: Stretch[], cores: number | undefined) => {
+    const timeline = spans.flatMap(([minutes, perCore, idle]) =>
+      Array.from({ length: minutes * 6 }, () => ({ perCore, idle })),
+    );
+    const cpu = hostCpu((t) => timeline[(t - T0) / 10]?.idle ?? 0);
+    return [
+      cpu(T0 - 10),
+      ...timeline.flatMap(({ perCore }, i) => [
+        cpu(T0 + i * 10),
+        pressure(T0 + i * 10, perCore * 10, 1, cores),
+      ]),
+    ];
+  };
+
+  test.each<{
+    name: string;
+    spans: Stretch[];
+    cores: number | undefined;
+    expected: { remind: number | null; warn: number | null; refuse: number | null; hours: number };
+  }>([
+    {
+      name: "calm machine suggests nothing",
+      cores: 10,
+      spans: [[60, 0.5, 80]],
+      expected: { remind: null, warn: null, refuse: null, hours: 1 },
+    },
+    {
+      name: "busy load with spare CPU suggests remind only",
+      cores: 10,
+      spans: [
+        [120, 1, 70],
+        [40, 3, 25],
+        [4, 6, 5],
+      ],
+      expected: { remind: 3, warn: null, refuse: null, hours: 2.7 },
+    },
+    {
+      name: "saturated load suggests all three",
+      cores: 10,
+      spans: [
+        [120, 1, 70],
+        [40, 3, 25],
+        [30, 6, 5],
+      ],
+      expected: { remind: 3, warn: 3, refuse: 6, hours: 3.2 },
+    },
+    {
+      name: "samples without a core count are skipped",
+      spans: [[60, 6, 5]],
+      cores: undefined,
+      expected: { remind: null, warn: null, refuse: null, hours: 0 },
+    },
+  ])("load thresholds: $name", async ({ spans, cores, expected }) => {
+    const rows = await osquery(stretches(spans, cores), "load-thresholds");
+    expect(rows).toEqual([expected]);
   });
 });
 

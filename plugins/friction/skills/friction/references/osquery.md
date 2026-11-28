@@ -21,6 +21,7 @@ osqueryd's snapshot log is the main source for contention. The loader expects th
 - `heavy-writers` returns the `cwd`. Name the target by what the process was doing (a session-index refresh, a bench run), never by the path.
 - `memory`: `lvl` is macOS's memory pressure level, where 2 is warn and 4 is critical. Record a finding only for a stretch at 2 or above longer than a minute.
 - `load-thresholds` suggests the `load` mod's `remind`, `warn`, and `refuse` from how idle the CPU was at each load per core. Compare them on the weekly window with the `load@bendrucker` options in `user/settings.json`. A suggestion a full step or more from the setting is a finding. A NULL suggestion means the window never reached that load, so it says nothing about the setting, except that `refuse` belongs at `0` while every weekly run leaves it NULL. It is empty on a machine whose `pressure` query predates `cores`.
+- Read `load-thresholds` beside the session index's `mods` rows for `load.cap.deny`. Agent priority is deferred until refusals hold real work, so a week with 60 or more denies is a `contention` finding on `load holds`.
 - `background-cpu` needs 20 hours of one process, so it fires only on the weekly window. Record it at `low`.
 - Only about a third of `bun`/`duckdb` pids carry a `proc_tags` session tag, so treat an untagged process as unknown, not as unrelated to Claude.
 
@@ -37,3 +38,4 @@ The fingerprint is `type|target`, so each query names its symptom the same way e
 | `memory` | `contention` | `memory pressure` |
 | `background-cpu` | `contention` | the process name |
 | `load-thresholds`, a suggestion a step or more from the setting | `config-drift` | `load thresholds` |
+| `mods`, 60 or more `load.cap.deny` in a week | `contention` | `load holds` |
